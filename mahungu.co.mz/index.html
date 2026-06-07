@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Mahungu Studio | Creative Platform</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+<!-- Sidebar ESQUERDA: Navegação Global -->
+<aside class="sidebar-left">
+    <div class="sidebar-header">
+        <h1>Mahungu 2.0</h1>
+        <p class="upload-hint" style="padding:0">Creative Studio</p>
+    </div>
+
+    <nav class="main-nav">
+        <a href="javascript:void(0)" class="nav-item active" data-tab="dashboard" onclick="showTab('dashboard', this)">
+            <i data-lucide="layout-dashboard"></i>
+            Dashboard
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-tab="editor" onclick="showTab('editor', this)">
+            <i data-lucide="pen-tool"></i>
+            Painel de Edição
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-tab="news-sources" onclick="showTab('news-sources', this)">
+            <i data-lucide="rss"></i>
+            Fontes de Notícias
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-tab="history" onclick="showTab('history', this)">
+            <i data-lucide="history"></i>
+            Histórico
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-tab="profile" onclick="showTab('profile', this)">
+            <i data-lucide="user-circle"></i>
+            Perfil
+        </a>
+    </nav>
+
+    <div class="control-group ai-section" style="margin-top: auto;">
+        <div style="display: flex; gap: 8px;">
+            <button class="btn-ai" style="flex: 1;" onclick="openAIChat()" title="Abrir Chat Mahungu AI">
+                <i data-lucide="sparkles" style="color: #7000ff"></i>
+                Mahungu AI
+            </button>
+            <button class="btn-tool" style="width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0;" onclick="openAISettings()" title="Configurações de IA">
+                <i data-lucide="settings" size="18"></i>
+            </button>
+        </div>
+    </div>
+</aside>
+
+<!-- Sidebar DIREITA: Ferramentas -->
+<aside class="sidebar-right hidden" id="editor-tools">
+    <div class="control-group">
+        <div class="control-label">Fundo</div>
+        <button class="btn-main" onclick="trocarFoto()">
+            <i data-lucide="image"></i>
+            Trocar Foto
+        </button>
+    </div>
+
+    <div class="control-group">
+        <div class="control-label">Ajustes de Imagem</div>
+        <div class="range-group">
+            <label>Zoom</label>
+            <input type="range" min="1" max="3" step="0.1" value="1" oninput="updateEditorState('zoom', this.value)">
+        </div>
+        <div class="range-group">
+            <label>Posição X</label>
+            <input type="range" min="-500" max="500" step="1" value="0" oninput="updateEditorState('posX', this.value)">
+        </div>
+        <div class="range-group">
+            <label>Posição Y</label>
+            <input type="range" min="-500" max="500" step="1" value="0" oninput="updateEditorState('posY', this.value)">
+        </div>
+    </div>
+
+    <div class="control-group">
+        <div class="control-label">Texto</div>
+        <div class="color-grid">
+            <button class="btn-tool laranja" onclick="aplicarCor('laranja')"><span></span> Laranja</button>
+            <button class="btn-tool branco" onclick="aplicarCor('branco')"><span></span> Branco</button>
+        </div>
+        <div class="font-controls" style="display: flex; gap: 10px; margin-top: 5px;">
+            <button class="btn-tool" style="flex:1" onclick="changeFontSize(4)" title="Aumentar Fonte">
+                <i data-lucide="plus"></i>
+            </button>
+            <button class="btn-tool" style="flex:1" onclick="changeFontSize(-4)" title="Diminuir Fonte">
+                <i data-lucide="minus"></i>
+            </button>
+        </div>
+        <button class="btn-full" onclick="limparFormatacao()" style="margin-top: 5px;">
+            <i data-lucide="eraser" style="width: 14px; height: 14px;"></i> Limpar Formatação
+        </button>
+    </div>
+
+    <div class="control-group" style="margin-top: auto;">
+        <button class="btn-main" onclick="openSaveModal()" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); margin-bottom: 10px;">
+            <i data-lucide="save"></i>
+            Salvar Flyer
+        </button>
+        <button class="btn-main btn-success" onclick="downloadFlyer()">
+            <i data-lucide="download"></i>
+            Exportar Flyer
+        </button>
+    </div>
+</aside>
+
+
+<!-- Área Central -->
+<main class="main-content">
+    
+    <!-- DASHBOARD -->
+    <section id="tab-dashboard" class="tab-content">
+        <div class="content-wrapper">
+            <div class="sidebar-header" style="margin-bottom: 30px;">
+                <h1 style="color: #fff; font-size: 24px;">Visão Geral</h1>
+            </div>
+        <div class="dashboard-grid">
+            <div class="analytics-card">
+                <div class="icon" style="background: rgba(112, 0, 255, 0.1); color: #7000ff;"><i data-lucide="rss"></i></div>
+                <div class="val" id="stats-sources">0</div>
+                <div class="label">Fontes Ativas</div>
+            </div>
+            <div class="analytics-card">
+                <div class="icon" style="background: rgba(0, 255, 136, 0.1); color: #00ff88;"><i data-lucide="newspaper"></i></div>
+                <div class="val" id="stats-news">0</div>
+                <div class="label">Notícias Hoje</div>
+            </div>
+            <div class="analytics-card">
+                <div class="icon" style="background: rgba(255, 152, 0, 0.1); color: #ff9800;"><i data-lucide="sparkles"></i></div>
+                <div class="val" id="stats-proposals">0</div>
+                <div class="label">Propostas Pendentes</div>
+            </div>
+            <div class="analytics-card">
+                <div class="icon" style="background: rgba(40, 167, 69, 0.1); color: #28a745;"><i data-lucide="check-circle"></i></div>
+                <div class="val" id="stats-approved">0</div>
+                <div class="label">Flyers Aprovados</div>
+            </div>
+        </div>
+        <div class="chart-container">
+            <div class="chart-header">
+                <div class="chart-title" id="chart-view-title">Performance Mensal</div>
+                <div class="chart-controls">
+                    <button class="btn-mini active" id="chart-btn-mensal" type="button" onclick="updateChart('mensal', this)">
+                        <i data-lucide="calendar-range"></i>
+                        <span>Mensal</span>
+                    </button>
+                    <button class="btn-mini" id="chart-btn-semanal" type="button" onclick="updateChart('semanal', this)">
+                        <i data-lucide="calendar-days"></i>
+                        <span>Semanal</span>
+                    </button>
+                </div>
+            </div>
+            <div class="bars-group" id="dashboard-bars">
+                <!-- Barras serão geradas via JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- EDITOR -->
+    <section id="tab-editor" class="tab-content hidden">
+        <div class="flyer-wrapper">
+            <div class="flyer">
+                <div class="layer-photo"><img src="assets/img/photos/foto-base.png" alt=""></div>
+                <div class="layer-meio-fundo"><img src="assets/img/system/onda-azul.png" alt=""></div>
+                <div class="layer-barra-cima"><img src="assets/img/system/barra-cima.png" alt=""></div>
+                <div class="layer-barra-baixo"><img src="assets/img/system/barra-baixo.png" alt=""></div>
+                <div class="layer-logo"><img src="assets/img/system/logo.png" alt=""></div>
+                <div class="layer-texto">
+                    <div class="headline-editor" id="editor" contenteditable="true" spellcheck="false">
+                        <span class="cor-laranja">1,5 milhões de dólares</span><br>
+                        <span class="cor-branca">Será o preço da polémica de<br>Elon Musk com o Twitter</span>
+                    </div>
+                </div>
+                <div class="color-toolbar" id="toolbar">
+                    <div class="cor-btn laranja" onclick="aplicarCor('laranja')"></div>
+                    <div class="cor-btn branco" onclick="aplicarCor('branco')"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FONTES DE NOTÍCIAS -->
+    <section id="tab-news-sources" class="tab-content hidden">
+        <div class="content-wrapper">
+            <div class="sidebar-header" style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+                <h1 style="color: #fff; font-size: 24px;">Fontes de Notícias</h1>
+                <button class="btn-main" style="width: auto; padding: 10px 20px;" onclick="openSourceModal()">
+                    <i data-lucide="plus"></i> Adicionar Fonte
+                </button>
+            </div>
+            
+            <div style="background: rgba(40, 167, 69, 0.05); border: 1px solid rgba(40, 167, 69, 0.2); border-radius: 12px; padding: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 style="color: var(--success); font-size: 16px; margin-bottom: 5px;">Monitoramento Ativo</h3>
+                    <p style="color: var(--text-muted); font-size: 13px;">O sistema verifica as fontes ativas automaticamente.</p>
+                </div>
+                <button class="btn-tool" onclick="runAutomationManual()" id="btn-scan-now">
+                    <i data-lucide="refresh-cw"></i> Scan Agora
+                </button>
+            </div>
+
+            <div class="management-list" id="sources-container">
+                <!-- Renderizado via JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- HISTÓRICO -->
+    <section id="tab-history" class="tab-content hidden">
+        <div class="content-wrapper">
+            <div class="sidebar-header" style="margin-bottom: 30px;">
+                <h1 style="color: #fff; font-size: 24px;">Histórico de Criações</h1>
+            </div>
+            <div class="history-grid">
+                <!-- Renderizado via JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- PERFIL -->
+    <section id="tab-profile" class="tab-content hidden">
+        <div class="content-wrapper">
+            <div class="profile-page">
+                <div class="profile-page-header">
+                    <h1>Perfil</h1>
+                </div>
+
+                <div class="profile-container">
+                    <div class="profile-avatar-panel">
+                        <button class="avatar-upload" type="button" onclick="updateProfileAvatar()" id="profile-avatar-container" aria-label="Atualizar foto de perfil">
+                            <i data-lucide="user" size="48" id="profile-avatar-icon"></i>
+                            <span class="avatar-overlay"><i data-lucide="camera" size="16"></i></span>
+                        </button>
+                        <div class="profile-avatar-info">
+                            <strong id="profile-display-name">Mahungu User</strong>
+                            <span>Creative Studio</span>
+                        </div>
+                    </div>
+
+                    <div class="profile-form-panel">
+                        <div class="profile-grid">
+                            <div class="form-group profile-field-wide">
+                                <label>Nome Completo</label>
+                                <input type="text" id="profile-name" value="Mahungu User">
+                            </div>
+                            <div class="form-group">
+                                <label>Endereço de E-mail</label>
+                                <input type="email" id="profile-email" value="user@mahungu.com">
+                            </div>
+                            <div class="form-group">
+                                <label>Número de Telefone</label>
+                                <input type="tel" id="profile-phone" value="+258 84 000 0000">
+                            </div>
+                        </div>
+
+                        <div class="profile-actions">
+                            <button class="btn-main profile-save-btn" type="button" onclick="saveProfileData()">
+                                <i data-lucide="save"></i>
+                                Atualizar Perfil
+                            </button>
+                            <button class="btn-main profile-password-btn" type="button" onclick="openPasswordModal()">
+                                <i data-lucide="lock-keyhole"></i>
+                                Alterar Senha
+                            </button>
+                            <button class="btn-main" style="background: rgba(255, 152, 0, 0.1); color: #ffb347; border: 1px solid rgba(255, 152, 0, 0.3);" type="button" onclick="openBackupModal()">
+                                <i data-lucide="database"></i>
+                                Backup & Recuperação
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<!-- MODAL DE SALVAR FLYER -->
+<div class="modal-overlay" id="save-modal" onclick="closeSaveModal(event)">
+    <div class="modal-container" style="max-width: 450px; height: auto; min-height: 0; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 30px;">
+            <div>
+                <div class="modal-eyebrow">Histórico</div>
+                <h2>Salvar no Sistema</h2>
+            </div>
+            <button class="close-modal" onclick="closeSaveModal()"><i data-lucide="x"></i></button>
+        </div>
+        
+        <div class="form-group">
+            <label>Nome do Flyer</label>
+            <input type="text" id="save-title" placeholder="Ex: Polémica Elon Musk">
+        </div>
+        
+        <div class="form-group">
+            <label>Categoria</label>
+            <select id="save-category" class="custom-select">
+                <option value="Notícias">Notícias</option>
+                <option value="Polémicas">Polémicas</option>
+                <option value="Tecnologia">Tecnologia</option>
+                <option value="Entretenimento">Entretenimento</option>
+                <option value="Desporto">Desporto</option>
+                <option value="Política">Política</option>
+                <option value="Outros">Outros</option>
+            </select>
+        </div>
+
+        <button class="btn-main btn-success" style="margin-top: 10px;" onclick="confirmSaveToHistory()">
+            <i data-lucide="save"></i> Salvar Agora
+        </button>
+    </div>
+</div>
+
+<!-- MODAL DE SENHA -->
+<div class="modal-overlay" id="password-modal" onclick="closePasswordModal(event)">
+    <div class="modal-container" style="max-width: 450px; height: auto; min-height: 0; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 30px;">
+            <div>
+                <div class="modal-eyebrow">Segurança</div>
+                <h2>Redefinir Senha</h2>
+            </div>
+            <button class="close-modal" onclick="closePasswordModal()"><i data-lucide="x"></i></button>
+        </div>
+        <div class="form-group">
+            <label>Senha Atual</label>
+            <input type="password" placeholder="••••••••">
+        </div>
+        <div class="form-group">
+            <label>Nova Senha</label>
+            <input type="password" placeholder="••••••••">
+        </div>
+        <div class="form-group">
+            <label>Confirmar Nova Senha</label>
+            <input type="password" placeholder="••••••••">
+        </div>
+        <button class="btn-main btn-success" style="margin-top: 10px;" onclick="alert('Senha alterada com sucesso!'); closePasswordModal();">
+            Salvar Nova Senha
+        </button>
+    </div>
+</div>
+
+<!-- MODAL DE POST (FLYER + IA) -->
+<div class="modal-overlay" id="post-modal" onclick="closeFlyerModal(event)">
+    <div class="modal-container" onclick="event.stopPropagation()">
+        <div class="modal-preview">
+            <div class="modal-preview-frame">
+                <img id="modal-img" src="" alt="Flyer Preview">
+            </div>
+        </div>
+        <div class="modal-sidebar">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-eyebrow">Post gerado</div>
+                    <h2 id="modal-title">Título do Flyer</h2>
+                </div>
+                <button class="close-modal" onclick="closeFlyerModal()"><i data-lucide="x"></i></button>
+            </div>
+            <div class="meta-info">
+                <div class="meta-item">
+                    <div class="meta-label">Resolução</div>
+                    <div class="meta-val">1080 × 1350</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Data</div>
+                    <div class="meta-val">06 Jun 2026</div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-main btn-success" id="modal-download-btn">
+                    <i data-lucide="download"></i> Baixar Flyer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE CHAT IA -->
+<div class="modal-overlay" id="ai-chat-modal" onclick="closeAIChat(event)">
+    <div class="modal-container" style="max-width: 600px; height: 80vh; padding: 0; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="padding: 25px 30px; border-bottom: 1px solid var(--glass-border);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(112, 0, 255, 0.1); display: flex; align-items: center; justify-content: center; color: #7000ff;">
+                    <i data-lucide="sparkles"></i>
+                </div>
+                <div>
+                    <h2 style="color: #fff; font-size: 18px;">Mahungu AI</h2>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <span style="width: 6px; height: 6px; background: #00ff88; border-radius: 50%; box-shadow: 0 0 10px #00ff88;"></span>
+                        <span style="font-size: 11px; color: #00ff88;">Online</span>
+                    </div>
+                </div>
+            </div>
+            <button class="close-modal" onclick="closeAIChat()"><i data-lucide="x"></i></button>
+        </div>
+        
+        <div class="chat-messages" id="chat-messages" style="flex: 1; overflow-y: auto; padding: 30px; display: flex; flex-direction: column; gap: 20px;">
+            <!-- Mensagens do chat -->
+        </div>
+
+        <div class="chat-input-area" style="padding: 20px 30px; border-top: 1px solid var(--glass-border); background: rgba(255,255,255,0.02);">
+            <div class="chat-quick-replies" id="chat-quick-replies" style="display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto; padding-bottom: 5px;">
+                <!-- Botões de resposta rápida -->
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="chat-input" placeholder="Digite sua mensagem..." style="flex: 1;" onkeypress="if(event.key === 'Enter') sendChatMessage()">
+                <button class="btn-main" style="width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center;" onclick="sendChatMessage()">
+                    <i data-lucide="send" size="20"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE CONFIGURAÇÕES DE IA -->
+<div class="modal-overlay" id="ai-settings-modal" onclick="closeAISettings(event)">
+    <div class="modal-container" style="max-width: 450px; height: auto; min-height: 0; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 25px;">
+            <div>
+                <div class="modal-eyebrow">Configurações</div>
+                <h2 style="color: #fff; font-size: 20px;">Mahungu AI (Gemini)</h2>
+            </div>
+            <button class="close-modal" onclick="closeAISettings()"><i data-lucide="x"></i></button>
+        </div>
+        
+        <div class="form-group">
+            <label>Google API Key</label>
+            <div style="position: relative; display: flex; gap: 10px; align-items: center;">
+                <input type="password" id="ai-api-key" placeholder="Cole sua Google API Key aqui" style="flex: 1;">
+            </div>
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--primary); text-decoration: none;">Obtenha uma chave gratuita aqui.</a>
+            </p>
+        </div>
+
+        <div class="form-group">
+            <label>Intervalo de Monitoramento (minutos)</label>
+            <input type="number" id="monitoring-interval" min="1" max="180" value="15" style="width: 100%;">
+        </div>
+
+        <button class="btn-main" style="margin-top: 20px; background: #7000ff;" onclick="saveAISettings()">
+            <i data-lucide="save"></i> Salvar Configurações
+        </button>
+    </div>
+</div>
+
+<!-- MODAL DE FONTE RSS -->
+<div class="modal-overlay" id="source-modal" onclick="closeSourceModal(event)">
+    <div class="modal-container" style="max-width: 450px; height: auto; min-height: 0; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 25px;">
+            <div>
+                <div class="modal-eyebrow">Configuração</div>
+                <h2 style="color: #fff; font-size: 20px;">Fonte de Notícias</h2>
+            </div>
+            <button class="close-modal" onclick="closeSourceModal()"><i data-lucide="x"></i></button>
+        </div>
+        
+        <input type="hidden" id="source-id">
+        <div class="form-group"><label>Nome do Portal</label><input type="text" id="source-name" placeholder="Ex: Portal de Notícias"></div>
+        <div class="form-group"><label>URL do Feed RSS</label><input type="url" id="source-url" placeholder="https://exemplo.com/rss"></div>
+        <div class="form-group">
+            <label>Categoria</label>
+            <select id="source-category" class="custom-select">
+                <option value="Notícias">Notícias</option>
+                <option value="Tecnologia">Tecnologia</option>
+                <option value="Economia">Economia</option>
+                <option value="Desporto">Desporto</option>
+                <option value="Entretenimento">Entretenimento</option>
+            </select>
+        </div>
+        <button class="btn-main btn-success" style="margin-top: 10px;" onclick="saveSource()"><i data-lucide="save"></i> Salvar Fonte</button>
+    </div>
+</div>
+
+<!-- MODAL DE BACKUP E RESTORE -->
+<div class="modal-overlay" id="backup-modal" onclick="closeBackupModal(event)">
+    <div class="modal-container" style="max-width: 450px; height: auto; min-height: 0; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 25px;">
+            <div>
+                <div class="modal-eyebrow">Proteção de Dados</div>
+                <h2 style="color: #fff; font-size: 20px;">Backup e Recuperação</h2>
+            </div>
+            <button class="close-modal" onclick="closeBackupModal()"><i data-lucide="x"></i></button>
+        </div>
+        
+        <div style="background: rgba(255, 152, 0, 0.05); border: 1px solid rgba(255, 152, 0, 0.2); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+            <p style="font-size: 13px; color: #ffb347; line-height: 1.5;">
+                <i data-lucide="alert-circle" size="14" style="display: inline; vertical-align: middle; margin-right: 8px;"></i>
+                Faça backup regularmente para não perder seus flyers, propostas e configurações.
+            </p>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+            <h3 style="font-size: 14px; color: var(--text-muted); margin-bottom: 12px; font-weight: 700;">Exportar Dados</h3>
+            <button class="btn-main btn-success" style="width: 100%;" onclick="downloadBackupFile()">
+                <i data-lucide="download"></i> Fazer Download do Backup
+            </button>
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+                Um arquivo JSON com todos os seus dados será baixado. Guarde em local seguro.
+            </p>
+        </div>
+
+        <div style="border-top: 1px solid var(--glass-border); padding-top: 20px;">
+            <h3 style="font-size: 14px; color: var(--text-muted); margin-bottom: 12px; font-weight: 700;">Restaurar Dados</h3>
+            <input type="file" id="backup-file-input" accept=".json" style="display: none;" onchange="handleBackupFileUpload(event)">
+            <button class="btn-main" style="width: 100%; background: rgba(112, 0, 255, 0.1); color: #b78cff;" onclick="triggerBackupFileInput()">
+                <i data-lucide="upload"></i> Carregar Arquivo de Backup
+            </button>
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+                Selecione um arquivo de backup .json para restaurar seus dados. Isto substituirá os dados atuais.
+            </p>
+        </div>
+
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border);">
+            <button class="btn-main" style="width: 100%; background: rgba(255, 68, 68, 0.1); color: #ff4444;" onclick="clearAllDataConfirm()">
+                <i data-lucide="trash-2"></i> Limpar Todos os Dados
+            </button>
+            <p style="font-size: 11px; color: #ff6666; margin-top: 8px;">
+                ⚠️ Esta ação é irreversível. Faça backup antes de continuar.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script type="module" src="assets/js/main.js"></script>
+<script>
+    lucide.createIcons();
+</script>
+</body>
+</html>
