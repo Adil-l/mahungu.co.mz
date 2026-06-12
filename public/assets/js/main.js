@@ -1046,6 +1046,18 @@ function trocarFoto() {
         reader.onload = (ev) => {
             const img = document.querySelector('.layer-photo img');
             if (img) img.src = ev.target.result;
+            // Repõe zoom/posição para a nova foto aparecer inteira (encaixada);
+            // o utilizador ajusta depois com os controlos de Ajustes de Imagem.
+            core.editorState.zoom = 1;
+            core.editorState.posX = 0;
+            core.editorState.posY = 0;
+            const inputs = document.querySelectorAll('.range-group input');
+            if (inputs.length >= 3) {
+                inputs[0].value = 1;
+                inputs[1].value = 0;
+                inputs[2].value = 0;
+            }
+            core.updateImageTransform();
             invalidateFlyerSnapshot();
         };
         reader.readAsDataURL(file);

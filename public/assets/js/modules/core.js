@@ -78,15 +78,15 @@ export const core = {
             flyerClone.style.margin = '0';
             flyerClone.style.position = 'relative';
 
-            // O html2canvas (1.4.1) não respeita object-fit:cover em <img> e
-            // estica a foto (fica achatada). Solução: no clone, converter a
-            // foto para background-image:cover na própria camada, preservando
-            // o zoom/posição (transform) — o html2canvas captura isto fielmente.
+            // O html2canvas (1.4.1) não respeita object-fit em <img> e estica a
+            // foto (fica achatada). Solução: no clone, converter a foto para
+            // background-image na própria camada, preservando o ajuste (contain)
+            // e o zoom/posição (transform) — o html2canvas captura isto fielmente.
             const cloneImg = flyerClone.querySelector('.layer-photo img');
             const cloneLayer = flyerClone.querySelector('.layer-photo');
             if (cloneImg && cloneLayer && cloneImg.src) {
                 cloneLayer.style.backgroundImage = `url("${cloneImg.src}")`;
-                cloneLayer.style.backgroundSize = 'cover';
+                cloneLayer.style.backgroundSize = 'contain';
                 cloneLayer.style.backgroundPosition = 'center';
                 cloneLayer.style.backgroundRepeat = 'no-repeat';
                 cloneLayer.style.transform = cloneImg.style.transform || '';
