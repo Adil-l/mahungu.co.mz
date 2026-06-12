@@ -21,7 +21,8 @@ Route::middleware(['auth'])->group(function () {
     });
     
     Route::put('/user/profile', [UserController::class, 'updateProfile']);
-    
+    Route::put('/user/password', [UserController::class, 'updatePassword']);
+
     Route::apiResource('flyers', FlyerController::class);
     Route::apiResource('proposals', ProposalController::class);
     Route::post('/proposals/clear', [ProposalController::class, 'clear']);

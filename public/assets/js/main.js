@@ -21,6 +21,7 @@ window.openFlyerModal = openFlyerModal;
 window.closeFlyerModal = closeFlyerModal;
 window.openPasswordModal = openPasswordModal;
 window.closePasswordModal = closePasswordModal;
+window.changePassword = changePassword;
 window.downloadFlyer = downloadFlyer;
 window.downloadDataUrl = downloadDataUrl;
 window.updateProfileAvatar = updateProfileAvatar;
@@ -1425,16 +1426,44 @@ function updateProfileAvatar() {
     input.click();
 }
 
-function saveProfileData() {
-    const profile = {
-        name: document.getElementById('profile-name').value,
-        email: document.getElementById('profile-email').value,
-        phone: document.getElementById('profile-phone').value,
-        avatar: document.getElementById('profile-avatar-container').style.backgroundImage
+// Cabeçalho para chamadas autenticadas à API (sessão + CSRF).
+function apiHeaders() {
+    return {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
     };
-    localStorage.setItem('mahungu_profile', JSON.stringify(profile));
-    updateProfileDisplayName(profile.name);
-    ui.showToast("Perfil atualizado!", "success");
+}
+
+async function saveProfileData() {
+    const payload = {
+        name: document.getElementById('profile-name').value.trim(),
+        email: document.getElementById('profile-email').value.trim(),
+        phone: document.getElementById('profile-phone').value.trim()
+    };
+    try {
+        const res = await fetch('/api/user/profile', {
+            method: 'PUT',
+            headers: apiHeaders(),
+            credentials: 'same-origin',
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            const msg = err.errors ? Object.values(err.errors)[0][0] : (err.message || 'Erro ao guardar o perfil.');
+            ui.showToast(msg, 'error');
+            return;
+        }
+        updateProfileDisplayName(payload.name);
+        // Mantém o nome/email coerentes na barra lateral (sessão atual).
+        if (window.MAHUNGU_USER) { window.MAHUNGU_USER.name = payload.name; window.MAHUNGU_USER.email = payload.email; }
+        // Avatar é cosmético — guardado localmente.
+        const avatar = document.getElementById('profile-avatar-container').style.backgroundImage;
+        if (avatar && avatar !== 'none') localStorage.setItem('mahungu_profile_avatar', avatar);
+        ui.showToast('Perfil atualizado!', 'success');
+    } catch (e) {
+        ui.showToast('Erro de ligação ao guardar o perfil.', 'error');
+    }
 }
 
 function updateProfileDisplayName(name) {
@@ -1442,26 +1471,63 @@ function updateProfileDisplayName(name) {
     if (displayName) displayName.textContent = (name || '').trim() || 'Mahungu User';
 }
 
-function loadProfileData() {
-    const saved = localStorage.getItem('mahungu_profile');
-    if (saved) {
-        const profile = JSON.parse(saved);
-        if (document.getElementById('profile-name')) {
-            document.getElementById('profile-name').value = profile.name;
-            document.getElementById('profile-email').value = profile.email;
-            document.getElementById('profile-phone').value = profile.phone;
-            updateProfileDisplayName(profile.name);
-            if (profile.avatar && profile.avatar !== 'none') {
-                const container = document.getElementById('profile-avatar-container');
-                const icon = document.getElementById('profile-avatar-icon');
-                if (container) {
-                    container.style.backgroundImage = profile.avatar;
-                    container.style.backgroundSize = 'cover';
-                    container.style.backgroundPosition = 'center';
-                    if (icon) icon.style.display = 'none';
-                }
+async function loadProfileData() {
+    // Carrega os dados reais do utilizador autenticado.
+    try {
+        const res = await fetch('/api/user', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+        if (res.ok) {
+            const user = await res.json();
+            const nameEl = document.getElementById('profile-name');
+            if (nameEl) {
+                nameEl.value = user.name || '';
+                document.getElementById('profile-email').value = user.email || '';
+                document.getElementById('profile-phone').value = user.phone || '';
+                updateProfileDisplayName(user.name);
             }
         }
+    } catch (e) { /* sem ligação — mantém os valores atuais */ }
+
+    // Avatar (cosmético, guardado localmente).
+    const avatar = localStorage.getItem('mahungu_profile_avatar');
+    if (avatar && avatar !== 'none') {
+        const container = document.getElementById('profile-avatar-container');
+        const icon = document.getElementById('profile-avatar-icon');
+        if (container) {
+            container.style.backgroundImage = avatar;
+            container.style.backgroundSize = 'cover';
+            container.style.backgroundPosition = 'center';
+            if (icon) icon.style.display = 'none';
+        }
+    }
+}
+
+async function changePassword() {
+    const current = document.getElementById('password-current').value;
+    const next = document.getElementById('password-new').value;
+    const confirm = document.getElementById('password-confirm').value;
+    if (!current || !next) { ui.showToast('Preencha todos os campos.', 'error'); return; }
+    if (next.length < 8) { ui.showToast('A nova senha deve ter pelo menos 8 caracteres.', 'error'); return; }
+    if (next !== confirm) { ui.showToast('As senhas novas não coincidem.', 'error'); return; }
+    try {
+        const res = await fetch('/api/user/password', {
+            method: 'PUT',
+            headers: apiHeaders(),
+            credentials: 'same-origin',
+            body: JSON.stringify({ current_password: current, password: next, password_confirmation: confirm })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            const msg = err.errors ? Object.values(err.errors)[0][0] : (err.message || 'Erro ao mudar a senha.');
+            ui.showToast(msg, 'error');
+            return;
+        }
+        ui.showToast('Senha alterada com sucesso!', 'success');
+        document.getElementById('password-current').value = '';
+        document.getElementById('password-new').value = '';
+        document.getElementById('password-confirm').value = '';
+        closePasswordModal();
+    } catch (e) {
+        ui.showToast('Erro de ligação.', 'error');
     }
 }
 
