@@ -55,6 +55,11 @@ body.editor-active {
 
 .sidebar-header h1 { font-size: 18px; font-weight: 800; color: var(--primary); text-transform: uppercase; }
 
+/* Cabeçalhos de secção: título e grupo de botões quebram (em vez de transbordar)
+   em ecrãs estreitos. Sem efeito no desktop (com espaço, space-between mantém-se). */
+.sidebar-header { flex-wrap: wrap; gap: 15px; }
+.sidebar-header > div { flex-wrap: wrap; }
+
 /* ── NAVEGAÇÃO ── */
 .main-nav { display: flex; flex-direction: column; gap: 8px; position: relative; z-index: 13001; pointer-events: auto; }
 .nav-item {
