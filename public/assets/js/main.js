@@ -96,6 +96,11 @@ function proposalPhotoSrc(proposal) {
 // Definido quando uma proposta é aberta no editor; guardado junto do flyer.
 let editorPostMeta = null;
 
+// ID do flyer salvo atualmente carregado no editor (via "Editar" nas Salvadas/
+// Histórico). Quando definido, "Salvar Flyer" ATUALIZA esse flyer em vez de
+// criar um novo. É null para um flyer novo (proposta carregada ou rascunho).
+let editingFlyerId = null;
+
 // Monta o texto pronto a copiar para redes sociais.
 function buildCaptionText(meta) {
     if (!meta) return '';
@@ -651,12 +656,16 @@ async function confirmSaveToHistory() {
 
     try {
         const dataUrl = await core.captureCurrentFlyer();
-        const newEntry = {
-            id: Date.now(),
+        // Se há um flyer carregado via "Editar", reutiliza o id para ATUALIZAR
+        // (o IndexedDB faz upsert por id) e preserva a data de criação original.
+        const isUpdate = editingFlyerId != null;
+        const existing = isUpdate ? await storage.getFlyerById(editingFlyerId) : null;
+        const entry = {
+            id: editingFlyerId || Date.now(),
             title: title,
             category: category,
-            status: 'Aprovado',
-            date: new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }),
+            status: existing?.status || 'Aprovado',
+            date: existing?.date || new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }),
             image: dataUrl,
             // Legenda associada (se o flyer veio de uma proposta carregada no editor)
             caption: editorPostMeta?.caption || '',
@@ -668,11 +677,15 @@ async function confirmSaveToHistory() {
                 imgSrc: document.querySelector('.layer-photo img').src
             }
         };
-        await storage.saveFlyer(newEntry);
-        await storage.syncFlyerToServer(newEntry);
+        await storage.saveFlyer(entry);
+        await storage.syncFlyerToServer(entry);
+        // Liga o editor a este flyer: salvar de novo continua a atualizá-lo.
+        editingFlyerId = entry.id;
         closeSaveModal();
-        ui.showToast("Flyer salvo!", "success");
-        if (document.getElementById('tab-history').classList.contains('hidden') === false) renderHistory();
+        ui.showToast(isUpdate ? "Flyer atualizado!" : "Flyer salvo!", "success");
+        // Reflete a alteração nas listas visíveis sem duplicar.
+        if (!document.getElementById('tab-history').classList.contains('hidden')) renderHistory();
+        if (!document.getElementById('tab-ai-saved').classList.contains('hidden')) renderAISaved();
     } catch (err) {
         ui.showToast("Erro ao salvar.", "error");
     } finally {
@@ -1503,6 +1516,14 @@ async function updateChart(view, el) {
 async function editFlyer(id) {
     const flyer = await storage.getFlyerById(id);
     if (!flyer || !flyer.state) return;
+    // Estamos a editar um flyer existente: o próximo "Salvar" atualiza-o.
+    editingFlyerId = flyer.id;
+    // Preserva a legenda/hashtags/CTA já guardados para não os perder ao salvar.
+    editorPostMeta = {
+        caption: flyer.caption || '',
+        hashtags: flyer.hashtags || [],
+        cta: flyer.cta || ''
+    };
     const editor = document.getElementById('editor');
     if (editor) {
         editor.innerHTML = flyer.state.html || '';
@@ -1597,6 +1618,9 @@ async function editProposalInEditor(id) {
     const photoSrc = proxyImageUrl(proposal.image);
     if (photoImg && photoSrc) photoImg.src = photoSrc;
 
+    // Flyer novo a partir de uma proposta: o próximo "Salvar" cria um novo.
+    editingFlyerId = null;
+
     // Guardar a legenda da proposta para acompanhar este flyer quando for salvo
     editorPostMeta = {
         caption: proposal.generatedCaption || '',
@@ -1659,6 +1683,13 @@ async function approveAndSaveProposal(id) {
             }
         };
         await storage.saveFlyer(newEntry);
+        // Liga o editor a este flyer: se o utilizador o editar e salvar, atualiza.
+        editingFlyerId = newEntry.id;
+        editorPostMeta = {
+            caption: newEntry.caption,
+            hashtags: newEntry.hashtags,
+            cta: newEntry.cta
+        };
 
         // Update proposal status
         proposal.status = 'approved';
