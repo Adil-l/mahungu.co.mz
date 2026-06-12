@@ -96,10 +96,15 @@ function proposalPhotoSrc(proposal) {
 // Definido quando uma proposta é aberta no editor; guardado junto do flyer.
 let editorPostMeta = null;
 
-// ID do flyer salvo atualmente carregado no editor (via "Editar" nas Salvadas/
-// Histórico). Quando definido, "Salvar Flyer" ATUALIZA esse flyer em vez de
-// criar um novo. É null para um flyer novo (proposta carregada ou rascunho).
+// ID do flyer salvo atualmente carregado no editor (via "Editar" nas Aprovadas).
+// Quando definido, "Salvar Flyer" ATUALIZA esse flyer em vez de criar um novo.
 let editingFlyerId = null;
+
+// ID da PROPOSTA (Salvada da IA) atualmente carregada no editor. Quando definido,
+// "Salvar Flyer" atualiza a proposta e mantém-na em "Salvadas da IA" (status
+// pending) — só "Aprovar" a promove a flyer em "Aprovadas". O estado visual
+// editado é guardado em proposal.flyerState para preview e aprovação fiéis.
+let editingProposalId = null;
 
 // Monta o texto pronto a copiar para redes sociais.
 function buildCaptionText(meta) {
@@ -655,6 +660,31 @@ async function confirmSaveToHistory() {
     lucide.createIcons();
 
     try {
+        // ── Edição de uma PROPOSTA (Salvada da IA) ──
+        // Atualiza a proposta e mantém-na em "Salvadas" (não cria flyer aprovado).
+        if (editingProposalId != null) {
+            const proposal = await storage.getProposalById(editingProposalId);
+            if (proposal) {
+                const editor = document.getElementById('editor');
+                const titleEl = editor.querySelector('.cor-laranja');
+                const sumEl = editor.querySelector('.cor-branca');
+                proposal.generatedTitle = (titleEl ? titleEl.textContent : editor.textContent).trim();
+                proposal.generatedSummary = sumEl ? sumEl.textContent.trim() : '';
+                // Guarda o estado visual editado para preview/aprovação fiéis.
+                proposal.flyerState = {
+                    html: editor.innerHTML,
+                    state: { ...core.editorState },
+                    imgSrc: document.querySelector('.layer-photo img').src
+                };
+                proposal.status = 'pending'; // continua em "Salvadas" até aprovar
+                await storage.saveProposal(proposal);
+                closeSaveModal();
+                ui.showToast('Alterações salvas nas Salvadas da IA!', 'success');
+                if (!document.getElementById('tab-ai-saved').classList.contains('hidden')) renderAISaved();
+                return;
+            }
+        }
+
         const dataUrl = await core.captureCurrentFlyer();
         // Se há um flyer carregado via "Editar", reutiliza o id para ATUALIZAR
         // (o IndexedDB faz upsert por id) e preserva a data de criação original.
@@ -1516,8 +1546,9 @@ async function updateChart(view, el) {
 async function editFlyer(id) {
     const flyer = await storage.getFlyerById(id);
     if (!flyer || !flyer.state) return;
-    // Estamos a editar um flyer existente: o próximo "Salvar" atualiza-o.
+    // Estamos a editar um flyer aprovado: o próximo "Salvar" atualiza-o.
     editingFlyerId = flyer.id;
+    editingProposalId = null;
     // Preserva a legenda/hashtags/CTA já guardados para não os perder ao salvar.
     editorPostMeta = {
         caption: flyer.caption || '',
@@ -1604,22 +1635,41 @@ async function editProposalInEditor(id) {
         return;
     }
 
+    // Editar uma proposta: o "Salvar" atualiza-a e mantém-na em "Salvadas".
+    editingProposalId = id;
+    editingFlyerId = null;
+
     const editor = document.getElementById('editor');
-    if (editor) {
-        // Simple approach: just put title and summary into the editor
-        // This might need more sophisticated formatting based on the actual flyer template
-        editor.innerHTML = `<span class="cor-laranja">${escapeHtml(proposal.generatedTitle)}</span><br><span class="cor-branca">${escapeHtml(proposal.generatedSummary)}</span>`;
-        invalidateFlyerSnapshot();
-        autoSave();
+    const photoImg = document.querySelector('.layer-photo img');
+
+    if (proposal.flyerState) {
+        // Já foi editada antes: recarrega exatamente o estado guardado.
+        if (editor) editor.innerHTML = proposal.flyerState.html || '';
+        core.editorState = { ...core.editorState, ...(proposal.flyerState.state || {}) };
+        if (photoImg && isValidImageSrc(proposal.flyerState.imgSrc)) photoImg.src = proposal.flyerState.imgSrc;
+    } else {
+        // Primeira edição: monta a partir do título/resumo gerados pela IA.
+        if (editor) {
+            editor.innerHTML = `<span class="cor-laranja">${escapeHtml(proposal.generatedTitle)}</span><br><span class="cor-branca">${escapeHtml(proposal.generatedSummary)}</span>`;
+        }
+        const photoSrc = proxyImageUrl(proposal.image);
+        if (photoImg && photoSrc) photoImg.src = photoSrc;
+        // Foto nova começa encaixada (ver Ajustes de Imagem).
+        core.editorState.zoom = 1;
+        core.editorState.posX = 0;
+        core.editorState.posY = 0;
     }
 
-    // Carregar também a foto da notícia no layout (via proxy CORS-safe)
-    const photoImg = document.querySelector('.layer-photo img');
-    const photoSrc = proxyImageUrl(proposal.image);
-    if (photoImg && photoSrc) photoImg.src = photoSrc;
-
-    // Flyer novo a partir de uma proposta: o próximo "Salvar" cria um novo.
-    editingFlyerId = null;
+    // Sincroniza os sliders com o estado carregado.
+    const inputs = document.querySelectorAll('.range-group input');
+    if (inputs.length >= 3) {
+        inputs[0].value = core.editorState.zoom;
+        inputs[1].value = core.editorState.posX;
+        inputs[2].value = core.editorState.posY;
+    }
+    core.updateImageTransform();
+    invalidateFlyerSnapshot();
+    autoSave();
 
     // Guardar a legenda da proposta para acompanhar este flyer quando for salvo
     editorPostMeta = {
@@ -1650,19 +1700,26 @@ async function approveAndSaveProposal(id) {
     lucide.createIcons();
 
     try {
-        // Temporarily load content into editor to capture
+        // Carrega o conteúdo no editor para capturar. Se a proposta foi editada
+        // ("Editar no Editor" + Salvar), usa o estado guardado (preserva ajustes);
+        // senão, monta a partir do título/resumo gerados pela IA.
         const editor = document.getElementById('editor');
-        if (editor) {
-            editor.innerHTML = `<span class="cor-laranja">${escapeHtml(proposal.generatedTitle)}</span><br><span class="cor-branca">${escapeHtml(proposal.generatedSummary)}</span>`;
-            invalidateFlyerSnapshot();
-        }
-
-        // Usar a foto da notícia no flyer (proxy CORS-safe para a captura funcionar)
         const photoImg = document.querySelector('.layer-photo img');
-        const photoSrc = proxyImageUrl(proposal.image);
-        if (photoImg && photoSrc) photoImg.src = photoSrc;
+        if (proposal.flyerState) {
+            if (editor) editor.innerHTML = proposal.flyerState.html || '';
+            core.editorState = { ...core.editorState, ...(proposal.flyerState.state || {}) };
+            if (photoImg && isValidImageSrc(proposal.flyerState.imgSrc)) photoImg.src = proposal.flyerState.imgSrc;
+            core.updateImageTransform();
+        } else {
+            if (editor) {
+                editor.innerHTML = `<span class="cor-laranja">${escapeHtml(proposal.generatedTitle)}</span><br><span class="cor-branca">${escapeHtml(proposal.generatedSummary)}</span>`;
+            }
+            const photoSrc = proxyImageUrl(proposal.image);
+            if (photoImg && photoSrc) photoImg.src = photoSrc;
+        }
+        if (editor) invalidateFlyerSnapshot();
 
-        if (editor) fitHeadline(editor);
+        if (editor && !proposal.flyerState) fitHeadline(editor);
 
         const dataUrl = await core.captureCurrentFlyer();
         const newEntry = {
@@ -1691,9 +1748,11 @@ async function approveAndSaveProposal(id) {
             cta: newEntry.cta
         };
 
-        // Update proposal status
+        // Update proposal status — promovida: sai de "Salvadas", vai p/ "Aprovadas".
         proposal.status = 'approved';
         await storage.saveProposal(proposal);
+        // O editor deixa de estar ligado à proposta (agora é o flyer aprovado).
+        editingProposalId = null;
         updateDashboardStats();
 
         closeProposalModal();
@@ -1737,24 +1796,40 @@ async function rejectProposal(id) {
 // Gera o markup do flyer em miniatura (MESMO layout do Painel de Edição,
 // reduzido via CSS .flyer-mini) preenchido com o conteúdo da proposta.
 function miniFlyerHTML(proposal) {
+    const fs = proposal.flyerState;
     const rawTitle = proposal.generatedTitle || proposal.title || 'Sem título';
     const rawSummary = proposal.generatedSummary || '';
-    const title = escapeHtml(rawTitle);
-    const summary = escapeHtml(rawSummary);
-    const photo = proposalPhotoSrc(proposal);
-    // Mesma heurística do editor: fonte menor para textos longos
-    const fontSize = headlineFontSize((rawTitle + rawSummary).length);
+
+    // Foto: se a proposta foi editada, usa a imagem e o zoom/posição guardados;
+    // senão, a imagem original (via proxy CORS-safe).
+    const photo = (fs && isValidImageSrc(fs.imgSrc)) ? fs.imgSrc : proposalPhotoSrc(proposal);
+    let photoStyle = '';
+    if (fs && fs.state) {
+        const s = fs.state;
+        photoStyle = ` style="transform: translate(${s.posX || 0}px, ${s.posY || 0}px) scale(${s.zoom || 1});"`;
+    }
+
+    // Texto: se a proposta foi editada, usa o HTML editado (fiel ao editor);
+    // senão, monta a partir do título/resumo gerados pela IA.
+    const fontSize = (fs && fs.state && fs.state.fontSize) || headlineFontSize((rawTitle + rawSummary).length);
+    let textInner;
+    if (fs && fs.html) {
+        textInner = fs.html;
+    } else {
+        const title = escapeHtml(rawTitle);
+        const summary = escapeHtml(rawSummary);
+        textInner = `<span class="cor-laranja">${title}</span>${summary ? `<br><span class="cor-branca">${summary}</span>` : ''}`;
+    }
+
     return `
         <div class="flyer flyer-mini">
-            <div class="layer-photo"><img src="${photo}" alt="" onerror="this.onerror=null;this.src='${DEFAULT_FLYER_PHOTO}'"></div>
+            <div class="layer-photo"><img src="${photo}"${photoStyle} alt="" onerror="this.onerror=null;this.src='${DEFAULT_FLYER_PHOTO}'"></div>
             <div class="layer-meio-fundo"><img src="/assets/img/system/onda-azul.png" alt=""></div>
             <div class="layer-barra-cima"><img src="/assets/img/system/barra-cima.png" alt=""></div>
             <div class="layer-barra-baixo"><img src="/assets/img/system/barra-baixo.png" alt=""></div>
             <div class="layer-logo"><img src="/assets/img/system/logo.png" alt=""></div>
             <div class="layer-texto">
-                <div class="headline-editor" style="font-size: ${fontSize}px;">
-                    <span class="cor-laranja">${title}</span>${summary ? `<br><span class="cor-branca">${summary}</span>` : ''}
-                </div>
+                <div class="headline-editor" style="font-size: ${fontSize}px;">${textInner}</div>
             </div>
         </div>`;
 }
