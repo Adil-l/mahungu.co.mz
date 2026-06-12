@@ -95,6 +95,11 @@ body.editor-active {
 .btn-success { background: var(--success); }
 .btn-success:hover { background: var(--success-hover); box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3); }
 
+/* Botão de ação com largura ao conteúdo (cabeçalhos de secção) */
+.btn-main.btn-pill { width: auto; padding: 10px 20px; }
+/* Grupo de botões de ação à direita do cabeçalho */
+.header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
 .btn-ai {
   background: #12121a; border: 1px solid #3d3d5c; border-radius: 12px; padding: 14px;
   color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 12px;
@@ -847,6 +852,13 @@ body.editor-active #tab-editor {
     .profile-password-btn {
         flex: none;
     }
+}
+
+/* Em ecrãs estreitos, os botões de ação do cabeçalho preenchem a largura
+   de forma uniforme em vez de ficarem com larguras irregulares. */
+@media (max-width: 768px) {
+    .header-actions { width: 100%; }
+    .header-actions .btn-pill { flex: 1 1 auto; }
 }
 
 .custom-select {

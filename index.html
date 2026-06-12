@@ -201,11 +201,11 @@
         <div class="content-wrapper">
             <div class="sidebar-header" style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
                 <h1 style="color: #fff; font-size: 24px;">Fontes de Notícias</h1>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn-main" style="width: auto; padding: 10px 20px; background: rgba(255,255,255,0.1);" onclick="updateDefaultSources()" title="Adicionar fontes padrão em falta (desporto, tecnologia, política...)">
+                <div class="header-actions">
+                    <button class="btn-main btn-pill" style="background: rgba(255,255,255,0.1);" onclick="updateDefaultSources()" title="Adicionar fontes padrão em falta (desporto, tecnologia, política...)">
                         <i data-lucide="download-cloud"></i> Atualizar fontes padrão
                     </button>
-                    <button class="btn-main" style="width: auto; padding: 10px 20px;" onclick="openSourceModal()">
+                    <button class="btn-main btn-pill" onclick="openSourceModal()">
                         <i data-lucide="plus"></i> Adicionar Fonte
                     </button>
                 </div>
@@ -235,14 +235,14 @@
                     <h1 style="color: #fff; font-size: 24px;">Propostas IA</h1>
                     <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;" id="proposals-count"></p>
                 </div>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn-main" style="width: auto; padding: 10px 20px; background: rgba(255,255,255,0.1);" onclick="openEngagementModal()" title="Criar post de curiosidade/diversão sem notícia">
+                <div class="header-actions">
+                    <button class="btn-main btn-pill" style="background: rgba(255,255,255,0.1);" onclick="openEngagementModal()" title="Criar post de curiosidade/diversão sem notícia">
                         <i data-lucide="party-popper"></i> Engajamento
                     </button>
-                    <button class="btn-main" style="width: auto; padding: 10px 20px; background: rgba(255, 68, 68, 0.1); color: #ff4444;" onclick="clearAllProposals()" title="Remover todas as propostas da lista">
+                    <button class="btn-main btn-pill" style="background: rgba(255, 68, 68, 0.1); color: #ff4444;" onclick="clearAllProposals()" title="Remover todas as propostas da lista">
                         <i data-lucide="trash-2"></i> Limpar Tudo
                     </button>
-                    <button class="btn-main" style="width: auto; padding: 10px 20px; background: #7000ff;" onclick="generateAllProposals()" id="btn-generate-all">
+                    <button class="btn-main btn-pill" style="background: #7000ff;" onclick="generateAllProposals()" id="btn-generate-all">
                         <i data-lucide="sparkles"></i> Gerar Tudo (IA)
                     </button>
                 </div>
@@ -311,11 +311,11 @@
         <div class="content-wrapper">
             <div class="sidebar-header" style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
                 <h1 style="color: #fff; font-size: 24px;">Agendamento de Posts</h1>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn-main" style="width: auto; padding: 10px 20px; background: rgba(255,255,255,0.1);" onclick="openSocialAccountsModal()">
+                <div class="header-actions">
+                    <button class="btn-main btn-pill" style="background: rgba(255,255,255,0.1);" onclick="openSocialAccountsModal()">
                         <i data-lucide="share-2"></i> Contas Sociais
                     </button>
-                    <button class="btn-main" style="width: auto; padding: 10px 20px;" onclick="openSchedulerModal()">
+                    <button class="btn-main btn-pill" onclick="openSchedulerModal()">
                         <i data-lucide="plus"></i> Novo Agendamento
                     </button>
                 </div>
