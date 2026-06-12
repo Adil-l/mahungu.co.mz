@@ -11,6 +11,15 @@ const FEED_PROXIES = [
 
 const FETCH_TIMEOUT_MS = 25000;
 
+// ── Filtro de recência ──
+// Notícias publicadas há mais de FRESH_DAYS são descartadas, EXCETO se parecerem
+// virais (muitos comentários ou palavras-chave) e ainda dentro de VIRAL_MAX_DAYS.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_FRESH_DAYS = 7;     // janela "recente" por omissão (configurável)
+const VIRAL_MAX_DAYS = 30;        // limite absoluto, mesmo para virais
+const VIRAL_MIN_COMMENTS = 30;    // nº de comentários que conta como "viral"
+const VIRAL_KEYWORDS = /(viral|pol[ée]mica|trending|chocante|esc[âa]ndalo|bomb[áa]stic|sensa[çc][ãa]o|recorde)/i;
+
 export const automation = {
     intervalId: null,
     isRunning: false,
@@ -91,7 +100,10 @@ export const automation = {
         let items = Array.from(xml.querySelectorAll('item'));
         if (items.length === 0) items = Array.from(xml.querySelectorAll('entry'));
 
+        const freshDays = Math.max(1, Number(storage.getSetting('maxNewsAgeDays', DEFAULT_FRESH_DAYS)) || DEFAULT_FRESH_DAYS);
+
         let newItemsCount = 0;
+        let skippedOld = 0;
 
         for (const item of items) {
             const title = (item.querySelector('title')?.textContent || '').trim();
@@ -105,32 +117,67 @@ export const automation = {
                 || item.querySelector('updated')?.textContent;
             const image = this.extractImage(item, description);
 
-            if (title && link) {
-                const id = this.generateId(link);
-                const exists = await storage.getProposalById(id);
+            if (!title || !link) continue;
 
-                if (!exists) {
-                    await storage.saveProposal({
-                        id: id,
-                        title: title,
-                        summary: description.replace(/<[^>]*>?/gm, '').trim().substring(0, 200),
-                        sourceUrl: link,
-                        sourceName: source.name,
-                        category: source.category || 'Geral',
-                        date: pubDate ? new Date(pubDate).toLocaleDateString('pt-PT') : new Date().toLocaleDateString('pt-PT'),
-                        image: image,
-                        status: 'new',
-                        timestamp: Date.now()
-                    });
-                    newItemsCount++;
+            // ── Filtro de recência ──
+            const publishedAt = this.parsePubDate(pubDate);
+            if (publishedAt != null) {
+                const ageDays = (Date.now() - publishedAt) / DAY_MS;
+                if (ageDays > freshDays) {
+                    // Antiga: só passa se ainda dentro do limite e parecer viral.
+                    const comments = this.extractCommentsCount(item);
+                    if (ageDays > VIRAL_MAX_DAYS || !this.looksViral(title, source.category, comments)) {
+                        skippedOld++;
+                        continue;
+                    }
                 }
+            }
+
+            const id = this.generateId(link);
+            const exists = await storage.getProposalById(id);
+
+            if (!exists) {
+                await storage.saveProposal({
+                    id: id,
+                    title: title,
+                    summary: description.replace(/<[^>]*>?/gm, '').trim().substring(0, 200),
+                    sourceUrl: link,
+                    sourceName: source.name,
+                    category: source.category || 'Geral',
+                    date: publishedAt != null ? new Date(publishedAt).toLocaleDateString('pt-PT') : new Date().toLocaleDateString('pt-PT'),
+                    image: image,
+                    status: 'new',
+                    publishedAt: publishedAt,                 // data real de publicação (ms) ou null
+                    timestamp: publishedAt != null ? publishedAt : Date.now() // ordena por publicação
+                });
+                newItemsCount++;
             }
         }
 
-        if (newItemsCount > 0) {
-            console.log(`✅ [${source.name}] ${newItemsCount} novas notícias.`);
+        if (newItemsCount > 0 || skippedOld > 0) {
+            console.log(`✅ [${source.name}] ${newItemsCount} novas` + (skippedOld ? ` (${skippedOld} antigas ignoradas)` : '') + '.');
         }
         return newItemsCount;
+    },
+
+    // Converte a data do feed (RFC822 ou ISO 8601) para timestamp (ms) ou null.
+    parsePubDate(str) {
+        if (!str) return null;
+        const t = Date.parse(str.trim());
+        return Number.isNaN(t) ? null : t;
+    },
+
+    // Nº de comentários via <slash:comments> (proxy de popularidade). 0 se ausente.
+    extractCommentsCount(item) {
+        const el = item.getElementsByTagName('slash:comments')[0];
+        const n = el ? parseInt((el.textContent || '').replace(/\D/g, ''), 10) : NaN;
+        return Number.isNaN(n) ? 0 : n;
+    },
+
+    // Heurística "viral" para notícias antigas: muitos comentários ou palavras-chave.
+    looksViral(title, category, comments) {
+        if (comments >= VIRAL_MIN_COMMENTS) return true;
+        return VIRAL_KEYWORDS.test(title || '') || VIRAL_KEYWORDS.test(category || '');
     },
 
     // Extrai o link de um item RSS ou Atom (<link href> ou <link>texto</link>).
