@@ -6,6 +6,12 @@ import { automation } from './modules/automation.js';
 import { scheduler } from './modules/scheduler.js';
 import { images } from './modules/images.js';
 
+// ── Helper: Gera IDs únicos (timestamp + aleatoriedade) para evitar colisões multi-user ──
+function generateUniqueFlyerId() {
+    // Date.now() + 5 dígitos aleatórios = 18 dígitos, praticamente imposível colidir
+    return Date.now() * 100000 + Math.floor(Math.random() * 100000);
+}
+
 // Expor funções para o escopo global
 window.showTab = showTab;
 window.aplicarCor = aplicarCor;
@@ -693,7 +699,7 @@ async function confirmSaveToHistory() {
         const isUpdate = editingFlyerId != null;
         const existing = isUpdate ? await storage.getFlyerById(editingFlyerId) : null;
         const entry = {
-            id: editingFlyerId || Date.now(),
+            id: editingFlyerId || generateUniqueFlyerId(),
             title: title,
             category: category,
             status: existing?.status || 'Aprovado',
@@ -1792,7 +1798,7 @@ async function approveAndSaveProposal(id) {
 
         const dataUrl = await core.captureCurrentFlyer();
         const newEntry = {
-            id: Date.now(),
+            id: generateUniqueFlyerId(),
             title: proposal.generatedTitle || "Flyer Gerado pela IA",
             category: proposal.category || "IA Gerado", // Assuming proposal has a category or default
             status: 'Aprovado',
@@ -2348,7 +2354,7 @@ async function generateEngagementContent() {
     try {
         const result = await ai.generateEngagement(vibe, tema);
         const proposal = {
-            id: Date.now(),
+            id: generateUniqueFlyerId(),
             title: result.flyerTitle,
             summary: result.flyerSummary,
             category: 'Engajamento',

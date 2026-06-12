@@ -3,6 +3,11 @@
  * Atualmente usa IndexedDB para suportar grandes volumes de dados (flyers).
  */
 
+// Helper: Gera IDs únicos (timestamp + aleatoriedade) para evitar colisões multi-user
+function generateUniqueId() {
+    return Date.now() * 100000 + Math.floor(Math.random() * 100000);
+}
+
 const DB_NAME = 'MahunguStudioDB';
 const DB_VERSION = 2;
 const STORE_FLYERS = 'flyers';
@@ -85,7 +90,7 @@ class StorageService {
     // ── MÉTODOS PARA FONTES (SOURCES) ──
     async saveSource(sourceData) {
         await this.initPromise;
-        if (!sourceData.id) sourceData.id = Date.now();
+        if (!sourceData.id) sourceData.id = generateUniqueId();
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction([STORE_SOURCES], 'readwrite');
             const store = transaction.objectStore(STORE_SOURCES);
@@ -120,7 +125,7 @@ class StorageService {
     // ── MÉTODOS PARA PROPOSTAS (PROPOSALS) ──
     async saveProposal(proposalData) {
         await this.initPromise;
-        if (!proposalData.id) proposalData.id = Date.now();
+        if (!proposalData.id) proposalData.id = generateUniqueId();
         if (!proposalData.status) proposalData.status = 'pending';
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction([STORE_PROPOSALS], 'readwrite');
