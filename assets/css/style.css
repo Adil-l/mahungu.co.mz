@@ -574,9 +574,45 @@ body.editor-active #tab-editor {
     animation: shimmer 1.3s linear infinite;
 }
 
-.history-info { padding: 15px; position: relative; }
-.history-title { font-size: 14px; font-weight: 600; margin-bottom: 5px; padding-right: 60px; }
-.history-date { font-size: 11px; color: var(--text-muted); }
+.history-info {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.history-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1.35;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 2.7em; /* reserva 2 linhas para alinhar os cartões */
+}
+.history-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.history-cat-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    background: rgba(212, 82, 42, 0.12);
+    color: var(--primary);
+    border: 1px solid rgba(212, 82, 42, 0.25);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.history-date { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 
 .status-badge {
     position: absolute;
@@ -589,12 +625,28 @@ body.editor-active #tab-editor {
     letter-spacing: 0.5px;
 }
 
+/* Badge de estado posicionado sobre a miniatura (canto superior esquerdo) */
+.history-thumb .status-badge {
+    top: 10px;
+    left: 10px;
+    right: auto;
+    z-index: 6;
+}
+
 .status-badge.pendente { background: rgba(255, 255, 255, 0.1); color: #fff; }
 .status-badge.rascunho { background: rgba(255, 179, 0, 0.1); color: #ffb300; }
 .status-badge.em-revisao { background: rgba(13, 110, 253, 0.12); color: #0d6efd; }
 .status-badge.aprovado { background: rgba(40, 167, 69, 0.1); color: #28a745; }
 .status-badge.publicado { background: rgba(13, 202, 240, 0.12); color: #0ddcf0; }
 .status-badge.rejeitado { background: rgba(255, 68, 68, 0.1); color: #ff4444; }
+
+/* Sobre a miniatura, usar pílula escura sólida para legibilidade sobre a foto
+   (mantém a cor do texto definida acima por estado). */
+.history-thumb .status-badge {
+    background: rgba(4, 8, 48, 0.82);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
 
 @keyframes shimmer {
     from { background-position: 220% 0; }
@@ -1403,4 +1455,322 @@ body.editor-active #tab-editor {
         border-top: 1px solid var(--glass-border);
         padding: 22px;
     }
+}
+
+/* ── ABA PROPOSTAS IA ── */
+.proposals-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+    gap: 24px;
+}
+
+.proposal-card {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: transform 0.2s;
+    display: flex;
+    flex-direction: column;
+}
+
+.proposal-card:hover { transform: translateY(-5px); border-color: var(--primary); }
+.proposal-card.is-ready:hover { border-color: var(--success); }
+
+/* Pré-visualização: o MESMO layout do flyer do editor, em miniatura (scale 0.2 => 216x270) */
+.proposal-preview {
+    position: relative;
+    width: 216px;
+    height: 270px;
+    margin: 16px auto 0;
+    border: 0;
+    padding: 0;
+    background: #060713;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    flex-shrink: 0;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+}
+
+.proposal-preview .flyer-mini {
+    transform: scale(0.2);
+    transform-origin: top left;
+}
+
+.proposal-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 30;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.proposal-badge.new { background: rgba(255, 152, 0, 0.15); color: #ff9800; border: 1px solid rgba(255, 152, 0, 0.4); }
+.proposal-badge.ready { background: rgba(40, 167, 69, 0.15); color: #28a745; border: 1px solid rgba(40, 167, 69, 0.4); }
+
+.proposal-card-info { padding: 14px 16px 8px; }
+
+.proposal-card-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.proposal-card-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.proposal-card-actions {
+    display: flex;
+    gap: 8px;
+    padding: 8px 16px 14px;
+    margin-top: auto;
+    align-items: center;
+}
+
+.proposal-generate-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: rgba(112, 0, 255, 0.12) !important;
+    color: #b78cff !important;
+    border: 1px solid rgba(112, 0, 255, 0.35) !important;
+    font-weight: 700;
+}
+
+.date-group-header {
+    grid-column: 1 / -1;
+    margin: 30px 0 10px;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.date-group-header::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, rgba(212, 82, 42, 0.3), transparent);
+}
+
+/* ── LEGENDA PARA REDES (modal do Histórico) ── */
+.modal-caption-block {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-top: 16px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.modal-caption-block .caption-text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #ddd;
+    margin-top: 8px;
+    white-space: pre-wrap;
+}
+
+.modal-caption-block .caption-tags { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+
+.modal-caption-block .caption-tag {
+    font-size: 11px;
+    color: #7fb3ff;
+    background: rgba(80, 140, 255, 0.1);
+    border: 1px solid rgba(80, 140, 255, 0.25);
+    border-radius: 20px;
+    padding: 2px 8px;
+}
+
+.modal-caption-block .caption-cta {
+    font-size: 12px;
+    color: var(--primary);
+    font-weight: 700;
+    margin-top: 10px;
+}
+
+/* Indicador "tem legenda" nas miniaturas do Histórico */
+.thumb-caption-flag {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    z-index: 5;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(4, 8, 48, 0.75);
+    border: 1px solid var(--glass-border);
+    color: #7fb3ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── BADGE DE NOTIFICAÇÕES NA SIDEBAR ── */
+.nav-item { position: relative; }
+
+.nav-badge {
+    margin-left: auto;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--primary);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── MODAL DE REVISÃO MELHORADO ── */
+.proposal-review-body { display: flex; gap: 24px; align-items: flex-start; }
+
+.proposal-review-preview {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Variante maior da miniatura para o modal (scale 0.25 => 270x337) */
+.proposal-preview-lg { width: 270px; height: 337px; margin: 0; }
+.proposal-preview-lg .flyer-mini { transform: scale(0.25); }
+
+.proposal-preview-tools { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+.proposal-review-fields { flex: 1; min-width: 0; max-height: 420px; overflow-y: auto; padding-right: 6px; }
+
+/* ── GALERIA DE IMAGENS REAIS (Openverse) ── */
+.image-picker {
+    margin-top: 18px;
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 14px;
+    background: var(--glass-bg);
+}
+
+.image-picker-header { display: flex; gap: 8px; margin-bottom: 12px; }
+
+.image-picker-header input {
+    flex: 1;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: #fff;
+    padding: 8px 12px;
+    font-size: 13px;
+    outline: none;
+}
+
+.image-picker-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.image-picker-grid button {
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 0;
+    background: #060713;
+    cursor: pointer;
+    overflow: hidden;
+    aspect-ratio: 1;
+    transition: border-color 0.15s;
+}
+
+.image-picker-grid button:hover { border-color: var(--primary); }
+.image-picker-grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.image-picker-status {
+    grid-column: 1/-1;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 20px 0;
+}
+
+/* ── FILTROS E PESQUISA ── */
+.filter-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+}
+
+.filter-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.filter-chip {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.filter-chip:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+.filter-chip.active { background: rgba(212, 82, 42, 0.15); border-color: var(--primary); color: var(--primary); }
+
+.filter-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: var(--text-muted);
+    min-width: 220px;
+}
+
+.filter-search input {
+    background: transparent;
+    border: 0;
+    outline: none;
+    color: #fff;
+    font-size: 13px;
+    flex: 1;
+}
+
+.filter-search svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* Campos de texto do modal de revisão de proposta (preserva parágrafos da legenda) */
+.proposal-text-display {
+    white-space: pre-wrap;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #ddd;
+    margin-top: 4px;
 }

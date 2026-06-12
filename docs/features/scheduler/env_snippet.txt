@@ -1,0 +1,14 @@
+# Facebook / Instagram (Meta Graph API)
+# Criar app em https://developers.facebook.com/
+FACEBOOK_CLIENT_ID=
+FACEBOOK_CLIENT_SECRET=
+FACEBOOK_API_VERSION=v19.0
+
+# Instagram (opcional - se usar app separado do Facebook)
+INSTAGRAM_CLIENT_ID=
+INSTAGRAM_CLIENT_SECRET=
+
+# TikTok (Content Posting API)
+# Criar app em https://developers.tiktok.com/
+TIKTOK_CLIENT_ID=
+TIKTOK_CLIENT_SECRET=

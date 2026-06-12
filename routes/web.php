@@ -1,0 +1,34 @@
+<?php
+
+use App\Http\Controllers\FeedProxyController;
+use App\Http\Controllers\SpaController;
+use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
+
+// Proxy de feeds RSS (server-side, sem CORS) usado pela automação do frontend.
+Route::get('/feed-proxy', FeedProxyController::class)->name('feed-proxy');
+
+// Ecrãs de autenticação (visíveis apenas a convidados).
+Route::middleware('guest')->group(function () {
+    Route::view('/login', 'auth.login')->name('login');
+    Route::view('/register', 'auth.register')->name('register.show');
+    Route::view('/forgot-password', 'auth.forgot-password')->name('password.request');
+    Route::get('/reset-password/{token}', function (string $token) {
+        return view('auth.reset-password', [
+            'token' => $token,
+            'email' => request('email'),
+        ]);
+    })->name('password.reset');
+});
+
+// Rotas POST de autenticação (login, registo, recuperação, logout).
+require __DIR__.'/auth.php';
+
+// SPA (Mahungu Studio) — servida apenas a utilizadores autenticados.
+Route::middleware('auth')->get('/{any}', SpaController::class)
+    ->where('any', '^(?!api/|sanctum/|feed-proxy|login|register|forgot-password|reset-password|logout|verify-email|email/).*$');

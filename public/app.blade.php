@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Mahungu Studio | Creative Platform</title>
+    <link rel="stylesheet" href="/assets/css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        window.MAHUNGU_CONFIG = {
+            apiKey: "{{ env('GEMINI_API_KEY') }}"
+        };
+    </script>
+</head>
+<body class="{{ auth()->check() ? 'authenticated' : 'guest' }}">
+
+@auth
+<!-- Sidebar ESQUERDA: Navegação Global -->
+<aside class="sidebar-left">
+    <div class="sidebar-header">
+        <h1>Mahungu 2.0</h1>
+        <p class="upload-hint" style="padding:0">Creative Studio</p>
+    </div>
+
+    <nav class="main-nav">
+        <a href="javascript:void(0)" class="nav-item active" data-tab="dashboard">
+            <i data-lucide="layout-dashboard"></i>
+            Dashboard
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-tab="editor">
+            <i data-lucide="pen-tool"></i>
+            Painel de Edição
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-tab="news-sources">
+            <i data-lucide="rss"></i>
+            Fontes de Notícias
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-tab="proposals">
+            <i data-lucide="sparkles"></i>
+            Propostas IA
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-tab="ai-saved">
+            <i data-lucide="bookmark"></i>
+            Salvadas da IA
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-tab="history">
+            <i data-lucide="history"></i>
+            Posts Aprovados
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-tab="scheduler">
+            <i data-lucide="calendar"></i>
+            Agendamento
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-tab="profile">
+            <i data-lucide="user-circle"></i>
+            Perfil
+        </a>
+    </nav>
+
+    <div class="control-group ai-section" style="margin-top: auto;">
+        <div style="display: flex; gap: 8px;">
+            <button class="btn-ai" style="flex: 1;" onclick="openAIChat()" title="Abrir Chat Mahungu AI">
+                <i data-lucide="sparkles" style="color: #7000ff"></i>
+                Mahungu AI
+            </button>
+            <button class="btn-tool" style="width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0;" onclick="openAISettings()" title="Configurações de IA">
+                <i data-lucide="settings" size="18"></i>
+            </button>
+        </div>
+    </div>
+</aside>
+
+<!-- Sidebar DIREITA: Ferramentas -->
+<aside class="sidebar-right hidden" id="editor-tools">
+    <div class="control-group">
+        <div class="control-label">Fundo</div>
+        <button class="btn-main" onclick="trocarFoto()">
+            <i data-lucide="image"></i>
+            Trocar Foto
+        </button>
+    </div>
+
+    <div class="control-group">
+        <div class="control-label">Ajustes de Imagem</div>
+        <div class="range-group">
+            <label>Zoom</label>
+            <input type="range" min="1" max="3" step="0.1" value="1" oninput="updateEditorState('zoom', this.value)">
+        </div>
+        <div class="range-group">
+            <label>Posição X</label>
+            <input type="range" min="-500" max="500" step="1" value="0" oninput="updateEditorState('posX', this.value)">
+        </div>
+        <div class="range-group">
+            <label>Posição Y</label>
+            <input type="range" min="-500" max="500" step="1" value="0" oninput="updateEditorState('posY', this.value)">
+        </div>
+    </div>
+
+    <div class="control-group">
+        <div class="control-label">Texto</div>
+        <div class="color-grid">
+            <button class="btn-tool laranja" onclick="aplicarCor('laranja')"><span></span> Laranja</button>
+            <button class="btn-tool branco" onclick="aplicarCor('branco')"><span></span> Branco</button>
+        </div>
+        <div class="font-controls" style="display: flex; gap: 10px; margin-top: 5px;">
+            <button class="btn-tool" style="flex:1" onclick="changeFontSize(4)" title="Aumentar Fonte">
+                <i data-lucide="plus"></i>
+            </button>
+            <button class="btn-tool" style="flex:1" onclick="changeFontSize(-4)" title="Diminuir Fonte">
+                <i data-lucide="minus"></i>
+            </button>
+        </div>
+        <button class="btn-full" onclick="limparFormatacao()" style="margin-top: 5px;">
+            <i data-lucide="eraser" style="width: 14px; height: 14px;"></i> Limpar Formatação
+        </button>
+    </div>
+
+    <div class="control-group" style="margin-top: auto;">
+        <button class="btn-main" onclick="openSaveModal()" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); margin-bottom: 10px;">
+            <i data-lucide="save"></i>
+            Salvar Flyer
+        </button>
+        <button class="btn-main btn-success" onclick="downloadFlyer()">
+            <i data-lucide="download"></i>
+            Exportar Flyer
+        </button>
+    </div>
+</aside>
+
+<!-- Área Central -->
+<main class="main-content">
+    
+    <!-- DASHBOARD -->
+    <section id="tab-dashboard" class="tab-content">
+        <div class="content-wrapper">
+            <div class="sidebar-header" style="margin-bottom: 30px;">
+                <h1 style="color: #fff; font-size: 24px;">Visão Geral</h1>
+            </div>
+        <div class="dashboard-grid">
+            <div class="analytics-card">
+                <div class="icon" style="background: rgba(112, 0, 255, 0.1); color: #7000ff;"><i data-lucide="rss"></i></div>
+                <div class="val" id="stats-sources">0</div>
+                <div class="label">Fontes Ativas</div>
+            </div>
+            <div class="analytics-card">
+                <div class="icon" style="background: rgba(0, 255, 136, 0.1); color: #00ff88;"><i data-lucide="newspaper"></i></div>
+                <div class="val" id="stats-news">0</div>
+                <div class="label">Notícias Hoje</div>
+            </div>
+            <div class="analytics-card">
+                <div class="icon" style="background: rgba(255, 152, 0, 0.1); color: #ff9800;"><i data-lucide="sparkles"></i></div>
+                <div class="val" id="stats-proposals">0</div>
+                <div class="label">Propostas Pendentes</div>
+            </div>
+            <div class="analytics-card">
+                <div class="icon" style="background: rgba(40, 167, 69, 0.1); color: #28a745;"><i data-lucide="check-circle"></i></div>
+                <div class="val" id="stats-approved">0</div>
+                <div class="label">Flyers Aprovados</div>
+            </div>
+        </div>
+        <div class="chart-container">
+            <div class="chart-header">
+                <div class="chart-title" id="chart-view-title">Performance Mensal</div>
+                <div class="chart-controls">
+                    <button class="btn-mini active" id="chart-btn-mensal" type="button" onclick="updateChart('mensal', this)">
+                        <i data-lucide="calendar-range"></i>
+                        <span>Mensal</span>
+                    </button>
+                    <button class="btn-mini" id="chart-btn-semanal" type="button" onclick="updateChart('semanal', this)">
+                        <i data-lucide="calendar-days"></i>
+                        <span>Semanal</span>
+                    </button>
+                </div>
+            </div>
+            <div class="bars-group" id="dashboard-bars">
+                <!-- Barras serão geradas via JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- EDITOR -->
+    <section id="tab-editor" class="tab-content hidden">
+        <div class="flyer-wrapper">
+            <div class="flyer">
+                <div class="layer-photo"><img src="/assets/img/photos/foto-base.png" alt=""></div>
+                <div class="layer-meio-fundo"><img src="/assets/img/system/onda-azul.png" alt=""></div>
+                <div class="layer-barra-cima"><img src="/assets/img/system/barra-cima.png" alt=""></div>
+                <div class="layer-barra-baixo"><img src="/assets/img/system/barra-baixo.png" alt=""></div>
+                <div class="layer-logo"><img src="/assets/img/system/logo.png" alt=""></div>
+                <div class="layer-texto">
+                    <div class="headline-editor" id="editor" contenteditable="true" spellcheck="false">
+                        <span class="cor-laranja">1,5 milhões de dólares</span><br>
+                        <span class="cor-branca">Será o preço da polémica de<br>Elon Musk com o Twitter</span>
+                    </div>
+                </div>
+                <div class="color-toolbar" id="toolbar">
+                    <div class="cor-btn laranja" onclick="aplicarCor('laranja')"></div>
+                    <div class="cor-btn branco" onclick="aplicarCor('branco')"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FONTES DE NOTÍCIAS -->
+    <section id="tab-news-sources" class="tab-content hidden">
+        <div class="content-wrapper">
+            <div class="sidebar-header" style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+                <h1 style="color: #fff; font-size: 24px;">Fontes de Notícias</h1>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-main" style="width: auto; padding: 10px 20px; background: rgba(255,255,255,0.1);" onclick="updateDefaultSources()" title="Adicionar fontes padrão em falta (desporto, tecnologia, política...)">
+                        <i data-lucide="download-cloud"></i> Atualizar fontes padrão
+                    </button>
+                    <button class="btn-main" style="width: auto; padding: 10px 20px;" onclick="openSourceModal()">
+                        <i data-lucide="plus"></i> Adicionar Fonte
+                    </button>
+                </div>
+            </div>
+            
+            <div style="background: rgba(40, 167, 69, 0.05); border: 1px solid rgba(40, 167, 69, 0.2); border-radius: 12px; padding: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 style="color: var(--success); font-size: 16px; margin-bottom: 5px;">Monitoramento Ativo</h3>
+                    <p style="color: var(--text-muted); font-size: 13px;">O sistema verifica as fontes ativas automaticamente.</p>
+                </div>
+                <button class="btn-tool" onclick="runAutomationManual()" id="btn-scan-now">
+                    <i data-lucide="refresh-cw"></i> Scan Agora
+                </button>
+            </div>
+
+            <div class="management-list" id="sources-container">
+                <!-- Renderizado via JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- PROPOSTAS IA -->
+    <section id="tab-proposals" class="tab-content hidden">
+        <div class="content-wrapper">
+            <div class="sidebar-header" style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1 style="color: #fff; font-size: 24px;">Propostas IA</h1>
+                    <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;" id="proposals-count"></p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-main" style="width: auto; padding: 10px 20px; background: rgba(255,255,255,0.1);" onclick="openEngagementModal()" title="Criar post de curiosidade/diversão sem notícia">
+                        <i data-lucide="party-popper"></i> Engajamento
+                    </button>
+                    <button class="btn-main" style="width: auto; padding: 10px 20px; background: rgba(255, 68, 68, 0.1); color: #ff4444;" onclick="clearAllProposals()" title="Remover todas as propostas da lista">
+                        <i data-lucide="trash-2"></i> Limpar Tudo
+                    </button>
+                    <button class="btn-main" style="width: auto; padding: 10px 20px; background: #7000ff;" onclick="generateAllProposals()" id="btn-generate-all">
+                        <i data-lucide="sparkles"></i> Gerar Tudo (IA)
+                    </button>
+                </div>
+            </div>
+
+            <div class="filter-bar">
+                <div class="filter-chips" id="proposals-filter-chips"></div>
+                <div class="filter-search">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="proposals-search" placeholder="Pesquisar propostas..." oninput="onProposalsSearch(this.value)">
+                </div>
+            </div>
+
+            <div class="proposals-grid" id="proposals-container">
+                <!-- Renderizado via JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- SALVADAS DA IA -->
+    <section id="tab-ai-saved" class="tab-content hidden">
+        <div class="content-wrapper">
+            <div class="sidebar-header" style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+                <h1 style="color: #fff; font-size: 24px;">Salvadas da IA</h1>
+            </div>
+            
+            <div class="filter-bar">
+                <div class="filter-chips" id="ai-saved-filter-chips"></div>
+                <div class="filter-search">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="ai-saved-search" placeholder="Pesquisar salvadas..." oninput="onAISavedSearch(this.value)">
+                </div>
+            </div>
+
+            <div class="proposals-grid" id="ai-saved-container">
+                <!-- Conteúdo virá depois -->
+                <div style="grid-column: 1/-1; text-align: center; padding: 50px; color: var(--text-muted);">
+                    <i data-lucide="bookmark" size="48" style="margin-bottom: 15px; opacity: 0.2;"></i>
+                    <p>Nenhuma proposta salva no momento.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- POSTS APROVADOS -->
+    <section id="tab-history" class="tab-content hidden">
+        <div class="content-wrapper">
+            <div class="sidebar-header" style="margin-bottom: 30px;">
+                <h1 style="color: #fff; font-size: 24px;">Posts Aprovados</h1>
+            </div>
+            <div class="history-grid">
+                <!-- Renderizado via JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- AGENDAMENTO -->
+    <section id="tab-scheduler" class="tab-content hidden">
+        <div class="content-wrapper">
+            <div class="sidebar-header" style="margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+                <h1 style="color: #fff; font-size: 24px;">Agendamento de Posts</h1>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn-main" style="width: auto; padding: 10px 20px; background: rgba(255,255,255,0.1);" onclick="openSocialAccountsModal()">
+                        <i data-lucide="share-2"></i> Contas Sociais
+                    </button>
+                    <button class="btn-main" style="width: auto; padding: 10px 20px;" onclick="openSchedulerModal()">
+                        <i data-lucide="plus"></i> Novo Agendamento
+                    </button>
+                </div>
+            </div>
+
+            <div class="dashboard-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 30px;">
+                <div class="analytics-card">
+                    <div class="icon" style="background: rgba(255, 152, 0, 0.1); color: #ff9800;"><i data-lucide="clock"></i></div>
+                    <div class="val" id="stats-pending-posts">0</div>
+                    <div class="label">Agendados</div>
+                </div>
+                <div class="analytics-card">
+                    <div class="icon" style="background: rgba(40, 167, 69, 0.1); color: #28a745;"><i data-lucide="check-circle"></i></div>
+                    <div class="val" id="stats-posted-posts">0</div>
+                    <div class="label">Publicados</div>
+                </div>
+                <div class="analytics-card">
+                    <div class="icon" style="background: rgba(255, 68, 68, 0.1); color: #ff4444;"><i data-lucide="alert-circle"></i></div>
+                    <div class="val" id="stats-failed-posts">0</div>
+                    <div class="label">Falhas</div>
+                </div>
+            </div>
+
+            <div class="management-list" id="scheduled-posts-container">
+                <!-- Renderizado via JS -->
+                <div style="text-align: center; padding: 50px; color: var(--text-muted);">
+                    <i data-lucide="calendar" size="48" style="margin-bottom: 15px; opacity: 0.2;"></i>
+                    <p>Nenhum post agendado no momento.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- PERFIL -->
+    <section id="tab-profile" class="tab-content hidden">
+        <div class="content-wrapper">
+            <div class="profile-page">
+                <div class="profile-page-header">
+                    <h1>Perfil</h1>
+                </div>
+
+                <div class="profile-container">
+                    <div class="profile-avatar-panel">
+                        <button class="avatar-upload" type="button" onclick="updateProfileAvatar()" id="profile-avatar-container" aria-label="Atualizar foto de perfil" style="background-image: {{ auth()->user()->avatar_url ? 'url('.auth()->user()->avatar_url.')' : 'none' }}; background-size: cover; background-position: center;">
+                            <i data-lucide="user" size="48" id="profile-avatar-icon" style="{{ auth()->user()->avatar_url ? 'display: none;' : '' }}"></i>
+                            <span class="avatar-overlay"><i data-lucide="camera" size="16"></i></span>
+                        </button>
+                        <div class="profile-avatar-info">
+                            <strong id="profile-display-name">{{ auth()->user()->name }}</strong>
+                            <span>Creative Studio</span>
+                        </div>
+                    </div>
+
+                    <div class="profile-form-panel">
+                        <div class="profile-grid">
+                            <div class="form-group profile-field-wide">
+                                <label>Nome Completo</label>
+                                <input type="text" id="profile-name" value="{{ auth()->user()->name }}">
+                            </div>
+                            <div class="form-group">
+                                <label>Endereço de E-mail</label>
+                                <input type="email" id="profile-email" value="{{ auth()->user()->email }}">
+                            </div>
+                            <div class="form-group">
+                                <label>Número de Telefone</label>
+                                <input type="tel" id="profile-phone" value="{{ auth()->user()->phone }}">
+                            </div>
+                        </div>
+
+                        <div class="profile-actions">
+                            <button class="btn-main profile-save-btn" type="button" onclick="saveProfileData()">
+                                <i data-lucide="save"></i>
+                                Atualizar Perfil
+                            </button>
+                            <button class="btn-main profile-password-btn" type="button" onclick="openPasswordModal()">
+                                <i data-lucide="lock-keyhole"></i>
+                                Alterar Senha
+                            </button>
+                            <button class="btn-main" style="background: rgba(255, 152, 0, 0.1); color: #ffb347; border: 1px solid rgba(255, 152, 0, 0.3);" type="button" onclick="openBackupModal()">
+                                <i data-lucide="database"></i>
+                                Backup & Recuperação
+                            </button>
+                            <button class="btn-main" style="background: rgba(255, 68, 68, 0.1); color: #ff4444; border: 1px solid rgba(255, 68, 68, 0.3);" type="button" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
+                                <i data-lucide="log-out"></i>
+                                Sair
+                            </button>
+                            <form id="logout-form" action="/logout" method="POST" style="display: none;">
+                                @csrf
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="engagement-modal" onclick="closeEngagementModal(event)">
+    <div class="modal-container" style="max-width: 450px; height: auto; min-height: 0; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 25px;">
+            <div>
+                <div class="modal-eyebrow">Mahungu AI</div>
+                <h2 style="color: #fff; font-size: 20px;">Conteúdo de Engajamento</h2>
+            </div>
+            <button class="close-modal" onclick="closeEngagementModal()"><i data-lucide="x"></i></button>
+        </div>
+
+        <div class="form-group">
+            <label>Tipo de conteúdo</label>
+            <select id="engagement-vibe" class="custom-select">
+                <option value="Sabias que... (curiosidade)">Sabias que... (curiosidade)</option>
+                <option value="Facto engraçado">Facto engraçado</option>
+                <option value="Pergunta à audiência">Pergunta à audiência</option>
+                <option value="Motivação do dia">Motivação do dia</option>
+                <option value="Nesta data (efeméride)">Nesta data (efeméride)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Tema (opcional)</label>
+            <input type="text" id="engagement-topic" placeholder="Ex: futebol moçambicano, música, história de Maputo...">
+        </div>
+
+        <button class="btn-main btn-success" style="margin-top: 10px;" onclick="generateEngagementContent()" id="btn-engagement-generate">
+            <i data-lucide="sparkles"></i> Criar com IA
+        </button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="proposal-review-modal" onclick="closeProposalModal(event)">
+    <div class="modal-container" style="max-width: 860px; height: auto; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 25px;">
+            <div>
+                <div class="modal-eyebrow">Revisão de Proposta</div>
+                <h2 style="color: #fff; font-size: 20px;">Proposta de Post <span id="proposal-id-display"></span></h2>
+            </div>
+            <button class="close-modal" onclick="closeProposalModal()"><i data-lucide="x"></i></button>
+        </div>
+
+        <div class="proposal-review-body">
+            <!-- Pré-visualização real do flyer (layout do editor em miniatura) -->
+            <div class="proposal-review-preview">
+                <div class="proposal-preview proposal-preview-lg" id="proposal-modal-preview">
+                    <!-- miniFlyerHTML via JS -->
+                </div>
+                <div class="proposal-preview-tools">
+                    <button class="btn-mini" onclick="regenerateProposal(currentProposalId)" id="btn-regenerate" title="Gerar outra versão com IA">
+                        <i data-lucide="refresh-cw"></i> Regenerar
+                    </button>
+                    <button class="btn-mini" onclick="openImagePicker(currentProposalId)" title="Procurar imagem real">
+                        <i data-lucide="image-plus"></i> Imagem
+                    </button>
+                    <button class="btn-mini" onclick="copyProposalCaption(currentProposalId)" title="Copiar legenda">
+                        <i data-lucide="copy"></i> Legenda
+                    </button>
+                </div>
+            </div>
+
+            <div class="proposal-review-fields">
+                <div class="form-group">
+                    <label>Título Sugerido</label>
+                    <p id="proposal-title" class="proposal-text-display"></p>
+                </div>
+                <div class="form-group">
+                    <label>Resumo Sugerido</label>
+                    <p id="proposal-summary" class="proposal-text-display"></p>
+                </div>
+                <div class="form-group">
+                    <label>Legenda para Redes Sociais</label>
+                    <p id="proposal-caption" class="proposal-text-display"></p>
+                </div>
+                <div class="form-group">
+                    <label>Hashtags</label>
+                    <p id="proposal-hashtags" class="proposal-text-display"></p>
+                </div>
+                <div class="form-group">
+                    <label>Call to Action (CTA)</label>
+                    <p id="proposal-cta" class="proposal-text-display"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Galeria de imagens reais (Openverse) -->
+        <div id="image-picker" class="image-picker" style="display: none;">
+            <div class="image-picker-header">
+                <input type="text" id="image-picker-query" placeholder="Pesquisar imagem... (ex: futebol, Maputo)" onkeypress="if(event.key === 'Enter') searchPickerImages()">
+                <button class="btn-mini" onclick="searchPickerImages()"><i data-lucide="search"></i></button>
+                <button class="btn-mini" onclick="closeImagePicker()"><i data-lucide="x"></i></button>
+            </div>
+            <div class="image-picker-grid" id="image-picker-grid">
+                <!-- thumbs via JS -->
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn-main" style="flex: 1; background: rgba(255,255,255,0.1);" onclick="editProposalInEditor(currentProposalId)">
+                <i data-lucide="pen-tool"></i> Editar no Editor
+            </button>
+            <button class="btn-main btn-success" style="flex: 1;" onclick="approveAndSaveProposal(currentProposalId)">
+                <i data-lucide="check-circle"></i> Aprovar e Salvar
+            </button>
+            <button class="btn-main btn-reject" style="flex: 1;" onclick="rejectProposal(currentProposalId)">
+                <i data-lucide="x-circle"></i> Rejeitar
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="save-modal" onclick="closeSaveModal(event)">
+    <div class="modal-container" style="max-width: 450px; height: auto; min-height: 0; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 30px;">
+            <div>
+                <div class="modal-eyebrow">Posts Aprovados</div>
+                <h2>Salvar no Sistema</h2>
+            </div>
+            <button class="close-modal" onclick="closeSaveModal()"><i data-lucide="x"></i></button>
+        </div>
+        <div class="form-group">
+            <label>Nome do Flyer</label>
+            <input type="text" id="save-title" placeholder="Ex: Polémica Elon Musk">
+        </div>
+        <div class="form-group">
+            <label>Categoria</label>
+            <select id="save-category" class="custom-select">
+                <option value="Notícias">Notícias</option>
+                <option value="Polémicas">Polémicas</option>
+                <option value="Tecnologia">Tecnologia</option>
+                <option value="Entretenimento">Entretenimento</option>
+                <option value="Desporto">Desporto</option>
+                <option value="Política">Política</option>
+                <option value="Outros">Outros</option>
+            </select>
+        </div>
+        <button class="btn-main btn-success" style="margin-top: 10px;" onclick="confirmSaveToHistory()">
+            <i data-lucide="save"></i> Salvar Agora
+        </button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="password-modal" onclick="closePasswordModal(event)">
+    <div class="modal-container" style="max-width: 450px; height: auto; min-height: 0; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 30px;">
+            <div>
+                <div class="modal-eyebrow">Segurança</div>
+                <h2>Redefinir Senha</h2>
+            </div>
+            <button class="close-modal" onclick="closePasswordModal()"><i data-lucide="x"></i></button>
+        </div>
+        <div class="form-group"><label>Senha Atual</label><input type="password" placeholder="••••••••"></div>
+        <div class="form-group"><label>Nova Senha</label><input type="password" placeholder="••••••••"></div>
+        <div class="form-group"><label>Confirmar Nova Senha</label><input type="password" placeholder="••••••••"></div>
+        <button class="btn-main btn-success" style="margin-top: 10px;" onclick="alert('Senha alterada com sucesso!'); closePasswordModal();">Salvar Nova Senha</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="post-modal" onclick="closeFlyerModal(event)">
+    <div class="modal-container" onclick="event.stopPropagation()">
+        <div class="modal-preview"><div class="modal-preview-frame"><img id="modal-img" src="" alt=""></div></div>
+        <div class="modal-sidebar">
+            <div class="modal-header">
+                <div><div class="modal-eyebrow">Post gerado</div><h2 id="modal-title">Título</h2></div>
+                <button class="close-modal" onclick="closeFlyerModal()"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-actions"><button class="btn-main btn-success" id="modal-download-btn"><i data-lucide="download"></i> Baixar Flyer</button></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="ai-chat-modal" onclick="closeAIChat(event)">
+    <div class="modal-container" style="max-width: 600px; height: 80vh; padding: 0; display: flex; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="padding: 25px 30px; border-bottom: 1px solid var(--glass-border);">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(112, 0, 255, 0.1); display: flex; align-items: center; justify-content: center; color: #7000ff;"><i data-lucide="sparkles"></i></div>
+                <div><h2 style="color: #fff; font-size: 18px;">Mahungu AI</h2><div style="display: flex; align-items: center; gap: 5px;"><span style="width: 6px; height: 6px; background: #00ff88; border-radius: 50%;"></span><span style="font-size: 11px; color: #00ff88;">Online</span></div></div>
+            </div>
+            <button class="close-modal" onclick="closeAIChat()"><i data-lucide="x"></i></button>
+        </div>
+        <div class="chat-messages" id="chat-messages" style="flex: 1; overflow-y: auto; padding: 30px; display: flex; flex-direction: column; gap: 20px;"></div>
+        <div class="chat-input-area" style="padding: 20px 30px; border-top: 1px solid var(--glass-border);">
+            <div class="chat-quick-replies" id="chat-quick-replies" style="display: flex; gap: 8px; margin-bottom: 15px; overflow-x: auto;"></div>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="chat-input" placeholder="Digite sua mensagem..." style="flex: 1;" onkeypress="if(event.key === 'Enter') sendChatMessage()">
+                <button class="btn-main" style="width: 50px; height: 50px; border-radius: 12px;" onclick="sendChatMessage()"><i data-lucide="send" size="20"></i></button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="ai-settings-modal" onclick="closeAISettings(event)">
+    <div class="modal-container" style="max-width: 450px; height: auto; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 25px;">
+            <div>
+                <div class="modal-eyebrow">Configurações</div>
+                <h2 style="color: #fff; font-size: 20px;">Mahungu AI (Gemini)</h2>
+            </div>
+            <button class="close-modal" onclick="closeAISettings()"><i data-lucide="x"></i></button>
+        </div>
+        <div class="form-group">
+            <label>Google API Key</label>
+            <input type="password" id="ai-api-key" placeholder="Cole sua Google API Key aqui">
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--primary); text-decoration: none;">Obtenha uma chave gratuita aqui.</a>
+            </p>
+        </div>
+        <div class="form-group">
+            <label>Intervalo de Monitoramento (minutos)</label>
+            <input type="number" id="monitoring-interval" min="1" max="180" value="15">
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button class="btn-main" id="test-ai-btn" style="flex: 1; background: rgba(255,255,255,0.1);" onclick="testAIConnection()">
+                <i data-lucide="plug-zap"></i> Testar Conexão
+            </button>
+            <button class="btn-main" style="flex: 2; background: #7000ff;" onclick="saveAISettings()"><i data-lucide="save"></i> Salvar Configurações</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="source-modal" onclick="closeSourceModal(event)">
+    <div class="modal-container" style="max-width: 450px; height: auto; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 25px;">
+            <div><div class="modal-eyebrow">Configuração</div><h2 style="color: #fff; font-size: 20px;">Fonte RSS</h2></div>
+            <button class="close-modal" onclick="closeSourceModal()"><i data-lucide="x"></i></button>
+        </div>
+        <input type="hidden" id="source-id">
+        <div class="form-group"><label>Nome</label><input type="text" id="source-name"></div>
+        <div class="form-group"><label>URL</label><input type="url" id="source-url"></div>
+        <div class="form-group"><label>Categoria</label><select id="source-category" class="custom-select"><option value="Notícias">Notícias</option><option value="Tecnologia">Tecnologia</option></select></div>
+        <button class="btn-main btn-success" onclick="saveSource()"><i data-lucide="save"></i> Salvar</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="social-accounts-modal" onclick="closeSocialAccountsModal(event)">
+    <div class="modal-container" style="max-width: 500px; height: auto; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 25px;">
+            <div><div class="modal-eyebrow">Integrações</div><h2 style="color: #fff; font-size: 20px;">Contas Sociais</h2></div>
+            <button class="close-modal" onclick="closeSocialAccountsModal()"><i data-lucide="x"></i></button>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 15px;" id="social-accounts-list">
+            <!-- Instagram -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); display: flex; align-items: center; justify-content: center; color: #fff;"><i data-lucide="instagram" width="20" height="20"></i></div>
+                    <div>
+                        <div style="font-weight: 600; color: #fff;">Instagram</div>
+                        <div style="font-size: 11px; color: var(--text-muted);" id="status-instagram">Desconectado</div>
+                    </div>
+                </div>
+                <button class="btn-mini" onclick="connectSocial('instagram')">Conectar</button>
+            </div>
+            <!-- Facebook -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: #1877f2; display: flex; align-items: center; justify-content: center; color: #fff;"><i data-lucide="facebook" width="20" height="20"></i></div>
+                    <div>
+                        <div style="font-weight: 600; color: #fff;">Facebook</div>
+                        <div style="font-size: 11px; color: var(--text-muted);" id="status-facebook">Desconectado</div>
+                    </div>
+                </div>
+                <button class="btn-mini" onclick="connectSocial('facebook')">Conectar</button>
+            </div>
+            <!-- TikTok -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: #000; display: flex; align-items: center; justify-content: center; color: #fff;"><i data-lucide="music" width="20" height="20"></i></div>
+                    <div>
+                        <div style="font-weight: 600; color: #fff;">TikTok</div>
+                        <div style="font-size: 11px; color: var(--text-muted);" id="status-tiktok">Desconectado</div>
+                    </div>
+                </div>
+                <button class="btn-mini" onclick="connectSocial('tiktok')">Conectar</button>
+            </div>
+            <!-- Twitter / X -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: #000; display: flex; align-items: center; justify-content: center; color: #fff;"><i data-lucide="twitter" width="20" height="20"></i></div>
+                    <div>
+                        <div style="font-weight: 600; color: #fff;">Twitter / X</div>
+                        <div style="font-size: 11px; color: var(--text-muted);" id="status-twitter">Desconectado</div>
+                    </div>
+                </div>
+                <button class="btn-mini" onclick="connectSocial('twitter')">Conectar</button>
+            </div>
+            <!-- Threads -->
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 15px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="width: 40px; height: 40px; border-radius: 10px; background: #fff; display: flex; align-items: center; justify-content: center; color: #000;"><i data-lucide="at-sign" width="20" height="20"></i></div>
+                    <div>
+                        <div style="font-weight: 600; color: #fff;">Threads</div>
+                        <div style="font-size: 11px; color: var(--text-muted);" id="status-threads">Desconectado</div>
+                    </div>
+                </div>
+                <button class="btn-mini" onclick="connectSocial('threads')">Conectar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="scheduler-modal" onclick="closeSchedulerModal(event)">
+    <div class="modal-container" style="max-width: 500px; height: auto; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 25px;">
+            <div><div class="modal-eyebrow">Agendamento</div><h2 style="color: #fff; font-size: 20px;">Novo Post</h2></div>
+            <button class="close-modal" onclick="closeSchedulerModal()"><i data-lucide="x"></i></button>
+        </div>
+        
+        <div class="form-group">
+            <label>Selecione o Flyer (Opcional)</label>
+            <select id="schedule-flyer" class="custom-select">
+                <option value="">Sem Flyer (Apenas Texto)</option>
+                <!-- Preenchido via JS -->
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>Legenda / Conteúdo</label>
+            <textarea id="schedule-content" style="width: 100%; min-height: 100px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 8px; color: #fff; padding: 12px; font-family: inherit; resize: vertical;" placeholder="Escreva a legenda do seu post..."></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>Plataformas</label>
+            <div style="display: flex; gap: 10px; margin-top: 5px;">
+                <label style="flex: 1; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" name="platforms" value="instagram">
+                    <span style="font-size: 13px;">Instagram</span>
+                </label>
+                <label style="flex: 1; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" name="platforms" value="facebook">
+                    <span style="font-size: 13px;">Facebook</span>
+                </label>
+                <label style="flex: 1; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" name="platforms" value="tiktok">
+                    <span style="font-size: 13px;">TikTok</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Data e Hora</label>
+            <input type="datetime-local" id="schedule-datetime">
+        </div>
+
+        <button class="btn-main btn-success" style="margin-top: 10px;" onclick="saveScheduledPost()">
+            <i data-lucide="calendar"></i> Agendar Agora
+        </button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="backup-modal" onclick="closeBackupModal(event)">
+    <div class="modal-container" style="max-width: 450px; height: auto; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 25px;">
+            <div><div class="modal-eyebrow">Dados</div><h2 style="color: #fff; font-size: 20px;">Backup</h2></div>
+            <button class="close-modal" onclick="closeBackupModal()"><i data-lucide="x"></i></button>
+        </div>
+        <button class="btn-main btn-success" style="width: 100%; margin-bottom: 20px;" onclick="downloadBackupFile()"><i data-lucide="download"></i> Download Backup</button>
+        <input type="file" id="backup-file-input" style="display: none;" onchange="handleBackupFileUpload(event)">
+        <button class="btn-main" style="width: 100%;" onclick="triggerBackupFileInput()"><i data-lucide="upload"></i> Restaurar Backup</button>
+    </div>
+</div>
+@endauth
+
+@guest
+<div id="login-overlay" style="position: fixed; inset: 0; background: #0a0a0b; z-index: 9999; display: flex; align-items: center; justify-content: center;">
+    <div class="modal-container" style="max-width: 400px; height: auto; padding: 40px; flex-direction: column; background: #141417; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px;">
+        <div class="sidebar-header" style="margin-bottom: 30px; text-align: center;">
+            <h1 style="color: #fff; font-size: 28px;">Mahungu 2.0</h1>
+            <p class="upload-hint">Por favor, faça login para continuar</p>
+        </div>
+        <div class="form-group"><label>E-mail</label><input type="email" id="login-email" placeholder="seu@email.com"></div>
+        <div class="form-group"><label>Senha</label><input type="password" id="login-password" placeholder="••••••••"></div>
+        <button class="btn-main btn-success" style="margin-top: 10px;" onclick="handleLogin()">Entrar</button>
+        <p id="login-error" style="color: #ff4444; font-size: 12px; margin-top: 15px; text-align: center; display: none;"></p>
+    </div>
+</div>
+<script>
+    async function handleLogin() {
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
+        const errorEl = document.getElementById('login-error');
+        errorEl.style.display = 'none';
+        try {
+            const module = await import('/assets/js/modules/storage.js');
+            await module.storage.login(email, password);
+            window.location.reload();
+        } catch (err) {
+            errorEl.textContent = err.message;
+            errorEl.style.display = 'block';
+        }
+    }
+</script>
+@endguest
+
+<div class="modal-overlay" id="confirm-modal" onclick="closeConfirmModal(event)">
+    <div class="modal-container" style="max-width: 450px; height: auto; min-height: 0; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 25px;">
+            <div>
+                <div class="modal-eyebrow" id="confirm-eyebrow">Atenção</div>
+                <h2 style="color: #fff; font-size: 20px;" id="confirm-title">Remover Tudo</h2>
+            </div>
+            <button class="close-modal" onclick="closeConfirmModal()"><i data-lucide="x"></i></button>
+        </div>
+        <p id="confirm-message" style="color: var(--text-muted); font-size: 14px; line-height: 1.6; margin-bottom: 30px;">
+            Deseja remover todas as propostas geradas? Esta ação não pode ser desfeita.
+        </p>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn-main" style="flex: 1; background: rgba(255,255,255,0.1);" onclick="closeConfirmModal()">Cancelar</button>
+            <button class="btn-main" style="flex: 1; background: rgba(255, 68, 68, 0.1); color: #ff4444; border: 1px solid rgba(255, 68, 68, 0.3);" id="confirm-yes-btn">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script type="module" src="/assets/js/main.js"></script>
+<script>
+    window.addEventListener('load', () => { if (typeof lucide !== 'undefined') lucide.createIcons(); });
+</script>
+</body>
+</html>

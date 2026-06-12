@@ -1,0 +1,33 @@
+# Dependências
+/vendor
+/node_modules
+
+# Ambiente / segredos
+.env
+.env.testing
+.env.*.local
+
+# Base de dados local (SQLite)
+/database/*.sqlite
+/database/database.sqlite
+/database/test.sqlite
+
+# Laravel runtime
+/storage/*.key
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/logs/*
+/bootstrap/cache/*
+
+# Testes / caches
+.phpunit.result.cache
+
+# Sistema operativo
+.DS_Store
+*.log
+
+# Editores
+.idea
+.vscode
+*.swp
