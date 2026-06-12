@@ -2320,6 +2320,8 @@ function openAISettings() {
     document.getElementById('brand-hashtags').value = storage.getSetting('brandHashtags', '');
     const intervalInput = document.getElementById('monitoring-interval');
     if (intervalInput) intervalInput.value = storage.getSetting('monitoringInterval', 15);
+    const ageInput = document.getElementById('news-age-days');
+    if (ageInput) ageInput.value = String(storage.getSetting('maxNewsAgeDays', 7));
     modal.classList.add('active');
     lucide.createIcons();
 }
@@ -2332,8 +2334,10 @@ function closeAISettings(e) {
 function saveAISettings() {
     const apiKey = document.getElementById('ai-api-key').value.trim();
     const interval = parseInt(document.getElementById('monitoring-interval').value) || 15;
+    const newsAge = parseInt(document.getElementById('news-age-days').value) || 7;
     storage.updateSetting('apiKey', apiKey);
     storage.updateSetting('monitoringInterval', interval);
+    storage.updateSetting('maxNewsAgeDays', newsAge);
     // Diretrizes de marca (injetadas em todos os prompts da IA)
     storage.updateSetting('brandVoice', document.getElementById('brand-voice').value.trim());
     storage.updateSetting('brandAudience', document.getElementById('brand-audience').value.trim());

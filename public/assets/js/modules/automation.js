@@ -15,10 +15,13 @@ const FETCH_TIMEOUT_MS = 25000;
 // Notícias publicadas há mais de FRESH_DAYS são descartadas, EXCETO se parecerem
 // virais (muitos comentários ou palavras-chave) e ainda dentro de VIRAL_MAX_DAYS.
 const DAY_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_FRESH_DAYS = 7;     // janela "recente" por omissão (configurável)
-const VIRAL_MAX_DAYS = 30;        // limite absoluto, mesmo para virais
-const VIRAL_MIN_COMMENTS = 30;    // nº de comentários que conta como "viral"
+const DEFAULT_FRESH_DAYS = 7;     // janela "recente" por omissão (configurável na UI)
+const VIRAL_MAX_DAYS = 30;        // até aqui, basta ser viral (critério normal)
+const EVERGREEN_MAX_DAYS = 180;   // até aqui, só se for FORTEMENTE viral (memorável)
+const VIRAL_MIN_COMMENTS = 30;    // comentários que contam como "viral"
+const STRONG_MIN_COMMENTS = 100;  // comentários que contam como "memorável"
 const VIRAL_KEYWORDS = /(viral|pol[ée]mica|trending|chocante|esc[âa]ndalo|bomb[áa]stic|sensa[çc][ãa]o|recorde)/i;
+const STRONG_KEYWORDS = /(viral|recorde|hist[óo]ric|in[ée]dit|imperd[íi]vel)/i;
 
 export const automation = {
     intervalId: null,
@@ -119,14 +122,21 @@ export const automation = {
 
             if (!title || !link) continue;
 
-            // ── Filtro de recência ──
+            // ── Filtro de recência (em camadas) ──
             const publishedAt = this.parsePubDate(pubDate);
             if (publishedAt != null) {
                 const ageDays = (Date.now() - publishedAt) / DAY_MS;
                 if (ageDays > freshDays) {
-                    // Antiga: só passa se ainda dentro do limite e parecer viral.
                     const comments = this.extractCommentsCount(item);
-                    if (ageDays > VIRAL_MAX_DAYS || !this.looksViral(title, source.category, comments)) {
+                    let keep;
+                    if (ageDays <= VIRAL_MAX_DAYS) {
+                        keep = this.looksViral(title, source.category, comments);          // viral
+                    } else if (ageDays <= EVERGREEN_MAX_DAYS) {
+                        keep = this.looksStronglyViral(title, source.category, comments);   // memorável
+                    } else {
+                        keep = false;                                                      // demasiado antiga
+                    }
+                    if (!keep) {
                         skippedOld++;
                         continue;
                     }
@@ -178,6 +188,12 @@ export const automation = {
     looksViral(title, category, comments) {
         if (comments >= VIRAL_MIN_COMMENTS) return true;
         return VIRAL_KEYWORDS.test(title || '') || VIRAL_KEYWORDS.test(category || '');
+    },
+
+    // Heurística mais exigente para notícias muito antigas (memoráveis/evergreen).
+    looksStronglyViral(title, category, comments) {
+        if (comments >= STRONG_MIN_COMMENTS) return true;
+        return STRONG_KEYWORDS.test(title || '') || STRONG_KEYWORDS.test(category || '');
     },
 
     // Extrai o link de um item RSS ou Atom (<link href> ou <link>texto</link>).
