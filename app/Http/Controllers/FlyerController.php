@@ -21,7 +21,16 @@ class FlyerController extends Controller
      */
     public function store(FlyerRequest $request)
     {
-        return Flyer::create($request->validated());
+        $data = $request->validated();
+        // Se há client_id (IndexedDB), faz upsert (evita duplicatas ao editar).
+        // Senão, cria novo (compatível com clientes antigos).
+        if (!empty($data['client_id'])) {
+            return Flyer::updateOrCreate(
+                ['client_id' => $data['client_id']],
+                $data
+            );
+        }
+        return Flyer::create($data);
     }
 
     /**
