@@ -6,6 +6,7 @@ use App\Http\Controllers\NewsSourceController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ScheduledPostController;
 use App\Http\Controllers\SocialAccountController;
+use App\Http\Controllers\SyncController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -27,7 +28,12 @@ Route::middleware(['auth'])->group(function () {
     Route::apiResource('proposals', ProposalController::class);
     Route::post('/proposals/clear', [ProposalController::class, 'clear']);
     Route::apiResource('sources', NewsSourceController::class);
-    
+
+    // Store partilhado entre utilizadores (Salvados/Aprovados visíveis por todos).
+    Route::get('/sync/{kind}', [SyncController::class, 'index']);
+    Route::post('/sync/{kind}', [SyncController::class, 'store']);
+    Route::delete('/sync/{kind}/{clientId}', [SyncController::class, 'destroy']);
+
     Route::apiResource('scheduled-posts', ScheduledPostController::class);
     Route::get('/social-accounts', [SocialAccountController::class, 'index']);
     Route::delete('/social-accounts/{platform}', [SocialAccountController::class, 'destroy']);

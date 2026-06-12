@@ -679,6 +679,7 @@ async function confirmSaveToHistory() {
                 };
                 proposal.status = 'pending'; // continua em "Salvadas" até aprovar
                 await storage.saveProposal(proposal);
+                await shareProposal(proposal); // visível para todos
                 closeSaveModal();
                 ui.showToast('Alterações salvas nas Salvadas da IA!', 'success');
                 if (!document.getElementById('tab-ai-saved').classList.contains('hidden')) renderAISaved();
@@ -709,6 +710,7 @@ async function confirmSaveToHistory() {
             }
         };
         await storage.saveFlyer(entry);
+        await shareFlyer(entry); // visível para todos
         await storage.syncFlyerToServer(entry);
         // Liga o editor a este flyer: salvar de novo continua a atualizá-lo.
         editingFlyerId = entry.id;
@@ -1398,6 +1400,7 @@ async function deleteHistoryItem(id, event) {
     if (event) event.stopPropagation();
     if (await ui.confirm("Excluir", "Remover este post aprovado?")) {
         await storage.deleteFlyer(id);
+        await storage.deleteShared('flyer', id); // remove para todos
         renderHistory();
         ui.showToast("Post removido.", "success");
         updateDashboardStats();
@@ -1806,6 +1809,7 @@ async function approveAndSaveProposal(id) {
             }
         };
         await storage.saveFlyer(newEntry);
+        await shareFlyer(newEntry); // visível para todos
         // Liga o editor a este flyer: se o utilizador o editar e salvar, atualiza.
         editingFlyerId = newEntry.id;
         editorPostMeta = {
@@ -1817,6 +1821,7 @@ async function approveAndSaveProposal(id) {
         // Update proposal status — promovida: sai de "Salvadas", vai p/ "Aprovadas".
         proposal.status = 'approved';
         await storage.saveProposal(proposal);
+        await shareProposal(proposal); // status propagado a todos (sai de Salvados)
         // O editor deixa de estar ligado à proposta (agora é o flyer aprovado).
         editingProposalId = null;
         updateDashboardStats();
@@ -1846,6 +1851,7 @@ async function rejectProposal(id) {
     if (await ui.confirm("Rejeitar Proposta", "Tem certeza que deseja rejeitar esta proposta?")) {
         proposal.status = 'rejected';
         await storage.saveProposal(proposal);
+        await shareProposal(proposal); // status propagado a todos
         updateDashboardStats();
         closeProposalModal();
         renderProposals();
@@ -2092,6 +2098,7 @@ async function generateProposalContent(id) {
         applyGenerationToProposal(proposal, result);
         await ensureProposalImage(proposal);
         await storage.saveProposal(proposal);
+        await shareProposal(proposal); // Salvados visíveis para todos
         updateDashboardStats();
         renderProposals();
         renderAISaved();
@@ -2126,6 +2133,7 @@ async function generateAllProposals() {
             applyGenerationToProposal(novas[i], result);
             await ensureProposalImage(novas[i]);
             await storage.saveProposal(novas[i]);
+            await shareProposal(novas[i]); // Salvados visíveis para todos
             done++;
             renderProposals(); // mostra cada flyer assim que fica pronto
             renderAISaved();
@@ -2200,6 +2208,7 @@ async function regenerateProposal(id) {
         const result = await ai.generateContent(proposal);
         applyGenerationToProposal(proposal, result);
         await storage.saveProposal(proposal);
+        await shareProposal(proposal); // Salvados visíveis para todos
         renderProposals();
         renderAISaved();
         // Reabrir o modal com o novo conteúdo (atualiza preview e campos)
@@ -2295,6 +2304,7 @@ async function selectPickerImage(index) {
 
     proposal.image = chosen.url;
     await storage.saveProposal(proposal);
+    await shareProposal(proposal); // propaga a nova imagem
 
     // Atualizar o preview do modal e a lista
     const previewEl = document.getElementById('proposal-modal-preview');
@@ -2350,6 +2360,7 @@ async function generateEngagementContent() {
         applyGenerationToProposal(proposal, result);
         await ensureProposalImage(proposal);
         await storage.saveProposal(proposal);
+        await shareProposal(proposal); // Salvados visíveis para todos
 
         updateDashboardStats();
         renderProposals();
@@ -2603,6 +2614,66 @@ async function updateDefaultSources() {
 window.updateDefaultSources = updateDefaultSources;
 
 // Inicialização
+// ═══════════════════════════════════════════════════════════════════
+// ║ SINCRONIZAÇÃO ENTRE UTILIZADORES (Salvados + Aprovados partilhados) ║
+// ═══════════════════════════════════════════════════════════════════
+// Partilha uma proposta processada (não o feed bruto 'new') para todos verem.
+async function shareProposal(p) {
+    if (p && p.status && p.status !== 'new') await storage.pushShared('proposal', p);
+}
+async function shareFlyer(f) {
+    if (f) await storage.pushShared('flyer', f);
+}
+
+let _syncingShared = false;
+async function syncSharedData(rerender = true) {
+    if (_syncingShared) return;
+    _syncingShared = true;
+    try {
+        const [proposals, flyers] = await Promise.all([
+            storage.pullShared('proposal'),
+            storage.pullShared('flyer')
+        ]);
+
+        // Propostas partilhadas (pending/approved/rejected) -> IndexedDB local.
+        if (Array.isArray(proposals)) {
+            for (const p of proposals) {
+                if (p && p.id != null) await storage.saveProposal(p);
+            }
+        }
+
+        // Flyers: o servidor é a fonte da verdade (merge + remove os apagados).
+        if (Array.isArray(flyers)) {
+            const serverIds = new Set(flyers.map(f => String(f.id)));
+            for (const f of flyers) {
+                if (f && f.id != null) await storage.saveFlyer(f);
+            }
+            const locais = await storage.getAllFlyers();
+            for (const lf of locais) {
+                if (!serverIds.has(String(lf.id))) await storage.deleteFlyerLocal(lf.id);
+            }
+        }
+
+        if (rerender) rerenderSharedTabs();
+    } catch (e) {
+        console.warn('Sincronização partilhada falhou:', e);
+    } finally {
+        _syncingShared = false;
+    }
+}
+
+// Re-renderiza apenas as abas partilhadas visíveis + dashboard.
+function rerenderSharedTabs() {
+    const visible = (id) => { const el = document.getElementById(id); return el && !el.classList.contains('hidden'); };
+    if (visible('tab-ai-saved')) renderAISaved();
+    if (visible('tab-history')) renderHistory();
+    if (visible('tab-proposals')) renderProposals();
+    if (typeof updateAISavedBadge === 'function') updateAISavedBadge();
+    if (typeof updateProposalsBadge === 'function') updateProposalsBadge();
+    updateDashboardStats();
+}
+window.syncSharedData = syncSharedData;
+
 async function initApp() {
     try {
         console.log('Mahungu Studio: Iniciando aplicação...');
@@ -2628,6 +2699,11 @@ async function initApp() {
         if (dashboardNav) {
             showTab('dashboard', dashboardNav);
         }
+
+        // Sincronização entre utilizadores: puxa Salvados/Aprovados de todos e
+        // depois repete periodicamente (quase em tempo real).
+        syncSharedData();
+        setInterval(() => syncSharedData(), 45000);
 
         console.log('Mahungu Studio: Dashboard atualizada com dados reais.');
     } catch (error) {

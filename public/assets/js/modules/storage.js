@@ -268,6 +268,64 @@ class StorageService {
         }
     }
 
+    // ── Store partilhado entre utilizadores (kind: 'proposal' | 'flyer') ──
+    // Empurra um objeto para o servidor (upsert por id), para todos verem.
+    async pushShared(kind, obj) {
+        if (!obj || obj.id == null) return null;
+        try {
+            const res = await fetch(`/api/sync/${kind}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ client_id: String(obj.id), payload: obj })
+            });
+            return res.ok;
+        } catch (e) { return null; }
+    }
+
+    // Puxa todos os objetos partilhados de um tipo. Devolve null em falha
+    // (para o chamador NÃO reconciliar/apagar contra uma lista vazia errada).
+    async pullShared(kind) {
+        try {
+            const res = await fetch(`/api/sync/${kind}`, {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin'
+            });
+            if (!res.ok) return null;
+            const data = await res.json();
+            return Array.isArray(data) ? data : null;
+        } catch (e) { return null; }
+    }
+
+    // Remove um flyer APENAS do IndexedDB local (sem tocar no servidor).
+    async deleteFlyerLocal(id) {
+        await this.initPromise;
+        return new Promise((resolve) => {
+            const tx = this.db.transaction([STORE_FLYERS], 'readwrite');
+            tx.objectStore(STORE_FLYERS).delete(id);
+            tx.oncomplete = () => resolve(true);
+            tx.onerror = () => resolve(false);
+        });
+    }
+
+    // Remove um objeto partilhado do servidor.
+    async deleteShared(kind, id) {
+        try {
+            await fetch(`/api/sync/${kind}/${encodeURIComponent(String(id))}`, {
+                method: 'DELETE',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
+                },
+                credentials: 'same-origin'
+            });
+        } catch (e) { /* offline-first */ }
+    }
+
     async getDashboardStats() {
         const flyers = await this.getAllFlyers();
         const now = new Date();
