@@ -238,6 +238,8 @@ body.editor-active #tab-editor {
 .tab-content {
     flex: 1;
     width: 100%;
+    position: relative;
+    padding-bottom: 50px;
     animation: fadeIn 0.3s ease-in-out;
 }
 
@@ -262,11 +264,6 @@ body.editor-active #tab-editor {
     margin-bottom: 40px;
     position: relative;
     z-index: 1;
-}
-
-.tab-content {
-    position: relative;
-    padding-bottom: 50px;
 }
 
 /* Efeito de brilho no fundo das abas */
@@ -1164,36 +1161,6 @@ body.editor-active #tab-editor {
     justify-content: center;
 }
 
-.btn-copy {
-    position: absolute;
-    bottom: 12px;
-    right: 12px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid var(--glass-border);
-    border-radius: 8px;
-    padding: 8px 12px;
-    color: #fff;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.2s;
-    backdrop-filter: blur(5px);
-}
-
-.btn-copy:hover {
-    background: var(--primary);
-    border-color: var(--primary);
-    transform: translateY(-2px);
-}
-
-.btn-copy i {
-    width: 14px;
-    height: 14px;
-}
-
 .modal-preview-frame::before {
     content: '';
     position: absolute;
@@ -1409,27 +1376,6 @@ body.editor-active #tab-editor {
     color: #e0e0e0;
 }
 
-.btn-copy {
-    position: absolute;
-    bottom: 10px; right: 10px;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    color: var(--text-muted);
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 11px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.2s;
-}
-
-.btn-copy:hover {
-    background: #fff;
-    color: #000;
-}
-
 @media (max-width: 980px) {
     .modal-overlay { padding: 20px; }
 
@@ -1551,6 +1497,26 @@ body.editor-active #tab-editor {
     color: #b78cff !important;
     border: 1px solid rgba(112, 0, 255, 0.35) !important;
     font-weight: 700;
+}
+
+.date-group-header {
+    grid-column: 1 / -1;
+    margin: 30px 0 10px;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.date-group-header::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, rgba(212, 82, 42, 0.3), transparent);
 }
 
 /* ── LEGENDA PARA REDES (modal do Histórico) ── */
