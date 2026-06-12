@@ -59,7 +59,10 @@ class ScheduledPostController extends Controller
 
     /**
      * Descodifica um data URL (data:image/png;base64,...) e guarda-o no disco
-     * privado, devolvendo o caminho relativo (ou null se inválido).
+     * público, devolvendo o caminho relativo (ou null se inválido).
+     *
+     * Usa o disco 'public' (storage/app/public, exposto via /storage) porque o
+     * Instagram exige um URL público da imagem para publicar.
      */
     private function storeDataUrl(string $dataUrl): ?string
     {
@@ -72,7 +75,7 @@ class ScheduledPostController extends Controller
             return null;
         }
         $path = 'scheduled/' . Str::uuid() . '.' . $ext;
-        Storage::disk('local')->put($path, $bytes);
+        Storage::disk('public')->put($path, $bytes);
         return $path;
     }
 

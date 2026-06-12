@@ -13,6 +13,8 @@
 /database/test.sqlite
 
 # Laravel runtime
+/public/storage
+/storage/app/public/scheduled
 /storage/*.key
 /storage/framework/cache/*
 /storage/framework/sessions/*

@@ -62,13 +62,14 @@ class SocialAccountController extends Controller
                 'client_id' => config("services.$platform.client_id"),
                 'redirect_uri' => route('social.callback', $platform),
                 'state' => Auth::id(),
-                'scope' => 'pages_manage_posts,pages_read_engagement',
+                'response_type' => 'code',
+                'scope' => config("services.$platform.scopes"),
             ]),
             'tiktok' => 'https://www.tiktok.com/v2/auth/authorize/?' . http_build_query([
                 'client_key' => config('services.tiktok.client_id'),
                 'redirect_uri' => route('social.callback', $platform),
                 'state' => Auth::id(),
-                'scope' => 'video.publish',
+                'scope' => config('services.tiktok.scopes'),
                 'response_type' => 'code',
             ]),
         };

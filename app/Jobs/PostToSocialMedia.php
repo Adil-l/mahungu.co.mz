@@ -40,6 +40,15 @@ class PostToSocialMedia implements ShouldQueue
 
         foreach ($platforms as $platform) {
             try {
+                // Modo simulação: marca como publicado sem contas nem APIs reais.
+                // Demonstra o fluxo agendamento->publicação antes da aprovação da
+                // Meta. Activa com SOCIAL_SIMULATE=true no .env.
+                if (config('services.social.simulate')) {
+                    Log::info("[SIMULAÇÃO] Publicaria no $platform (post #{$this->scheduledPost->id}).");
+                    $successCount++;
+                    continue;
+                }
+
                 $account = SocialAccount::where('user_id', $this->scheduledPost->user_id)
                     ->where('platform', $platform)
                     ->first();
@@ -96,9 +105,10 @@ class PostToSocialMedia implements ShouldQueue
 
         return match ($platform) {
             'facebook' => $this->postToFacebook($account, $content, $mediaPath),
+            'instagram' => $this->postToInstagram($account, $content, $mediaPath),
             default => throw new \Exception(
-                "Publicação automática para $platform ainda não está disponível (de momento só Facebook). "
-                . "Instagram exige uma conta IG Business + URL pública da imagem; TikTok exige a Content Posting API."
+                "Publicação automática para $platform ainda não está disponível. "
+                . "TikTok exige a Content Posting API; Twitter/Threads não estão implementados."
             ),
         };
     }
@@ -125,9 +135,9 @@ class PostToSocialMedia implements ShouldQueue
         $pageId = $page['id'];
         $pageToken = $page['access_token'];
 
-        if ($mediaPath && Storage::disk('local')->exists($mediaPath)) {
+        if ($mediaPath && Storage::disk('public')->exists($mediaPath)) {
             // Publica a imagem na Página.
-            $res = Http::attach('source', Storage::disk('local')->get($mediaPath), 'flyer.png')
+            $res = Http::attach('source', Storage::disk('public')->get($mediaPath), 'flyer.png')
                 ->post("https://graph.facebook.com/v19.0/{$pageId}/photos", [
                     'caption' => $content,
                     'access_token' => $pageToken,
@@ -145,6 +155,69 @@ class PostToSocialMedia implements ShouldQueue
         }
 
         Log::info("Publicado no Facebook (página {$pageId}) para o utilizador {$account->user_id}.");
+        return true;
+    }
+
+    /**
+     * Publica uma imagem numa conta Instagram Business ligada a uma Página.
+     * Fluxo da Graph API: descobrir a Página -> a conta IG -> criar container
+     * de media (com URL público da imagem) -> publicar o container.
+     */
+    protected function postToInstagram($account, string $content, ?string $mediaPath): bool
+    {
+        if (!$mediaPath || !Storage::disk('public')->exists($mediaPath)) {
+            throw new \Exception('O Instagram exige uma imagem para publicar.');
+        }
+
+        $userToken = $account->access_token;
+
+        // 1) Página + Page Access Token
+        $pages = Http::get('https://graph.facebook.com/v19.0/me/accounts', [
+            'access_token' => $userToken,
+        ])->throw()->json('data', []);
+
+        if (empty($pages)) {
+            throw new \Exception('Nenhuma Página do Facebook associada (necessária para o Instagram).');
+        }
+
+        $page = $pages[0];
+        $pageToken = $page['access_token'];
+
+        // 2) Conta Instagram Business ligada à Página
+        $igId = Http::get("https://graph.facebook.com/v19.0/{$page['id']}", [
+            'fields' => 'instagram_business_account',
+            'access_token' => $pageToken,
+        ])->throw()->json('instagram_business_account.id');
+
+        if (!$igId) {
+            throw new \Exception('Esta Página não tem uma conta Instagram Business ligada.');
+        }
+
+        // 3) URL público da imagem (o IG vai buscá-la; não aceita upload de bytes).
+        $imageUrl = Storage::disk('public')->url($mediaPath);
+
+        // 4) Cria o container de media
+        $container = Http::post("https://graph.facebook.com/v19.0/{$igId}/media", [
+            'image_url' => $imageUrl,
+            'caption' => $content,
+            'access_token' => $pageToken,
+        ]);
+
+        if ($container->failed()) {
+            throw new \Exception('Instagram (container): ' . $container->json('error.message', 'erro ao preparar a imagem.'));
+        }
+
+        // 5) Publica o container
+        $publish = Http::post("https://graph.facebook.com/v19.0/{$igId}/media_publish", [
+            'creation_id' => $container->json('id'),
+            'access_token' => $pageToken,
+        ]);
+
+        if ($publish->failed()) {
+            throw new \Exception('Instagram (publish): ' . $publish->json('error.message', 'erro ao publicar.'));
+        }
+
+        Log::info("Publicado no Instagram (conta {$igId}) para o utilizador {$account->user_id}.");
         return true;
     }
 }
