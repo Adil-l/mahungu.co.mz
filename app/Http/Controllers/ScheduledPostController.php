@@ -75,7 +75,9 @@ class ScheduledPostController extends Controller
             return null;
         }
         $path = 'scheduled/' . Str::uuid() . '.' . $ext;
-        Storage::disk('public')->put($path, $bytes);
+        // visibilidade 'public' para o S3 servir um URL acessível (Instagram/Threads
+        // vão buscar a imagem pelo URL). No disco local 'public' é o comportamento normal.
+        Storage::disk(config('filesystems.media_disk'))->put($path, $bytes, 'public');
         return $path;
     }
 

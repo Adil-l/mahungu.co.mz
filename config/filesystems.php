@@ -4,6 +4,12 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
+    // Disco onde se guardam as imagens dos flyers para publicação agendada.
+    // Local/dev: 'public' (disco local). Em produção serverless (Laravel Cloud),
+    // pôr MEDIA_DISK=s3 — o disco local é efémero e a imagem desaparece entre o
+    // agendamento e a publicação (a app dorme/acorda noutra instância).
+    'media_disk' => env('MEDIA_DISK', 'public'),
+
     'disks' => [
 
         'local' => [

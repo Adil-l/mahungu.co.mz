@@ -147,11 +147,11 @@ class PostToSocialMedia implements ShouldQueue
 
         $base = "https://graph.threads.net/v1.0/{$userId}";
 
-        if ($mediaPath && Storage::disk('public')->exists($mediaPath)) {
+        if ($mediaPath && Storage::disk(config('filesystems.media_disk'))->exists($mediaPath)) {
             // O Threads precisa de um URL público da imagem (não aceita upload de bytes).
             $createParams = [
                 'media_type' => 'IMAGE',
-                'image_url' => Storage::disk('public')->url($mediaPath),
+                'image_url' => Storage::disk(config('filesystems.media_disk'))->url($mediaPath),
                 'text' => $content,
                 'access_token' => $token,
             ];
@@ -201,8 +201,8 @@ class PostToSocialMedia implements ShouldQueue
         $mediaPath = $this->scheduledPost->media_path;
 
         $mediaIds = [];
-        if ($mediaPath && Storage::disk('public')->exists($mediaPath)) {
-            $mediaIds[] = $twitter->uploadMedia(Storage::disk('public')->get($mediaPath), 'flyer.png');
+        if ($mediaPath && Storage::disk(config('filesystems.media_disk'))->exists($mediaPath)) {
+            $mediaIds[] = $twitter->uploadMedia(Storage::disk(config('filesystems.media_disk'))->get($mediaPath), 'flyer.png');
         }
 
         if (trim($content) === '' && empty($mediaIds)) {
@@ -248,8 +248,8 @@ class PostToSocialMedia implements ShouldQueue
         $content = $this->scheduledPost->content ?? '';
         $mediaPath = $this->scheduledPost->media_path;
 
-        if ($mediaPath && Storage::disk('public')->exists($mediaPath)) {
-            $res = Http::attach('source', Storage::disk('public')->get($mediaPath), 'flyer.png')
+        if ($mediaPath && Storage::disk(config('filesystems.media_disk'))->exists($mediaPath)) {
+            $res = Http::attach('source', Storage::disk(config('filesystems.media_disk'))->get($mediaPath), 'flyer.png')
                 ->post("https://graph.facebook.com/v19.0/{$pageId}/photos", [
                     'caption' => $content,
                     'access_token' => $pageToken,
@@ -291,9 +291,9 @@ class PostToSocialMedia implements ShouldQueue
         $pageId = $page['id'];
         $pageToken = $page['access_token'];
 
-        if ($mediaPath && Storage::disk('public')->exists($mediaPath)) {
+        if ($mediaPath && Storage::disk(config('filesystems.media_disk'))->exists($mediaPath)) {
             // Publica a imagem na Página.
-            $res = Http::attach('source', Storage::disk('public')->get($mediaPath), 'flyer.png')
+            $res = Http::attach('source', Storage::disk(config('filesystems.media_disk'))->get($mediaPath), 'flyer.png')
                 ->post("https://graph.facebook.com/v19.0/{$pageId}/photos", [
                     'caption' => $content,
                     'access_token' => $pageToken,
@@ -321,7 +321,7 @@ class PostToSocialMedia implements ShouldQueue
      */
     protected function postToInstagram($account, string $content, ?string $mediaPath): bool
     {
-        if (!$mediaPath || !Storage::disk('public')->exists($mediaPath)) {
+        if (!$mediaPath || !Storage::disk(config('filesystems.media_disk'))->exists($mediaPath)) {
             throw new \Exception('O Instagram exige uma imagem para publicar.');
         }
 
@@ -350,7 +350,7 @@ class PostToSocialMedia implements ShouldQueue
         }
 
         // 3) URL público da imagem (o IG vai buscá-la; não aceita upload de bytes).
-        $imageUrl = Storage::disk('public')->url($mediaPath);
+        $imageUrl = Storage::disk(config('filesystems.media_disk'))->url($mediaPath);
 
         // 4) Cria o container de media
         $container = Http::post("https://graph.facebook.com/v19.0/{$igId}/media", [
