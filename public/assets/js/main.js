@@ -97,6 +97,16 @@ function escapeHtml(s) {
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Monta o HTML do título do flyer: TÍTULO (branco) - RESUMO (laranja), com o
+// hífen no meio a separar os dois. Usado em todos os pontos que pintam o flyer.
+function headlineHtml(title, summary) {
+    const t = escapeHtml(String(title ?? '').trim());
+    const s = escapeHtml(String(summary ?? '').trim());
+    return s
+        ? `<span class="cor-branca">${t} - </span><span class="cor-laranja">${s}</span>`
+        : `<span class="cor-branca">${t}</span>`;
+}
+
 const DEFAULT_FLYER_PHOTO = '/assets/img/photos/foto-base.png';
 
 // Encaminha imagens externas por um proxy com CORS aberto (images.weserv.nl)
@@ -686,9 +696,10 @@ async function confirmSaveToHistory() {
             const proposal = await storage.getProposalById(editingProposalId);
             if (proposal) {
                 const editor = document.getElementById('editor');
-                const titleEl = editor.querySelector('.cor-laranja');
-                const sumEl = editor.querySelector('.cor-branca');
-                proposal.generatedTitle = (titleEl ? titleEl.textContent : editor.textContent).trim();
+                // Título agora é branco e o resumo laranja (ver headlineHtml).
+                const titleEl = editor.querySelector('.cor-branca');
+                const sumEl = editor.querySelector('.cor-laranja');
+                proposal.generatedTitle = (titleEl ? titleEl.textContent : editor.textContent).replace(/\s*-\s*$/, '').trim();
                 proposal.generatedSummary = sumEl ? sumEl.textContent.trim() : '';
                 // Guarda o estado visual editado para preview/aprovação fiéis.
                 proposal.flyerState = {
@@ -2049,7 +2060,7 @@ async function editProposalInEditor(id) {
     } else {
         // Primeira edição: monta a partir do título/resumo gerados pela IA.
         if (editor) {
-            editor.innerHTML = `<span class="cor-laranja">${escapeHtml(proposal.generatedTitle)}</span><br><span class="cor-branca">${escapeHtml(proposal.generatedSummary)}</span>`;
+            editor.innerHTML = headlineHtml(proposal.generatedTitle, proposal.generatedSummary);
         }
         const photoSrc = proxyImageUrl(proposal.image);
         if (photoImg && photoSrc) photoImg.src = photoSrc;
@@ -2111,7 +2122,7 @@ async function approveAndSaveProposal(id) {
             core.updateImageTransform();
         } else {
             if (editor) {
-                editor.innerHTML = `<span class="cor-laranja">${escapeHtml(proposal.generatedTitle)}</span><br><span class="cor-branca">${escapeHtml(proposal.generatedSummary)}</span>`;
+                editor.innerHTML = headlineHtml(proposal.generatedTitle, proposal.generatedSummary);
             }
             const photoSrc = proxyImageUrl(proposal.image);
             if (photoImg && photoSrc) photoImg.src = photoSrc;
@@ -2218,9 +2229,7 @@ function miniFlyerHTML(proposal) {
     if (fs && fs.html) {
         textInner = fs.html;
     } else {
-        const title = escapeHtml(rawTitle);
-        const summary = escapeHtml(rawSummary);
-        textInner = `<span class="cor-laranja">${title}</span>${summary ? `<br><span class="cor-branca">${summary}</span>` : ''}`;
+        textInner = headlineHtml(rawTitle, rawSummary);
     }
 
     return `
