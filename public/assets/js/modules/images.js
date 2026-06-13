@@ -97,5 +97,41 @@ export const images = {
             console.warn('ImagesService: pesquisa falhou:', err.message);
             return '';
         }
+    },
+
+    /**
+     * Pesquisa no Pexels (foto profissional, por tema) via proxy do servidor
+     * (a chave fica no .env). Devolve o URL da 1.ª foto ou ''.
+     * @param {string} query
+     * @returns {Promise<string>}
+     */
+    async fromPexels(query) {
+        const q = String(query || '').trim();
+        if (!q) return '';
+        try {
+            const res = await fetch(`/api/images/search?q=${encodeURIComponent(q)}`, {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) return '';
+            const data = await res.json();
+            return data.url || '';
+        } catch (err) {
+            console.warn('ImagesService.fromPexels falhou:', err.message);
+            return '';
+        }
+    },
+
+    /**
+     * Último recurso: gera uma imagem por IA (Pollinations, sem chave) para
+     * notícias sem qualquer foto. O URL gera a imagem ao ser carregado. Pede
+     * "sem texto" para não chocar com o título do flyer. Devolve sempre um URL.
+     * @param {string} query
+     * @returns {string}
+     */
+    aiGenerate(query) {
+        const prompt = `editorial news illustration about: ${String(query || 'notícias').trim()}. `
+            + `professional, high quality, no text, no words, no watermark`;
+        return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1080&height=1350&nologo=true`;
     }
 };

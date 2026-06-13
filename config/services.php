@@ -75,6 +75,12 @@ return [
         'hashtag_host' => env('RAPIDAPI_HASHTAG_HOST', 'hashtagy-generate-hashtags.p.rapidapi.com'),
     ],
 
+    // Pexels — banco de fotos para reforçar imagens de flyers (chave grátis em
+    // pexels.com/api). A chave fica no servidor e nunca é exposta ao browser.
+    'pexels' => [
+        'key' => env('PEXELS_API_KEY'),
+    ],
+
     // Liga/desliga modo de simulação: quando true, os posts são marcados como
     // publicados sem chamar as APIs reais (útil para demonstrar o fluxo sem a
     // aprovação da Meta). Ver App\Jobs\PostToSocialMedia.
