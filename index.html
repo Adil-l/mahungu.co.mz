@@ -56,10 +56,6 @@
             <i data-lucide="user-circle"></i>
             <span class="nav-label">Perfil</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" onclick="openAISettings()" title="Configurações IA">
-            <i data-lucide="settings"></i>
-            <span class="nav-label">Configurações IA</span>
-        </a>
         <a href="javascript:void(0)" class="nav-item admin-only" data-tab="admin" style="display:none;" title="Administração">
             <i data-lucide="shield"></i>
             <span class="nav-label">Administração</span>
@@ -416,6 +412,10 @@
                             <button class="btn-main profile-password-btn" type="button" onclick="openPasswordModal()">
                                 <i data-lucide="lock-keyhole"></i>
                                 Alterar Senha
+                            </button>
+                            <button class="btn-main" style="background: rgba(112, 0, 255, 0.1); color: #b98aff; border: 1px solid rgba(112, 0, 255, 0.3);" type="button" onclick="openAISettings()">
+                                <i data-lucide="settings"></i>
+                                Configurações IA
                             </button>
                             <button class="btn-main" style="background: rgba(255, 152, 0, 0.1); color: #ffb347; border: 1px solid rgba(255, 152, 0, 0.3);" type="button" onclick="openBackupModal()">
                                 <i data-lucide="database"></i>
