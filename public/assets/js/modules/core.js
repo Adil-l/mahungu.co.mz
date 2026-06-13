@@ -7,7 +7,12 @@ export const core = {
         zoom: 1,
         posX: 0,
         posY: 0,
-        fontSize: 72
+        fontSize: 72,
+        // Modo "fundo duplo": duas imagens lado a lado, cada uma com o seu ajuste.
+        split: false,
+        activeHalf: 'left',
+        left: { src: '', zoom: 1, posX: 0, posY: 0 },
+        right: { src: '', zoom: 1, posX: 0, posY: 0 }
     },
 
     setScale() {
@@ -45,10 +50,19 @@ export const core = {
     },
 
     updateImageTransform() {
-        const img = document.querySelector('.layer-photo img');
-        if (img) {
-            img.style.transform = `translate(${this.editorState.posX}px, ${this.editorState.posY}px) scale(${this.editorState.zoom})`;
+        const s = this.editorState;
+        const single = document.querySelector('.layer-photo .photo-single');
+        if (single) {
+            single.style.transform = `translate(${s.posX}px, ${s.posY}px) scale(${s.zoom})`;
         }
+        // Modo "fundo duplo": cada metade tem o seu próprio zoom/posição.
+        ['left', 'right'].forEach(side => {
+            const half = s[side];
+            const img = document.querySelector(`.photo-half[data-half="${side}"] img`);
+            if (img && half) {
+                img.style.transform = `translate(${half.posX || 0}px, ${half.posY || 0}px) scale(${half.zoom || 1})`;
+            }
+        });
     },
 
     async captureCurrentFlyer() {
@@ -80,18 +94,49 @@ export const core = {
 
             // O html2canvas (1.4.1) não respeita object-fit em <img> e estica a
             // foto (fica achatada). Solução: no clone, converter a foto para
-            // background-image na própria camada, preservando o ajuste (contain)
-            // e o zoom/posição (transform) — o html2canvas captura isto fielmente.
-            const cloneImg = flyerClone.querySelector('.layer-photo img');
+            // background-image na própria camada, preservando o ajuste e o
+            // zoom/posição (transform) — o html2canvas captura isto fielmente.
             const cloneLayer = flyerClone.querySelector('.layer-photo');
-            if (cloneImg && cloneLayer && cloneImg.src) {
-                cloneLayer.style.backgroundImage = `url("${cloneImg.src}")`;
-                cloneLayer.style.backgroundSize = 'contain';
-                cloneLayer.style.backgroundPosition = 'center';
-                cloneLayer.style.backgroundRepeat = 'no-repeat';
-                cloneLayer.style.transform = cloneImg.style.transform || '';
-                cloneLayer.style.transformOrigin = 'center';
-                cloneImg.remove();
+            if (cloneLayer && cloneLayer.classList.contains('is-split')) {
+                // Modo "fundo duplo": converter CADA metade (cover) separadamente.
+                flyerClone.querySelectorAll('.photo-half').forEach(half => {
+                    half.classList.remove('active'); // tira o tracejado de seleção
+                    const img = half.querySelector('img');
+                    if (img && img.src) {
+                        half.style.backgroundImage = `url("${img.src}")`;
+                        half.style.backgroundSize = 'cover';
+                        half.style.backgroundPosition = 'center';
+                        half.style.backgroundRepeat = 'no-repeat';
+                        // O transform da metade fica num wrapper interno para não
+                        // mover o recorte (overflow:hidden) da própria metade.
+                        const t = img.style.transform || '';
+                        if (t) {
+                            half.style.backgroundImage = 'none';
+                            const fill = document.createElement('div');
+                            fill.style.cssText = `position:absolute;inset:0;background-image:url("${img.src}");background-size:cover;background-position:center;background-repeat:no-repeat;transform:${t};transform-origin:center;`;
+                            half.insertBefore(fill, half.firstChild);
+                        }
+                        img.remove();
+                    }
+                });
+                // Remover a foto single escondida para não interferir.
+                const hiddenSingle = flyerClone.querySelector('.layer-photo .photo-single');
+                if (hiddenSingle) hiddenSingle.remove();
+            } else {
+                const cloneImg = flyerClone.querySelector('.layer-photo .photo-single')
+                    || flyerClone.querySelector('.layer-photo img');
+                if (cloneImg && cloneLayer && cloneImg.src) {
+                    cloneLayer.style.backgroundImage = `url("${cloneImg.src}")`;
+                    cloneLayer.style.backgroundSize = 'contain';
+                    cloneLayer.style.backgroundPosition = 'center';
+                    cloneLayer.style.backgroundRepeat = 'no-repeat';
+                    cloneLayer.style.transform = cloneImg.style.transform || '';
+                    cloneLayer.style.transformOrigin = 'center';
+                    cloneImg.remove();
+                    // Remover também a estrutura split escondida (se existir).
+                    const split = cloneLayer.querySelector('.photo-split');
+                    if (split) split.remove();
+                }
             }
 
             captureHost.appendChild(flyerClone);

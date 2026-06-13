@@ -78,8 +78,18 @@
         <div class="control-label">Fundo</div>
         <button class="btn-main" onclick="trocarFoto()">
             <i data-lucide="image"></i>
-            Trocar Foto
+            <span id="trocar-foto-label">Trocar Foto</span>
         </button>
+        <button class="btn-full" id="btn-fundo-duplo" onclick="toggleSplit()" style="margin-top: 8px;">
+            <i data-lucide="columns-2" style="width: 14px; height: 14px;"></i> Fundo duplo
+        </button>
+        <div id="split-side-controls" style="display: none; margin-top: 8px;">
+            <div class="control-label" style="margin-bottom: 6px;">Lado a editar</div>
+            <div class="color-grid">
+                <button class="btn-tool split-side-btn active" data-side="left" onclick="selectHalf('left')">Esquerda</button>
+                <button class="btn-tool split-side-btn" data-side="right" onclick="selectHalf('right')">Direita</button>
+            </div>
+        </div>
     </div>
 
     <div class="control-group">
@@ -185,7 +195,14 @@
     <section id="tab-editor" class="tab-content hidden">
             <div class="flyer-wrapper">
             <div class="flyer">
-                <div class="layer-photo"><img src="/assets/img/photos/foto-base.png" alt=""></div>
+                <div class="layer-photo">
+                    <img class="photo-single" src="/assets/img/photos/foto-base.png" alt="">
+                    <div class="photo-split">
+                        <div class="photo-half" data-half="left" onclick="selectHalf('left')"><img alt=""></div>
+                        <div class="photo-half" data-half="right" onclick="selectHalf('right')"><img alt=""></div>
+                        <div class="photo-divider"></div>
+                    </div>
+                </div>
                 <div class="layer-meio-fundo"><img src="/assets/img/system/onda-azul.png" alt=""></div>
                 <div class="layer-barra-cima"><img src="/assets/img/system/barra-cima.png" alt=""></div>
                 <div class="layer-barra-baixo"><img src="/assets/img/system/barra-baixo.png" alt=""></div>
