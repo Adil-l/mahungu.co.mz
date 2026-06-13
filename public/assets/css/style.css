@@ -61,14 +61,53 @@ body.editor-active {
 .sidebar-header > div { flex-wrap: wrap; }
 
 /* ── NAVEGAÇÃO ── */
-.main-nav { display: flex; flex-direction: column; gap: 8px; position: relative; z-index: 13001; pointer-events: auto; }
+/* A nav ocupa o espaço disponível e rola internamente; logo fica no topo e a
+   secção AI/userbox fica em baixo, sem transbordar em ecrãs baixos. */
+.main-nav {
+  display: flex; flex-direction: column; gap: 8px;
+  position: relative; z-index: 13001; pointer-events: auto;
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  margin: 0 -6px; padding: 0 6px;
+}
+.main-nav::-webkit-scrollbar { width: 6px; }
+.main-nav::-webkit-scrollbar-track { background: transparent; }
+.main-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+.main-nav::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22); }
 .nav-item {
   display: flex; align-items: center; gap: 12px; padding: 12px 15px; border-radius: 10px;
   color: var(--text-muted); text-decoration: none; font-size: 14px; font-weight: 500; transition: all 0.2s;
-  pointer-events: auto;
+  pointer-events: auto; flex-shrink: 0; white-space: nowrap;
 }
 .nav-item:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
 .nav-item.active { background: rgba(212, 82, 42, 0.1); color: var(--primary); }
+
+/* ── BOTÃO RECOLHER ── */
+.sidebar-top { display: flex; justify-content: flex-end; flex-shrink: 0; }
+.sidebar-toggle {
+  width: 32px; height: 32px; border-radius: 8px;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+  color: var(--text-muted); cursor: pointer; z-index: 13002;
+  display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+}
+.sidebar-toggle:hover { color: #fff; background: rgba(255,255,255,0.1); }
+.sidebar-toggle i, .sidebar-toggle svg { width: 18px; height: 18px; }
+
+/* ── SIDEBAR RECOLHIDA ── */
+.sidebar-left { transition: width 0.25s ease, padding 0.25s ease; }
+.main-content { transition: margin-left 0.25s ease, margin-right 0.3s ease; }
+body.sidebar-collapsed .sidebar-left { width: 78px; padding-left: 12px; padding-right: 12px; }
+body.sidebar-collapsed .main-content { margin-left: 78px; }
+body.sidebar-collapsed .sidebar-top { justify-content: center; }
+body.sidebar-collapsed .sidebar-header { justify-content: center; }
+body.sidebar-collapsed .sidebar-header img { max-width: 46px !important; margin: 0 auto; }
+body.sidebar-collapsed .nav-item { justify-content: center; padding: 12px 0; gap: 0; }
+body.sidebar-collapsed .nav-label { display: none; }
+body.sidebar-collapsed .ai-section-row { flex-direction: column; }
+body.sidebar-collapsed .btn-ai { justify-content: center; padding: 12px 0; }
+/* userbox injetado pelo SpaController: esconder textos, manter avatar + ícone sair */
+body.sidebar-collapsed #mahungu-userbox { align-items: center; }
+body.sidebar-collapsed #mahungu-userbox > div > div:last-child { display: none; }
+body.sidebar-collapsed #mahungu-userbox button { font-size: 0 !important; }
 
 /* ── CARDS & GRUPOS ── */
 .stats-card {

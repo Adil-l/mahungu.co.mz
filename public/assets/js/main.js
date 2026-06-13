@@ -34,6 +34,9 @@ window.updateProfileAvatar = updateProfileAvatar;
 window.saveProfileData = saveProfileData;
 window.updateChart = updateChart;
 
+// Sidebar recolhível
+window.toggleSidebar = toggleSidebar;
+
 // Administração (apenas admin)
 window.switchAdminTab = switchAdminTab;
 window.openUserModal = openUserModal;
@@ -1133,6 +1136,7 @@ window.addEventListener('load', () => {
     renderHistory();
     loadProfileData();
     initAdminUI();
+    initSidebarState();
     updateDashboardStats();
 
     ai.init();
@@ -1559,6 +1563,30 @@ function initAdminUI() {
     if (window.MAHUNGU_USER && window.MAHUNGU_USER.is_admin) {
         document.querySelectorAll('.admin-only').forEach(el => { el.style.display = ''; });
     }
+}
+
+// ── SIDEBAR RECOLHÍVEL ──
+// Recolhe/expande a barra lateral e guarda a preferência (localStorage).
+function applySidebarState(collapsed) {
+    document.body.classList.toggle('sidebar-collapsed', collapsed);
+    const btn = document.querySelector('.sidebar-toggle');
+    if (btn) {
+        btn.title = collapsed ? 'Expandir menu' : 'Recolher menu';
+        btn.innerHTML = `<i data-lucide="${collapsed ? 'panel-left-open' : 'panel-left-close'}"></i>`;
+        if (window.lucide) lucide.createIcons();
+    }
+    // Reescala o editor após a animação (a área central muda de largura).
+    setTimeout(() => { if (core && core.setScale) core.setScale(); }, 280);
+}
+
+function toggleSidebar() {
+    const collapsed = !document.body.classList.contains('sidebar-collapsed');
+    localStorage.setItem('mahungu_sidebar_collapsed', collapsed ? '1' : '0');
+    applySidebarState(collapsed);
+}
+
+function initSidebarState() {
+    applySidebarState(localStorage.getItem('mahungu_sidebar_collapsed') === '1');
 }
 
 function switchAdminTab(tab) {

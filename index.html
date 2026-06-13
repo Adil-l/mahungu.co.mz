@@ -11,54 +11,59 @@
 
 <!-- Sidebar ESQUERDA: Navegação Global -->
 <aside class="sidebar-left">
+    <div class="sidebar-top">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" title="Recolher menu" aria-label="Recolher/expandir menu">
+            <i data-lucide="panel-left-close"></i>
+        </button>
+    </div>
     <div class="sidebar-header">
         <img src="/assets/img/system/logo.png" alt="Mahungu" style="width: 100%; max-width: 150px; height: auto; display: block;">
     </div>
 
     <nav class="main-nav">
-        <a href="javascript:void(0)" class="nav-item active" data-tab="dashboard">
+        <a href="javascript:void(0)" class="nav-item active" data-tab="dashboard" title="Dashboard">
             <i data-lucide="layout-dashboard"></i>
-            Dashboard
+            <span class="nav-label">Dashboard</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" data-tab="editor">
+        <a href="javascript:void(0)" class="nav-item" data-tab="editor" title="Painel de Edição">
             <i data-lucide="pen-tool"></i>
-            Painel de Edição
+            <span class="nav-label">Painel de Edição</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" data-tab="news-sources">
+        <a href="javascript:void(0)" class="nav-item" data-tab="news-sources" title="Fontes de Notícias">
             <i data-lucide="rss"></i>
-            Fontes de Notícias
+            <span class="nav-label">Fontes de Notícias</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" data-tab="proposals">
+        <a href="javascript:void(0)" class="nav-item" data-tab="proposals" title="Propostas IA">
             <i data-lucide="sparkles"></i>
-            Propostas IA
+            <span class="nav-label">Propostas IA</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" data-tab="ai-saved">
+        <a href="javascript:void(0)" class="nav-item" data-tab="ai-saved" title="Salvadas da IA">
             <i data-lucide="bookmark"></i>
-            Salvadas da IA
+            <span class="nav-label">Salvadas da IA</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" data-tab="history">
+        <a href="javascript:void(0)" class="nav-item" data-tab="history" title="Posts Aprovados">
             <i data-lucide="history"></i>
-            Posts Aprovados
+            <span class="nav-label">Posts Aprovados</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" data-tab="scheduler">
+        <a href="javascript:void(0)" class="nav-item" data-tab="scheduler" title="Agendamento">
             <i data-lucide="calendar"></i>
-            Agendamento
+            <span class="nav-label">Agendamento</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" data-tab="profile">
+        <a href="javascript:void(0)" class="nav-item" data-tab="profile" title="Perfil">
             <i data-lucide="user-circle"></i>
-            Perfil
+            <span class="nav-label">Perfil</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item admin-only" data-tab="admin" style="display:none;">
+        <a href="javascript:void(0)" class="nav-item admin-only" data-tab="admin" style="display:none;" title="Administração">
             <i data-lucide="shield"></i>
-            Administração
+            <span class="nav-label">Administração</span>
         </a>
     </nav>
 
-    <div class="control-group ai-section" style="margin-top: auto;">
-        <div style="display: flex; gap: 8px;">
+    <div class="control-group ai-section">
+        <div class="ai-section-row" style="display: flex; gap: 8px;">
             <button class="btn-ai" style="flex: 1;" onclick="openAIChat()" title="Abrir Chat Mahungu AI">
                 <i data-lucide="sparkles" style="color: #7000ff"></i>
-                Mahungu AI
+                <span class="nav-label">Mahungu AI</span>
             </button>
             <button class="btn-tool" style="width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0;" onclick="openAISettings()" title="Configurações de IA">
                 <i data-lucide="settings" size="18"></i>
