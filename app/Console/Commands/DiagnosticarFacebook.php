@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Http;
 class DiagnosticarFacebook extends Command
 {
     protected $signature = 'mahungu:fb-diag {--user= : ID do utilizador cuja conta Facebook ligada será testada}
-                                            {--token= : Testar diretamente este access_token (ignora a conta ligada)}';
+                                            {--token= : Testar diretamente este access_token (ignora a conta ligada)}
+                                            {--post-test : Publica um post de teste na Página e mostra a resposta crua do Facebook}';
 
     protected $description = 'Diagnostica o porquê de o Facebook não publicar: mostra permissões concedidas e Páginas visíveis para o token.';
 
@@ -90,6 +91,68 @@ class DiagnosticarFacebook extends Command
             $tasks = implode('/', $page['tasks'] ?? []);
             $podePublicar = in_array('CREATE_CONTENT', $page['tasks'] ?? [], true) ? 'PODE publicar' : 'SEM permissão de publicar';
             $this->line("  • {$page['name']} (id {$page['id']}) — {$podePublicar} [tasks: {$tasks}]");
+        }
+
+        // 4) Inspeciona a 1.ª Página: token da Página, estado de publicação e
+        //    últimas publicações — para confirmar se os posts aparecem mesmo.
+        $page = $pages[0];
+        $pageId = $page['id'];
+        $pageToken = $page['access_token'] ?? $token;
+
+        $info = Http::get("https://graph.facebook.com/v19.0/{$pageId}", [
+            'fields' => 'name,is_published,link',
+            'access_token' => $pageToken,
+        ])->json();
+
+        $this->newLine();
+        if (array_key_exists('is_published', $info)) {
+            $pub = $info['is_published'];
+            $this->line('Página "' . ($info['name'] ?? $pageId) . '" publicada/visível: ' . ($pub ? 'SIM' : 'NÃO'));
+            if (!$pub) {
+                $this->warn('A Página está NÃO PUBLICADA → os posts via API são aceites (200) mas NÃO ficam visíveis. Publica a Página nas Definições da Página.');
+            }
+            if (!empty($info['link'])) {
+                $this->line('Link: ' . $info['link']);
+            }
+        }
+
+        $feed = Http::get("https://graph.facebook.com/v19.0/{$pageId}/feed", [
+            'fields' => 'id,message,created_time,permalink_url',
+            'limit' => 5,
+            'access_token' => $pageToken,
+        ])->json();
+
+        $this->newLine();
+        if (isset($feed['error'])) {
+            $this->warn('Não consegui ler o feed da Página: ' . ($feed['error']['message'] ?? 'erro.'));
+        } else {
+            $posts = $feed['data'] ?? [];
+            $this->info('Últimas publicações na Página (' . count($posts) . '):');
+            foreach ($posts as $post) {
+                $msg = \Illuminate\Support\Str::limit($post['message'] ?? '(sem texto)', 60);
+                $this->line("  • {$post['created_time']} — {$msg}");
+                if (!empty($post['permalink_url'])) {
+                    $this->line('    ' . $post['permalink_url']);
+                }
+            }
+            if (empty($posts)) {
+                $this->warn('O feed está vazio — nenhuma publicação na Página (apesar dos logs de "Publicado").');
+            }
+        }
+
+        // 5) Teste de publicação opcional: mostra a resposta crua do Facebook.
+        if ($this->option('post-test')) {
+            $msg = 'Teste Mahungu ' . now()->toDateTimeString();
+            $res = Http::post("https://graph.facebook.com/v19.0/{$pageId}/feed", [
+                'message' => $msg,
+                'access_token' => $pageToken,
+            ]);
+            $this->newLine();
+            $this->line('POST de teste → HTTP ' . $res->status());
+            $this->line('Resposta crua: ' . $res->body());
+            if ($res->successful() && $res->json('id')) {
+                $this->info('O Facebook devolveu um id de post: ' . $res->json('id') . ' — confirma se aparece na Página.');
+            }
         }
 
         return self::SUCCESS;
