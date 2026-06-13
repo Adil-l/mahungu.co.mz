@@ -10,6 +10,11 @@ return [
     // agendamento e a publicação (a app dorme/acorda noutra instância).
     'media_disk' => env('MEDIA_DISK', 'public'),
 
+    // Visibilidade ao guardar a imagem. 'public' faz o S3 servir um URL acessível
+    // (Instagram/Threads). Se o bucket rejeitar ACLs por objeto ("bucket does not
+    // allow ACLs"), pôr MEDIA_VISIBILITY vazio e tornar o bucket público por política.
+    'media_visibility' => env('MEDIA_VISIBILITY', 'public'),
+
     'disks' => [
 
         'local' => [

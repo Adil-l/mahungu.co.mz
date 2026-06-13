@@ -75,9 +75,11 @@ class ScheduledPostController extends Controller
             return null;
         }
         $path = 'scheduled/' . Str::uuid() . '.' . $ext;
-        // visibilidade 'public' para o S3 servir um URL acessível (Instagram/Threads
-        // vão buscar a imagem pelo URL). No disco local 'public' é o comportamento normal.
-        Storage::disk(config('filesystems.media_disk'))->put($path, $bytes, 'public');
+        // Visibilidade configurável: 'public' para o S3 servir um URL acessível
+        // (Instagram/Threads). Se o bucket não permitir ACLs, MEDIA_VISIBILITY vazio.
+        $disk = Storage::disk(config('filesystems.media_disk'));
+        $visibility = config('filesystems.media_visibility');
+        $visibility ? $disk->put($path, $bytes, $visibility) : $disk->put($path, $bytes);
         return $path;
     }
 
