@@ -40,6 +40,31 @@ return [
         'scopes' => env('TIKTOK_SCOPES', 'video.publish'),
     ],
 
+    // X (Twitter). Publicação na conta da marca via OAuth 1.0a User Context
+    // (consumer + access tokens fixos do .env). client_id/secret = OAuth2 futuro.
+    'twitter' => [
+        'consumer_key' => env('TWITTER_CONSUMER_KEY'),
+        'consumer_secret' => env('TWITTER_CONSUMER_SECRET'),
+        'access_token' => env('TWITTER_ACCESS_TOKEN'),
+        'access_token_secret' => env('TWITTER_ACCESS_TOKEN_SECRET'),
+        'client_id' => env('TWITTER_CLIENT_ID'),
+        'client_secret' => env('TWITTER_CLIENT_SECRET'),
+        'bearer_token' => env('TWITTER_BEARER_TOKEN'),
+    ],
+
+    // Threads (Meta) — OAuth próprio da Threads API.
+    'threads' => [
+        'client_id' => env('THREADS_CLIENT_ID'),
+        'client_secret' => env('THREADS_CLIENT_SECRET'),
+        'scopes' => env('THREADS_SCOPES', 'threads_basic,threads_content_publish'),
+    ],
+
+    // RapidAPI — gerador de hashtags (Hashtagy).
+    'rapidapi' => [
+        'key' => env('RAPIDAPI_KEY'),
+        'hashtag_host' => env('RAPIDAPI_HASHTAG_HOST', 'hashtagy-generate-hashtags.p.rapidapi.com'),
+    ],
+
     // Liga/desliga modo de simulação: quando true, os posts são marcados como
     // publicados sem chamar as APIs reais (útil para demonstrar o fluxo sem a
     // aprovação da Meta). Ver App\Jobs\PostToSocialMedia.

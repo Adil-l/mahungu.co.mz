@@ -960,7 +960,20 @@ async function openSocialAccountsModal() {
             if (!statusEl) return; // Skip if element doesn't exist yet
             
             const btn = statusEl.parentElement.parentElement.querySelector('button');
-            
+
+            // X (Twitter) publica na conta da marca via credenciais do servidor
+            // (OAuth 1.0a). Não há ligação OAuth por utilizador para gerir aqui.
+            if (p === 'twitter') {
+                statusEl.textContent = 'Configurado no servidor (conta da marca)';
+                statusEl.style.color = 'var(--success)';
+                btn.textContent = 'Gerido pelo servidor';
+                btn.disabled = true;
+                btn.style.opacity = '0.6';
+                btn.style.cursor = 'default';
+                btn.onclick = null;
+                return;
+            }
+
             if (account) {
                 statusEl.textContent = `Conectado como ${account.platform_username || 'Usuário'}`;
                 statusEl.style.color = 'var(--success)';
@@ -1030,6 +1043,49 @@ window.saveScheduledPost = saveScheduledPost;
 window.deleteScheduledPost = deleteScheduledPost;
 window.connectSocial = connectSocial;
 window.disconnectSocial = disconnectSocial;
+
+// Gera hashtags reais (via /api/hashtags) e acrescenta-as à legenda do post.
+async function generateHashtags() {
+    const textarea = document.getElementById('schedule-content');
+    const current = textarea ? textarea.value.trim() : '';
+    const suggestion = current.split(/\s+/).filter(Boolean).slice(0, 3).join(' ');
+    const keyword = prompt('Palavra-chave para gerar hashtags:', suggestion);
+    if (keyword === null) return;
+    const kw = keyword.trim();
+    if (!kw) { ui.showToast('Escreve uma palavra-chave.', 'info'); return; }
+
+    const btn = document.getElementById('btn-generate-hashtags');
+    const original = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = 'A gerar…'; }
+
+    try {
+        const response = await fetch(`/api/hashtags?keyword=${encodeURIComponent(kw)}`, {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            }
+        });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            ui.showToast(data.message || 'Não foi possível gerar hashtags.', data.needs_subscription ? 'info' : 'error');
+            return;
+        }
+
+        const tags = (data.hashtags || []).slice(0, 15);
+        if (!tags.length) { ui.showToast('Sem hashtags para essa palavra.', 'info'); return; }
+
+        const joined = tags.join(' ');
+        if (textarea) textarea.value = current ? `${current}\n\n${joined}` : joined;
+        ui.showToast(`${tags.length} hashtags adicionadas.`, 'success');
+    } catch (err) {
+        ui.showToast('Erro ao gerar hashtags.', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = original; if (window.lucide) lucide.createIcons(); }
+    }
+}
+window.generateHashtags = generateHashtags;
 
 
 async function downloadFlyer() {

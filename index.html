@@ -829,22 +829,34 @@
                 <i data-lucide="sparkles" style="width:12px;height:12px;display:inline;vertical-align:middle;"></i>
                 Legenda preenchida a partir do flyer — podes editá-la livremente antes de agendar.
             </p>
+            <button type="button" class="btn-mini" id="btn-generate-hashtags" style="margin-top: 8px;" onclick="generateHashtags()">
+                <i data-lucide="hash" style="width:13px;height:13px;display:inline;vertical-align:middle;"></i>
+                Gerar hashtags
+            </button>
         </div>
 
         <div class="form-group">
             <label>Plataformas</label>
-            <div style="display: flex; gap: 10px; margin-top: 5px;">
-                <label style="flex: 1; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 5px;">
+                <label style="flex: 1 1 30%; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
                     <input type="checkbox" name="platforms" value="instagram">
                     <span style="font-size: 13px;">Instagram</span>
                 </label>
-                <label style="flex: 1; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <label style="flex: 1 1 30%; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
                     <input type="checkbox" name="platforms" value="facebook">
                     <span style="font-size: 13px;">Facebook</span>
                 </label>
-                <label style="flex: 1; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <label style="flex: 1 1 30%; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
                     <input type="checkbox" name="platforms" value="tiktok">
                     <span style="font-size: 13px;">TikTok</span>
+                </label>
+                <label style="flex: 1 1 30%; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" name="platforms" value="twitter">
+                    <span style="font-size: 13px;">X (Twitter)</span>
+                </label>
+                <label style="flex: 1 1 30%; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <input type="checkbox" name="platforms" value="threads">
+                    <span style="font-size: 13px;">Threads</span>
                 </label>
             </div>
         </div>

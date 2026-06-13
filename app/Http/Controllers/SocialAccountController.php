@@ -39,11 +39,11 @@ class SocialAccountController extends Controller
      */
     public function connect(Request $request, $platform)
     {
-        $providers = ['facebook', 'instagram', 'tiktok'];
+        $providers = ['facebook', 'instagram', 'tiktok', 'threads'];
 
         if (!in_array($platform, $providers, true)) {
             return response()->json([
-                'message' => "Integração com '$platform' ainda não está disponível. Plataformas suportadas: Facebook, Instagram e TikTok.",
+                'message' => "Integração com '$platform' ainda não está disponível. Plataformas suportadas: Facebook, Instagram, TikTok e Threads.",
             ], 422);
         }
 
@@ -72,6 +72,13 @@ class SocialAccountController extends Controller
                 'scope' => config('services.tiktok.scopes'),
                 'response_type' => 'code',
             ]),
+            'threads' => 'https://threads.net/oauth/authorize?' . http_build_query([
+                'client_id' => config('services.threads.client_id'),
+                'redirect_uri' => route('social.callback', $platform),
+                'state' => Auth::id(),
+                'scope' => config('services.threads.scopes'),
+                'response_type' => 'code',
+            ]),
         };
 
         return response()->json(['redirect_url' => $redirectUrl]);
@@ -92,6 +99,7 @@ class SocialAccountController extends Controller
             $data = match ($platform) {
                 'facebook', 'instagram' => $this->exchangeMeta($platform, $request->input('code')),
                 'tiktok' => $this->exchangeTikTok($request->input('code')),
+                'threads' => $this->exchangeThreads($request->input('code')),
                 default => null,
             };
 
@@ -194,6 +202,55 @@ class SocialAccountController extends Controller
             'expires_in' => $token['expires_in'] ?? null,
             'platform_user_id' => $token['open_id'] ?? ($info['data']['user']['open_id'] ?? null),
             'platform_username' => $info['data']['user']['display_name'] ?? null,
+        ];
+    }
+
+    /**
+     * Troca o código por um token de longa duração na Threads API (Meta) e
+     * obtém o id/username da conta Threads.
+     */
+    private function exchangeThreads(string $code): array
+    {
+        // O Threads pode devolver o código com um sufixo "#_" — remove-o.
+        if (str_ends_with($code, '#_')) {
+            $code = substr($code, 0, -2);
+        }
+
+        // 1) code -> token de curta duração (+ user_id da conta Threads)
+        $short = Http::asForm()->post('https://graph.threads.net/oauth/access_token', [
+            'client_id' => config('services.threads.client_id'),
+            'client_secret' => config('services.threads.client_secret'),
+            'grant_type' => 'authorization_code',
+            'redirect_uri' => route('social.callback', 'threads'),
+            'code' => $code,
+        ])->throw()->json();
+
+        $token = $short['access_token'] ?? null;
+        $userId = $short['user_id'] ?? null;
+        if (!$token) {
+            return [];
+        }
+
+        // 2) curta -> longa duração (~60 dias)
+        $long = Http::get('https://graph.threads.net/access_token', [
+            'grant_type' => 'th_exchange_token',
+            'client_secret' => config('services.threads.client_secret'),
+            'access_token' => $token,
+        ])->json();
+
+        $token = $long['access_token'] ?? $token;
+        $expiresIn = $long['expires_in'] ?? null;
+
+        // 3) dados da conta (id + username)
+        $me = Http::withToken($token)->get('https://graph.threads.net/v1.0/me', [
+            'fields' => 'id,username',
+        ])->json();
+
+        return [
+            'access_token' => $token,
+            'expires_in' => $expiresIn,
+            'platform_user_id' => $me['id'] ?? $userId,
+            'platform_username' => $me['username'] ?? null,
         ];
     }
 

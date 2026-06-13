@@ -49,6 +49,14 @@ class PostToSocialMedia implements ShouldQueue
                     continue;
                 }
 
+                // X (Twitter): publica na conta da marca via OAuth 1.0a com tokens
+                // fixos do .env — não há ligação OAuth por utilizador.
+                if ($platform === 'twitter') {
+                    $this->postToTwitter();
+                    $successCount++;
+                    continue;
+                }
+
                 $account = SocialAccount::where('user_id', $this->scheduledPost->user_id)
                     ->where('platform', $platform)
                     ->first();
@@ -106,11 +114,96 @@ class PostToSocialMedia implements ShouldQueue
         return match ($platform) {
             'facebook' => $this->postToFacebook($account, $content, $mediaPath),
             'instagram' => $this->postToInstagram($account, $content, $mediaPath),
+            'threads' => $this->postToThreads($account, $content, $mediaPath),
             default => throw new \Exception(
                 "Publicação automática para $platform ainda não está disponível. "
-                . "TikTok exige a Content Posting API; Twitter/Threads não estão implementados."
+                . "TikTok exige a Content Posting API e ainda não está implementado."
             ),
         };
+    }
+
+    /**
+     * Publica no Threads (Meta). Fluxo em dois passos como o Instagram:
+     * cria um container (TEXT ou IMAGE) e depois publica-o.
+     * Com imagem, o Threads vai buscar a imagem a um URL público (image_url).
+     */
+    protected function postToThreads($account, string $content, ?string $mediaPath): bool
+    {
+        $token = $account->access_token;
+        $userId = $account->platform_user_id;
+
+        if (!$userId) {
+            throw new \Exception('Threads: conta sem identificador. Reconecta a conta.');
+        }
+
+        $base = "https://graph.threads.net/v1.0/{$userId}";
+
+        if ($mediaPath && Storage::disk('public')->exists($mediaPath)) {
+            // O Threads precisa de um URL público da imagem (não aceita upload de bytes).
+            $createParams = [
+                'media_type' => 'IMAGE',
+                'image_url' => Storage::disk('public')->url($mediaPath),
+                'text' => $content,
+                'access_token' => $token,
+            ];
+        } else {
+            if (trim($content) === '') {
+                throw new \Exception('Threads: nada para publicar (sem texto nem imagem).');
+            }
+            $createParams = [
+                'media_type' => 'TEXT',
+                'text' => $content,
+                'access_token' => $token,
+            ];
+        }
+
+        // 1) Cria o container de media
+        $container = Http::post("{$base}/threads", $createParams);
+        if ($container->failed()) {
+            throw new \Exception('Threads (container): ' . $container->json('error.message', 'erro ao preparar a publicação.'));
+        }
+
+        // 2) Publica o container
+        $publish = Http::post("{$base}/threads_publish", [
+            'creation_id' => $container->json('id'),
+            'access_token' => $token,
+        ]);
+        if ($publish->failed()) {
+            throw new \Exception('Threads (publish): ' . $publish->json('error.message', 'erro ao publicar.'));
+        }
+
+        Log::info("Publicado no Threads (conta {$userId}) para o utilizador {$account->user_id}.");
+        return true;
+    }
+
+    /**
+     * Publica no X (Twitter) na conta da marca via OAuth 1.0a (tokens fixos do
+     * .env). Se o post tiver imagem, faz primeiro o upload e anexa-a ao tweet.
+     */
+    protected function postToTwitter(): string
+    {
+        $twitter = app(\App\Services\TwitterService::class);
+
+        if (!$twitter->configured()) {
+            throw new \Exception('X (Twitter) não está configurado (faltam tokens no .env).');
+        }
+
+        $content = $this->scheduledPost->content ?? '';
+        $mediaPath = $this->scheduledPost->media_path;
+
+        $mediaIds = [];
+        if ($mediaPath && Storage::disk('public')->exists($mediaPath)) {
+            $mediaIds[] = $twitter->uploadMedia(Storage::disk('public')->get($mediaPath), 'flyer.png');
+        }
+
+        if (trim($content) === '' && empty($mediaIds)) {
+            throw new \Exception('Nada para publicar no X (sem texto nem imagem).');
+        }
+
+        $tweetId = $twitter->postTweet($content, $mediaIds);
+        Log::info("Publicado no X (tweet {$tweetId}) para o utilizador {$this->scheduledPost->user_id}.");
+
+        return $tweetId;
     }
 
     /**

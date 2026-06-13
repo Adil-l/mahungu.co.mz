@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\FlyerController;
+use App\Http\Controllers\HashtagController;
 use App\Http\Controllers\ProposalController;
 use App\Http\Controllers\NewsSourceController;
 use App\Http\Controllers\UserController;
@@ -29,6 +30,9 @@ Route::middleware(['auth'])->group(function () {
     Route::apiResource('proposals', ProposalController::class);
     Route::post('/proposals/clear', [ProposalController::class, 'clear']);
     Route::apiResource('sources', NewsSourceController::class);
+
+    // Gerador de hashtags (proxy RapidAPI/Hashtagy).
+    Route::get('/hashtags', [HashtagController::class, 'generate']);
 
     // Store partilhado entre utilizadores (Salvados/Aprovados visíveis por todos).
     Route::get('/sync/{kind}', [SyncController::class, 'index']);
