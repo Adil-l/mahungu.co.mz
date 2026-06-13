@@ -57,6 +57,15 @@ Português de Moçambique. Tom claro e envolvente, nunca burocrático. Use \\n\\
 
 const MAHUNGU_CTA = '🔥 Siga a @mahungu_mz para mais notícias e tendências.';
 
+// Idioma obrigatório: tudo em português de Moçambique, mesmo que a notícia-fonte
+// venha noutra língua (deve ser traduzida). Reforçado em todos os prompts.
+const MAHUNGU_LANGUAGE_RULE = `
+IDIOMA (OBRIGATÓRIO): Escreve absolutamente TUDO em português de Moçambique —
+todos os campos (flyerTitle, flyerSummary, caption e hashtags). Se a notícia vier
+em inglês ou noutra língua, TRADUZ e escreve sempre em português. NUNCA respondas
+em inglês nem misturES línguas.
+`;
+
 function fetchWithTimeout(url, options = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -207,6 +216,7 @@ export const ai = {
             Você é o editor-chefe da Mahungu, plataforma moçambicana que transforma notícias
             em conteúdo rápido, claro e envolvente para redes sociais — gerando atenção,
             partilhas e comentários, sem perder credibilidade.
+            ${MAHUNGU_LANGUAGE_RULE}
             ${this.brandDirectives()}
 
             NOTÍCIA:
@@ -242,6 +252,7 @@ export const ai = {
     async generateCaption(title, category = 'Geral') {
         const prompt = `
             Você é o social media manager da Mahungu em Moçambique.
+            ${MAHUNGU_LANGUAGE_RULE}
             ${this.brandDirectives()}
             Um flyer já foi criado com este título: "${title}" (categoria: ${category}).
 
