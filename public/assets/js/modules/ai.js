@@ -74,10 +74,12 @@ function fetchWithTimeout(url, options = {}) {
 }
 
 export const ai = {
-    apiKey: '',
+    apiKey: '',      // Google Gemini
+    openaiKey: '',   // OpenAI (provedor principal quando definido)
 
     init() {
         this.apiKey = window.MAHUNGU_CONFIG?.apiKey || storage.getSetting('apiKey') || '';
+        this.openaiKey = window.MAHUNGU_CONFIG?.openaiKey || storage.getSetting('openaiKey') || '';
     },
 
     /**
@@ -98,6 +100,26 @@ export const ai = {
     },
 
     // ── PROVEDORES ──
+
+    async callOpenAI(prompt) {
+        if (!this.openaiKey) throw new Error('Sem OpenAI API Key.');
+        const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.openaiKey}`
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [{ role: 'user', content: prompt }]
+            })
+        });
+        if (!response.ok) throw new Error(`OpenAI HTTP ${response.status}`);
+        const data = await response.json();
+        const text = data?.choices?.[0]?.message?.content;
+        if (!text) throw new Error('OpenAI: resposta vazia.');
+        return text;
+    },
 
     async callGemini(prompt) {
         if (!this.apiKey) throw new Error('Sem API Key Gemini.');
@@ -161,6 +183,7 @@ export const ai = {
 
     async ask(prompt) {
         const providers = [];
+        if (this.openaiKey) providers.push(['OpenAI', (p) => this.callOpenAI(p)]);
         if (this.apiKey) providers.push(['Gemini', (p) => this.callGemini(p)]);
         providers.push(['llm7', (p) => this.callLLM7(p)]);
         providers.push(['Pollinations', (p) => this.callPollinations(p)]);

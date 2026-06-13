@@ -705,6 +705,16 @@
         </div>
         
         <div class="form-group">
+            <label>OpenAI API Key (recomendado)</label>
+            <div style="position: relative; display: flex; gap: 10px; align-items: center;">
+                <input type="password" id="ai-openai-key" placeholder="sk-... — provedor principal, sem limites das APIs gratuitas" style="flex: 1;">
+            </div>
+            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+                Com uma chave OpenAI, o modelo gpt-4o-mini passa a ser o provedor principal (mais fiável). <a href="https://platform.openai.com/api-keys" target="_blank" style="color: var(--primary); text-decoration: none;">Obtenha a sua chave aqui.</a>
+            </p>
+        </div>
+
+        <div class="form-group">
             <label>Google API Key (opcional)</label>
             <div style="position: relative; display: flex; gap: 10px; align-items: center;">
                 <input type="password" id="ai-api-key" placeholder="Opcional — sem chave, usa IA gratuita integrada" style="flex: 1;">

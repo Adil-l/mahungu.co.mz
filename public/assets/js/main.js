@@ -2870,6 +2870,8 @@ window.generateEngagementContent = generateEngagementContent;
 function openAISettings() {
     const modal = document.getElementById('ai-settings-modal');
     document.getElementById('ai-api-key').value = ai.apiKey || '';
+    const openaiInput = document.getElementById('ai-openai-key');
+    if (openaiInput) openaiInput.value = ai.openaiKey || '';
     // Diretrizes de marca guardadas
     document.getElementById('brand-voice').value = storage.getSetting('brandVoice', '');
     document.getElementById('brand-audience').value = storage.getSetting('brandAudience', '');
@@ -2889,9 +2891,11 @@ function closeAISettings(e) {
 
 function saveAISettings() {
     const apiKey = document.getElementById('ai-api-key').value.trim();
+    const openaiKey = (document.getElementById('ai-openai-key')?.value || '').trim();
     const interval = parseInt(document.getElementById('monitoring-interval').value) || 15;
     const newsAge = parseInt(document.getElementById('news-age-days').value) || 7;
     storage.updateSetting('apiKey', apiKey);
+    storage.updateSetting('openaiKey', openaiKey);
     storage.updateSetting('monitoringInterval', interval);
     storage.updateSetting('maxNewsAgeDays', newsAge);
     // Diretrizes de marca (injetadas em todos os prompts da IA)
@@ -2899,6 +2903,7 @@ function saveAISettings() {
     storage.updateSetting('brandAudience', document.getElementById('brand-audience').value.trim());
     storage.updateSetting('brandHashtags', document.getElementById('brand-hashtags').value.trim());
     ai.apiKey = apiKey;
+    ai.openaiKey = openaiKey;
     ui.showToast("Configurações salvas!", "success");
     closeAISettings();
 }
@@ -2906,6 +2911,8 @@ function saveAISettings() {
 async function testAIConnection() {
     // Sem chave também funciona: testa os provedores gratuitos integrados.
     const apiKey = document.getElementById('ai-api-key').value.trim();
+    const openaiKey = (document.getElementById('ai-openai-key')?.value || '').trim();
+    const hasKey = !!(apiKey || openaiKey);
 
     const btn = document.getElementById('test-ai-btn');
     if (!btn) return;
@@ -2916,18 +2923,21 @@ async function testAIConnection() {
     lucide.createIcons();
 
     const oldKey = ai.apiKey;
+    const oldOpenaiKey = ai.openaiKey;
     try {
-        // Temporariamente usa a chave para o teste sem salvá-la permanentemente
+        // Temporariamente usa as chaves para o teste sem salvá-las permanentemente
         ai.apiKey = apiKey;
+        ai.openaiKey = openaiKey;
 
         await ai.testConnection(); // Lança erro se nenhum provedor responder
 
-        ui.showToast(apiKey ? "Conexão bem-sucedida! Pode salvar." : "IA gratuita operacional!", "success");
+        ui.showToast(hasKey ? "Conexão bem-sucedida! Pode salvar." : "IA gratuita operacional!", "success");
     } catch (err) {
         console.error("AI Connection Test Failed:", err);
-        ui.showToast(apiKey ? "Falha na conexão. Verifique a API Key." : "IA indisponível. Verifique a internet.", "error");
+        ui.showToast(hasKey ? "Falha na conexão. Verifique a API Key." : "IA indisponível. Verifique a internet.", "error");
     } finally {
-        ai.apiKey = oldKey; // Restaura a chave antiga
+        ai.apiKey = oldKey; // Restaura as chaves antigas
+        ai.openaiKey = oldOpenaiKey;
         btn.disabled = false;
         btn.innerHTML = originalHtml;
         lucide.createIcons();
