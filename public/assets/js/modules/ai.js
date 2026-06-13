@@ -194,7 +194,7 @@ export const ai = {
             hashtags = ['#Mahungu', '#' + String(newsItem.category || 'Notícias').replace(/\s+/g, '')];
         }
 
-        const validTemplates = ['classic', 'modern', 'neon'];
+        const validTemplates = ['classic', 'modern', 'neon', 'split'];
         const template = validTemplates.includes(j.template) ? j.template : 'classic';
 
         // Truncagem dura: o gancho (título) deve ser curto; o resumo carrega o número/consequência.
@@ -236,7 +236,10 @@ export const ai = {
                 "cta": "${MAHUNGU_CTA}",
                 "template": "classic"
             }
-            O campo "template" deve ser um de: "classic", "modern", "neon".
+            O campo "template" deve ser um de: "classic", "modern", "neon", "split".
+            Use "split" (fundo duplo, duas imagens lado a lado) APENAS quando a notícia
+            compara/confronta dois sujeitos: duas pessoas, duas equipas, dois lados,
+            antes/depois ou rivalidade. Caso contrário, use "classic".
             Não escreva nada fora do JSON.
         `;
 

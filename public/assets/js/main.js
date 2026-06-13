@@ -17,6 +17,8 @@ window.showTab = showTab;
 window.aplicarCor = aplicarCor;
 window.limparFormatacao = limparFormatacao;
 window.trocarFoto = trocarFoto;
+window.toggleSplit = toggleSplit;
+window.selectHalf = selectHalf;
 window.updateEditorState = updateEditorState;
 window.changeFontSize = changeFontSize;
 window.openSaveModal = openSaveModal;
@@ -613,7 +615,15 @@ async function runAutomationManual() {
 }
 
 function updateEditorState(key, value) {
-    core.editorState[key] = parseFloat(value);
+    const v = parseFloat(value);
+    const s = core.editorState;
+    // No modo "fundo duplo", zoom/posição aplicam-se SÓ à metade ativa.
+    if (s.split && ['zoom', 'posX', 'posY'].includes(key)) {
+        const half = s[s.activeHalf] || (s[s.activeHalf] = { src: '', zoom: 1, posX: 0, posY: 0 });
+        half[key] = v;
+    } else {
+        s[key] = v;
+    }
     core.updateImageTransform();
     autoSave();
 }
@@ -636,7 +646,7 @@ function autoSave() {
     autoSaveTimeout = setTimeout(() => {
         const editor = document.getElementById('editor');
         if (!editor) return;
-        const img = document.querySelector('.layer-photo img');
+        const img = document.querySelector('.layer-photo .photo-single');
         const data = {
             html: editor.innerHTML,
             state: core.editorState,
@@ -660,17 +670,12 @@ function loadLastEdit() {
 
     if (data.state) core.editorState = data.state;
 
-    const img = document.querySelector('.layer-photo img');
+    const img = document.querySelector('.layer-photo .photo-single');
     // Só atribui o src se for válido, para não disparar ERR_INVALID_URL.
     if (img && isValidImageSrc(data.imgSrc)) img.src = data.imgSrc;
 
-    const inputs = document.querySelectorAll('.range-group input');
-    if (inputs.length >= 3) {
-        inputs[0].value = core.editorState.zoom;
-        inputs[1].value = core.editorState.posX;
-        inputs[2].value = core.editorState.posY;
-    }
-    core.updateImageTransform();
+    // Repõe modo duplo (se aplicável), metades, sliders e transforms.
+    applyBackgroundState();
 }
 
 function openSaveModal() {
@@ -713,7 +718,7 @@ async function confirmSaveToHistory() {
                 proposal.flyerState = {
                     html: editor.innerHTML,
                     state: { ...core.editorState },
-                    imgSrc: document.querySelector('.layer-photo img').src
+                    imgSrc: document.querySelector('.layer-photo .photo-single').src
                 };
                 proposal.status = 'pending'; // continua em "Salvadas" até aprovar
                 await storage.saveProposal(proposal);
@@ -744,7 +749,7 @@ async function confirmSaveToHistory() {
             state: {
                 html: document.getElementById('editor').innerHTML,
                 state: core.editorState,
-                imgSrc: document.querySelector('.layer-photo img').src
+                imgSrc: document.querySelector('.layer-photo .photo-single').src
             }
         };
         await storage.saveFlyer(entry);
@@ -1200,25 +1205,119 @@ function trocarFoto() {
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
-            const img = document.querySelector('.layer-photo img');
-            if (img) img.src = ev.target.result;
-            // Repõe zoom/posição para a nova foto aparecer inteira (encaixada);
-            // o utilizador ajusta depois com os controlos de Ajustes de Imagem.
-            core.editorState.zoom = 1;
-            core.editorState.posX = 0;
-            core.editorState.posY = 0;
-            const inputs = document.querySelectorAll('.range-group input');
-            if (inputs.length >= 3) {
-                inputs[0].value = 1;
-                inputs[1].value = 0;
-                inputs[2].value = 0;
+            const s = core.editorState;
+            if (s.split) {
+                // Troca a foto SÓ do lado ativo e repõe o ajuste desse lado.
+                const side = s.activeHalf;
+                const img = document.querySelector(`.photo-half[data-half="${side}"] img`);
+                if (img) img.src = ev.target.result;
+                s[side] = { src: ev.target.result, zoom: 1, posX: 0, posY: 0 };
+            } else {
+                const img = document.querySelector('.layer-photo .photo-single');
+                if (img) img.src = ev.target.result;
+                // Repõe zoom/posição para a nova foto aparecer inteira (encaixada);
+                // o utilizador ajusta depois com os controlos de Ajustes de Imagem.
+                s.zoom = 1;
+                s.posX = 0;
+                s.posY = 0;
             }
+            syncSlidersToActive();
             core.updateImageTransform();
             invalidateFlyerSnapshot();
+            autoSave();
         };
         reader.readAsDataURL(file);
     };
     input.click();
+}
+
+// Põe os 3 sliders (zoom/posX/posY) com os valores da fonte ativa:
+// a metade selecionada no modo duplo, ou a foto single.
+function syncSlidersToActive() {
+    const s = core.editorState;
+    const src = s.split ? (s[s.activeHalf] || {}) : s;
+    const inputs = document.querySelectorAll('.range-group input');
+    if (inputs.length >= 3) {
+        inputs[0].value = src.zoom ?? 1;
+        inputs[1].value = src.posX ?? 0;
+        inputs[2].value = src.posY ?? 0;
+    }
+}
+
+// Defaults do modo duplo — usados ao mesclar estados guardados antigos
+// (sem estes campos) para o modo não "vazar" de uma edição anterior.
+function freshSplitDefaults() {
+    return {
+        split: false,
+        activeHalf: 'left',
+        left: { src: '', zoom: 1, posX: 0, posY: 0 },
+        right: { src: '', zoom: 1, posX: 0, posY: 0 }
+    };
+}
+
+// Liga/desliga o modo "fundo duplo".
+function toggleSplit() {
+    const s = core.editorState;
+    s.split = !s.split;
+    if (s.split) {
+        s.activeHalf = s.activeHalf || 'left';
+        // Semeia o lado esquerdo a partir da foto single, se ainda estiver vazio.
+        const single = document.querySelector('.layer-photo .photo-single');
+        if (!isValidImageSrc(s.left && s.left.src) && single && isValidImageSrc(single.src)) {
+            s.left = { src: single.src, zoom: s.zoom || 1, posX: s.posX || 0, posY: s.posY || 0 };
+        }
+    }
+    applyBackgroundState();
+    invalidateFlyerSnapshot();
+    autoSave();
+    ui.showToast(s.split ? 'Fundo duplo ativado — escolha as duas imagens.' : 'Fundo duplo desativado.', 'info');
+}
+
+// Seleciona a metade (left/right) que os sliders e o "Trocar Foto" controlam.
+function selectHalf(side) {
+    if (side !== 'left' && side !== 'right') return;
+    if (!core.editorState.split) return;
+    core.editorState.activeHalf = side;
+    updateSplitUI();
+    syncSlidersToActive();
+}
+
+// Reflete o estado do modo duplo na UI (botões, realce da metade, rótulo).
+function updateSplitUI() {
+    const s = core.editorState;
+    const controls = document.getElementById('split-side-controls');
+    if (controls) controls.style.display = s.split ? 'block' : 'none';
+    const btn = document.getElementById('btn-fundo-duplo');
+    if (btn) btn.classList.toggle('active', !!s.split);
+    const label = document.getElementById('trocar-foto-label');
+    if (label) {
+        label.textContent = s.split
+            ? (s.activeHalf === 'right' ? 'Trocar Foto (Direita)' : 'Trocar Foto (Esquerda)')
+            : 'Trocar Foto';
+    }
+    document.querySelectorAll('.split-side-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.side === s.activeHalf));
+    document.querySelectorAll('.photo-half').forEach(h =>
+        h.classList.toggle('active', s.split && h.dataset.half === s.activeHalf));
+}
+
+// Repõe o DOM do fundo (single + metades) a partir de core.editorState.
+// Chamado por todos os fluxos que carregam um estado guardado.
+function applyBackgroundState() {
+    const s = core.editorState;
+    const layer = document.querySelector('.layer-photo');
+    if (layer) layer.classList.toggle('is-split', !!s.split);
+    ['left', 'right'].forEach(side => {
+        const half = s[side] || {};
+        const img = document.querySelector(`.photo-half[data-half="${side}"] img`);
+        if (img) {
+            if (isValidImageSrc(half.src)) img.src = half.src;
+            else img.removeAttribute('src');
+        }
+    });
+    updateSplitUI();
+    syncSlidersToActive();
+    core.updateImageTransform();
 }
 
 window.addEventListener('resize', core.setScale);
@@ -1981,15 +2080,10 @@ async function editFlyer(id) {
         }
     }
     core.editorState = {...(flyer.state.state || core.editorState)};
-    const img = document.querySelector('.layer-photo img');
+    const img = document.querySelector('.layer-photo .photo-single');
     if (img && isValidImageSrc(flyer.state.imgSrc)) img.src = flyer.state.imgSrc;
-    core.updateImageTransform();
-    const inputs = document.querySelectorAll('.range-group input');
-    if (inputs.length >= 3) {
-        inputs[0].value = core.editorState.zoom;
-        inputs[1].value = core.editorState.posX;
-        inputs[2].value = core.editorState.posY;
-    }
+    // Repõe modo duplo (se aplicável), metades, sliders e transforms.
+    applyBackgroundState();
     const editorNav = document.querySelector('.main-nav .nav-item[data-tab="editor"]');
     showTab('editor', editorNav);
     ui.showToast("Carregado para edição!", "success");
@@ -2058,36 +2152,39 @@ async function editProposalInEditor(id) {
     editingFlyerId = null;
 
     const editor = document.getElementById('editor');
-    const photoImg = document.querySelector('.layer-photo img');
+    const photoSingle = document.querySelector('.layer-photo .photo-single');
 
     if (proposal.flyerState) {
         // Já foi editada antes: recarrega exatamente o estado guardado.
         if (editor) editor.innerHTML = proposal.flyerState.html || '';
-        core.editorState = { ...core.editorState, ...(proposal.flyerState.state || {}) };
-        if (photoImg && isValidImageSrc(proposal.flyerState.imgSrc)) photoImg.src = proposal.flyerState.imgSrc;
+        core.editorState = { ...core.editorState, ...freshSplitDefaults(), ...(proposal.flyerState.state || {}) };
+        if (photoSingle && isValidImageSrc(proposal.flyerState.imgSrc)) photoSingle.src = proposal.flyerState.imgSrc;
     } else {
         // Primeira edição: monta a partir do título/resumo gerados pela IA.
         if (editor) {
             editor.innerHTML = headlineHtml(proposal.generatedTitle, proposal.generatedSummary);
         }
         const photoSrc = flyerPhotoUrl(proposal.image);
-        if (photoImg && photoSrc) photoImg.src = photoSrc;
+        if (photoSingle && photoSrc) photoSingle.src = photoSrc;
         // Foto nova começa encaixada (ver Ajustes de Imagem).
-        core.editorState.zoom = 1;
-        core.editorState.posX = 0;
-        core.editorState.posY = 0;
+        Object.assign(core.editorState, freshSplitDefaults(), { zoom: 1, posX: 0, posY: 0 });
+
+        if (proposal.suggestedTemplate === 'split') {
+            // IA sugeriu "fundo duplo": imagem da IA à esquerda, direita por preencher.
+            core.editorState.split = true;
+            core.editorState.activeHalf = 'right';
+            core.editorState.left = { src: photoSrc || '', zoom: 1, posX: 0, posY: 0 };
+            core.editorState.right = { src: '', zoom: 1, posX: 0, posY: 0 };
+        }
     }
 
-    // Sincroniza os sliders com o estado carregado.
-    const inputs = document.querySelectorAll('.range-group input');
-    if (inputs.length >= 3) {
-        inputs[0].value = core.editorState.zoom;
-        inputs[1].value = core.editorState.posX;
-        inputs[2].value = core.editorState.posY;
-    }
-    core.updateImageTransform();
+    // Repõe o fundo (single/duplo), metades, sliders e transforms.
+    applyBackgroundState();
     invalidateFlyerSnapshot();
     autoSave();
+    if (core.editorState.split) {
+        ui.showToast('Template duplo: escolha a 2ª imagem (direita).', 'info');
+    }
 
     // Guardar a legenda da proposta para acompanhar este flyer quando for salvo
     editorPostMeta = {
@@ -2122,19 +2219,22 @@ async function approveAndSaveProposal(id) {
         // ("Editar no Editor" + Salvar), usa o estado guardado (preserva ajustes);
         // senão, monta a partir do título/resumo gerados pela IA.
         const editor = document.getElementById('editor');
-        const photoImg = document.querySelector('.layer-photo img');
+        const photoSingle = document.querySelector('.layer-photo .photo-single');
         if (proposal.flyerState) {
             if (editor) editor.innerHTML = proposal.flyerState.html || '';
-            core.editorState = { ...core.editorState, ...(proposal.flyerState.state || {}) };
-            if (photoImg && isValidImageSrc(proposal.flyerState.imgSrc)) photoImg.src = proposal.flyerState.imgSrc;
-            core.updateImageTransform();
+            core.editorState = { ...core.editorState, ...freshSplitDefaults(), ...(proposal.flyerState.state || {}) };
+            if (photoSingle && isValidImageSrc(proposal.flyerState.imgSrc)) photoSingle.src = proposal.flyerState.imgSrc;
         } else {
             if (editor) {
                 editor.innerHTML = headlineHtml(proposal.generatedTitle, proposal.generatedSummary);
             }
             const photoSrc = flyerPhotoUrl(proposal.image);
-            if (photoImg && photoSrc) photoImg.src = photoSrc;
+            if (photoSingle && photoSrc) photoSingle.src = photoSrc;
+            // Aprovação direta (sem passar pelo editor): mesmo que a IA tenha
+            // sugerido "fundo duplo", aqui só há 1 imagem — cai para single.
+            Object.assign(core.editorState, freshSplitDefaults());
         }
+        applyBackgroundState();
         if (editor) invalidateFlyerSnapshot();
 
         if (editor && !proposal.flyerState) fitHeadline(editor);
@@ -2154,7 +2254,7 @@ async function approveAndSaveProposal(id) {
             state: {
                 html: editor.innerHTML,
                 state: core.editorState,
-                imgSrc: document.querySelector('.layer-photo img').src
+                imgSrc: document.querySelector('.layer-photo .photo-single').src
             }
         };
         await storage.saveFlyer(newEntry);
@@ -2240,9 +2340,24 @@ function miniFlyerHTML(proposal) {
         textInner = headlineHtml(rawTitle, rawSummary);
     }
 
+    // Fundo: modo duplo (duas metades) se o estado guardado o indicar; senão single.
+    const st = fs && fs.state;
+    let layerPhotoHTML;
+    if (st && st.split) {
+        const halfHTML = (side) => {
+            const h = st[side] || {};
+            const src = isValidImageSrc(h.src) ? h.src : DEFAULT_FLYER_PHOTO;
+            const t = `transform: translate(${h.posX || 0}px, ${h.posY || 0}px) scale(${h.zoom || 1});`;
+            return `<div class="photo-half" data-half="${side}"><img src="${src}" style="${t}" alt="" onerror="this.onerror=null;this.src='${DEFAULT_FLYER_PHOTO}'"></div>`;
+        };
+        layerPhotoHTML = `<div class="layer-photo is-split"><div class="photo-split">${halfHTML('left')}${halfHTML('right')}<div class="photo-divider"></div></div></div>`;
+    } else {
+        layerPhotoHTML = `<div class="layer-photo"><img class="photo-single" src="${photo}"${photoStyle} alt="" onerror="this.onerror=null;this.src='${DEFAULT_FLYER_PHOTO}'"></div>`;
+    }
+
     return `
         <div class="flyer flyer-mini">
-            <div class="layer-photo"><img src="${photo}"${photoStyle} alt="" onerror="this.onerror=null;this.src='${DEFAULT_FLYER_PHOTO}'"></div>
+            ${layerPhotoHTML}
             <div class="layer-meio-fundo"><img src="/assets/img/system/onda-azul.png" alt=""></div>
             <div class="layer-barra-cima"><img src="/assets/img/system/barra-cima.png" alt=""></div>
             <div class="layer-barra-baixo"><img src="/assets/img/system/barra-baixo.png" alt=""></div>
