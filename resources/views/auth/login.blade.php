@@ -19,7 +19,6 @@
 </form>
 <div class="auth-links">
     <a href="/forgot-password">Esqueci a minha senha</a>
-    <div>Não tem conta? <a href="/register">Criar conta</a></div>
 </div>
 @endsection
 

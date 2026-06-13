@@ -33,6 +33,14 @@ window.downloadDataUrl = downloadDataUrl;
 window.updateProfileAvatar = updateProfileAvatar;
 window.saveProfileData = saveProfileData;
 window.updateChart = updateChart;
+
+// Administração (apenas admin)
+window.switchAdminTab = switchAdminTab;
+window.openUserModal = openUserModal;
+window.closeUserModal = closeUserModal;
+window.createUser = createUser;
+window.deleteUser = deleteUser;
+window.loadAdminLogs = loadAdminLogs;
 // Exposto para que a automação (automation.js) possa atualizar o dashboard após um scan.
 window.updateDashboardStats = updateDashboardStats;
 
@@ -763,6 +771,7 @@ function showTab(tabId, el) {
     if (tabId === 'proposals') renderProposals();
     if (tabId === 'ai-saved') renderAISaved();
     if (tabId === 'scheduler') renderScheduledPosts();
+    if (tabId === 'admin') switchAdminTab('users');
 }
 
 // ── AGENDAMENTO (SCHEDULER) ──
@@ -1123,6 +1132,7 @@ window.addEventListener('load', () => {
     loadLastEdit();
     renderHistory();
     loadProfileData();
+    initAdminUI();
     updateDashboardStats();
 
     ai.init();
@@ -1537,6 +1547,194 @@ async function changePassword() {
         closePasswordModal();
     } catch (e) {
         ui.showToast('Erro de ligação.', 'error');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ║ ADMINISTRAÇÃO (apenas admin): gestão de utilizadores + logs       ║
+// ═══════════════════════════════════════════════════════════════════
+
+// Mostra o item de navegação "Administração" se o utilizador for admin.
+function initAdminUI() {
+    if (window.MAHUNGU_USER && window.MAHUNGU_USER.is_admin) {
+        document.querySelectorAll('.admin-only').forEach(el => { el.style.display = ''; });
+    }
+}
+
+function switchAdminTab(tab) {
+    document.querySelectorAll('.admin-tab-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.adminTab === tab);
+    });
+    document.getElementById('admin-panel-users').style.display = tab === 'users' ? '' : 'none';
+    document.getElementById('admin-panel-logs').style.display = tab === 'logs' ? '' : 'none';
+    if (tab === 'users') loadAdminUsers();
+    if (tab === 'logs') loadAdminLogs();
+}
+
+function fmtDateTime(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d)) return escapeHtml(iso);
+    return d.toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+async function loadAdminUsers() {
+    const tbody = document.getElementById('admin-users-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="6" class="admin-empty">A carregar…</td></tr>';
+    try {
+        const res = await fetch('/api/admin/users', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+        if (!res.ok) throw new Error('falha');
+        const users = await res.json();
+        if (!Array.isArray(users) || users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="admin-empty">Sem utilizadores.</td></tr>';
+            return;
+        }
+        const meId = window.MAHUNGU_USER?.id;
+        tbody.innerHTML = users.map(u => {
+            const isSelf = window.MAHUNGU_USER && window.MAHUNGU_USER.email === u.email;
+            const roleBadge = u.is_admin
+                ? '<span class="role-badge admin">Admin</span>'
+                : '<span class="role-badge user">Utilizador</span>';
+            const delBtn = isSelf
+                ? '<button class="btn-icon-danger" disabled title="Não pode apagar a sua conta"><i data-lucide="trash-2" size="15"></i></button>'
+                : `<button class="btn-icon-danger" onclick="deleteUser(${u.id}, '${escapeHtml(u.email)}')" title="Remover"><i data-lucide="trash-2" size="15"></i></button>`;
+            return `
+                <tr>
+                    <td>${escapeHtml(u.name || '')}</td>
+                    <td>${escapeHtml(u.email || '')}</td>
+                    <td>${escapeHtml(u.phone || '—')}</td>
+                    <td>${roleBadge}</td>
+                    <td>${fmtDateTime(u.created_at)}</td>
+                    <td style="text-align:right;">${delBtn}</td>
+                </tr>`;
+        }).join('');
+        lucide.createIcons();
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" class="admin-empty">Erro ao carregar utilizadores.</td></tr>';
+    }
+}
+
+function openUserModal() {
+    ['new-user-name', 'new-user-email', 'new-user-phone', 'new-user-password', 'new-user-password-confirm'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+    });
+    document.getElementById('new-user-admin').checked = false;
+    const msg = document.getElementById('user-modal-msg');
+    if (msg) { msg.style.display = 'none'; msg.textContent = ''; }
+    document.getElementById('user-modal').classList.add('active');
+    lucide.createIcons();
+}
+
+function closeUserModal(e) {
+    if (e && e.target !== e.currentTarget) return;
+    document.getElementById('user-modal').classList.remove('active');
+}
+
+function showUserModalMsg(text, type) {
+    const msg = document.getElementById('user-modal-msg');
+    if (!msg) return;
+    msg.textContent = text;
+    msg.style.display = 'block';
+    msg.style.color = type === 'error' ? '#ff6b6b' : 'var(--success)';
+}
+
+async function createUser() {
+    const name = document.getElementById('new-user-name').value.trim();
+    const email = document.getElementById('new-user-email').value.trim();
+    const phone = document.getElementById('new-user-phone').value.trim();
+    const password = document.getElementById('new-user-password').value;
+    const confirm = document.getElementById('new-user-password-confirm').value;
+    const isAdmin = document.getElementById('new-user-admin').checked;
+
+    if (!name || !email) { showUserModalMsg('Preencha o nome e o e-mail.', 'error'); return; }
+    if (password.length < 8) { showUserModalMsg('A senha deve ter pelo menos 8 caracteres.', 'error'); return; }
+    if (password !== confirm) { showUserModalMsg('As senhas não coincidem.', 'error'); return; }
+
+    const btn = document.getElementById('user-modal-submit');
+    btn.disabled = true;
+    try {
+        const res = await fetch('/api/admin/users', {
+            method: 'POST',
+            headers: apiHeaders(),
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                name, email, phone,
+                is_admin: isAdmin,
+                password,
+                password_confirmation: confirm
+            })
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            const m = err.errors ? Object.values(err.errors)[0][0] : (err.message || 'Erro ao criar utilizador.');
+            showUserModalMsg(m, 'error');
+            return;
+        }
+        ui.showToast('Utilizador criado!', 'success');
+        closeUserModal();
+        loadAdminUsers();
+    } catch (e) {
+        showUserModalMsg('Erro de ligação.', 'error');
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+async function deleteUser(id, email) {
+    if (!await ui.confirm('Remover utilizador', `Apagar a conta de ${email}? Esta ação não pode ser desfeita.`)) return;
+    try {
+        const res = await fetch(`/api/admin/users/${id}`, {
+            method: 'DELETE',
+            headers: apiHeaders(),
+            credentials: 'same-origin'
+        });
+        if (!res.ok && res.status !== 204) {
+            const err = await res.json().catch(() => ({}));
+            ui.showToast(err.message || 'Erro ao remover utilizador.', 'error');
+            return;
+        }
+        ui.showToast('Utilizador removido.', 'success');
+        loadAdminUsers();
+    } catch (e) {
+        ui.showToast('Erro de ligação.', 'error');
+    }
+}
+
+// Mapeia o prefixo da ação a uma classe CSS (cor do badge).
+function actionClass(action) {
+    if (!action) return '';
+    if (action.includes('login')) return 'login';
+    if (action.includes('logout')) return 'logout';
+    if (action.includes('created')) return 'created';
+    if (action.includes('deleted')) return 'deleted';
+    if (action.includes('flyer')) return 'flyer';
+    if (action.includes('proposal')) return 'proposal';
+    return '';
+}
+
+async function loadAdminLogs() {
+    const tbody = document.getElementById('admin-logs-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="4" class="admin-empty">A carregar…</td></tr>';
+    try {
+        const res = await fetch('/api/admin/logs', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin' });
+        if (!res.ok) throw new Error('falha');
+        const logs = await res.json();
+        if (!Array.isArray(logs) || logs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="admin-empty">Sem registos de atividade.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = logs.map(l => `
+            <tr>
+                <td style="white-space:nowrap;">${fmtDateTime(l.created_at)}</td>
+                <td>${escapeHtml(l.user_name || '—')}<br><span style="font-size:11px;color:var(--text-muted);">${escapeHtml(l.user_email || '')}</span></td>
+                <td><span class="action-tag ${actionClass(l.action)}">${escapeHtml(l.action || '')}</span></td>
+                <td>${escapeHtml(l.description || '')}</td>
+            </tr>`).join('');
+        lucide.createIcons();
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="4" class="admin-empty">Erro ao carregar registos.</td></tr>';
     }
 }
 

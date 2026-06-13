@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
@@ -19,6 +20,8 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        ActivityLog::record('auth.login', 'Iniciou sessão');
+
         return response()->noContent();
     }
 
@@ -27,6 +30,8 @@ class AuthenticatedSessionController extends Controller
      */
     public function destroy(Request $request): Response
     {
+        ActivityLog::record('auth.logout', 'Terminou sessão');
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

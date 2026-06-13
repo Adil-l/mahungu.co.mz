@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\FlyerController;
 use App\Http\Controllers\ProposalController;
 use App\Http\Controllers\NewsSourceController;
@@ -39,4 +40,12 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/social-accounts/{platform}', [SocialAccountController::class, 'destroy']);
     Route::post('/social-accounts/{platform}/connect', [SocialAccountController::class, 'connect']);
     Route::get('/social-accounts/{platform}/callback', [SocialAccountController::class, 'callback'])->name('social.callback');
+
+    // ── Administração (apenas admin): gestão de utilizadores + logs ──
+    Route::middleware('admin')->prefix('admin')->group(function () {
+        Route::get('/users', [AdminController::class, 'users']);
+        Route::post('/users', [AdminController::class, 'storeUser']);
+        Route::delete('/users/{user}', [AdminController::class, 'destroyUser']);
+        Route::get('/logs', [AdminController::class, 'logs']);
+    });
 });

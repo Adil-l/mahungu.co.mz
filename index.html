@@ -48,6 +48,10 @@
             <i data-lucide="user-circle"></i>
             Perfil
         </a>
+        <a href="javascript:void(0)" class="nav-item admin-only" data-tab="admin" style="display:none;">
+            <i data-lucide="shield"></i>
+            Administração
+        </a>
     </nav>
 
     <div class="control-group ai-section" style="margin-top: auto;">
@@ -403,7 +407,117 @@
             </div>
         </div>
     </section>
+
+    <!-- ABA ADMINISTRAÇÃO (apenas admin) -->
+    <section id="tab-admin" class="tab-content hidden">
+        <div class="content-wrapper">
+            <div class="sidebar-header" style="margin-bottom: 24px;">
+                <h1 style="color: #fff; font-size: 24px;">Administração</h1>
+                <p style="color: var(--text-muted); font-size: 13px; margin-top: 6px;">Gerir utilizadores e monitorizar a atividade do sistema.</p>
+            </div>
+
+            <!-- Sub-navegação -->
+            <div class="admin-tabs">
+                <button class="admin-tab-btn active" data-admin-tab="users" onclick="switchAdminTab('users')">
+                    <i data-lucide="users"></i> Utilizadores
+                </button>
+                <button class="admin-tab-btn" data-admin-tab="logs" onclick="switchAdminTab('logs')">
+                    <i data-lucide="scroll-text"></i> Registos de Atividade
+                </button>
+            </div>
+
+            <!-- Painel: Utilizadores -->
+            <div id="admin-panel-users" class="admin-panel">
+                <div class="admin-toolbar">
+                    <button class="btn-main" onclick="openUserModal()">
+                        <i data-lucide="user-plus"></i> Novo Utilizador
+                    </button>
+                </div>
+                <div class="admin-table-wrap">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>E-mail</th>
+                                <th>Telefone</th>
+                                <th>Função</th>
+                                <th>Criado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-users-tbody">
+                            <tr><td colspan="6" class="admin-empty">A carregar…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Painel: Logs -->
+            <div id="admin-panel-logs" class="admin-panel" style="display:none;">
+                <div class="admin-toolbar">
+                    <button class="btn-tool" onclick="loadAdminLogs()" title="Atualizar">
+                        <i data-lucide="refresh-cw" size="16"></i> Atualizar
+                    </button>
+                </div>
+                <div class="admin-table-wrap">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Utilizador</th>
+                                <th>Ação</th>
+                                <th>Descrição</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-logs-tbody">
+                            <tr><td colspan="4" class="admin-empty">A carregar…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
 </main>
+
+<!-- MODAL DE NOVO UTILIZADOR -->
+<div class="modal-overlay" id="user-modal" onclick="closeUserModal(event)">
+    <div class="modal-container" style="max-width: 460px; height: auto; min-height: 0; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 26px;">
+            <div>
+                <div class="modal-eyebrow">Administração</div>
+                <h2>Novo Utilizador</h2>
+            </div>
+            <button class="close-modal" onclick="closeUserModal()"><i data-lucide="x"></i></button>
+        </div>
+        <div class="form-group">
+            <label>Nome Completo</label>
+            <input type="text" id="new-user-name" placeholder="Ex: João Mucavel">
+        </div>
+        <div class="form-group">
+            <label>E-mail</label>
+            <input type="email" id="new-user-email" placeholder="joao@mahungu.co.mz">
+        </div>
+        <div class="form-group">
+            <label>Telefone (opcional)</label>
+            <input type="tel" id="new-user-phone" placeholder="+258 84 000 0000">
+        </div>
+        <div class="form-group">
+            <label>Senha</label>
+            <input type="password" id="new-user-password" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+        </div>
+        <div class="form-group">
+            <label>Confirmar Senha</label>
+            <input type="password" id="new-user-password-confirm" placeholder="••••••••" autocomplete="new-password">
+        </div>
+        <label class="auth-check" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-muted);margin-bottom:18px;cursor:pointer;">
+            <input type="checkbox" id="new-user-admin" style="width:auto;accent-color:var(--primary);"> Conceder permissões de administrador
+        </label>
+        <p class="auth-msg" id="user-modal-msg" style="display:none;margin:0 0 14px;font-size:13px;text-align:center;"></p>
+        <button class="btn-main btn-success" id="user-modal-submit" onclick="createUser()">
+            <i data-lucide="user-plus"></i> Criar Utilizador
+        </button>
+    </div>
+</div>
 
 <!-- MODAL DE SALVAR FLYER -->
 <div class="modal-overlay" id="save-modal" onclick="closeSaveModal(event)">

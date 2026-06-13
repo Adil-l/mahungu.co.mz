@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivityLog;
 use App\Models\SharedItem;
 use Illuminate\Http\Request;
 
@@ -32,10 +33,20 @@ class SyncController extends Controller
             'payload' => ['required', 'array'],
         ]);
 
-        SharedItem::updateOrCreate(
+        $item = SharedItem::updateOrCreate(
             ['kind' => $kind, 'client_id' => (string) $data['client_id']],
             ['payload' => json_encode($data['payload'], JSON_UNESCAPED_UNICODE)]
         );
+
+        // Regista só quando o item é criado pela 1ª vez (evita ruído nas atualizações).
+        if ($item->wasRecentlyCreated) {
+            $title = $data['payload']['title'] ?? $data['payload']['generatedTitle'] ?? 'sem título';
+            if ($kind === 'flyer') {
+                ActivityLog::record('flyer.shared', "Aprovou o post: {$title}");
+            } else {
+                ActivityLog::record('proposal.shared', "Salvou a proposta: {$title}");
+            }
+        }
 
         return response()->json(['ok' => true]);
     }

@@ -33,8 +33,10 @@ class SpaController extends Controller
         }
 
         $userJson = json_encode([
+            'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'is_admin' => (bool) $user->is_admin,
         ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
 
         $foot = <<<HTML

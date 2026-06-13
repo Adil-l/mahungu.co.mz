@@ -50,6 +50,7 @@ class Kernel extends HttpKernel
      */
     protected $middlewareAliases = [
         'auth' => \Illuminate\Auth\Middleware\Authenticate::class,
+        'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
         'cache.headers' => \Illuminate\Http\Middleware\SetCacheHeaders::class,
         'can' => \Illuminate\Auth\Middleware\Authorize::class,
         'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
