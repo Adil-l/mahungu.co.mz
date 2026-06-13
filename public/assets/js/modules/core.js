@@ -98,13 +98,15 @@ export const core = {
             // zoom/posição (transform) — o html2canvas captura isto fielmente.
             const cloneLayer = flyerClone.querySelector('.layer-photo');
             if (cloneLayer && cloneLayer.classList.contains('is-split')) {
-                // Modo "fundo duplo": converter CADA metade (cover) separadamente.
+                // Modo "fundo duplo": converter CADA metade separadamente.
+                // background-size: contain → mostra a imagem inteira, sem cortar
+                // as laterais (igual ao modo single).
                 flyerClone.querySelectorAll('.photo-half').forEach(half => {
                     half.classList.remove('active'); // tira o tracejado de seleção
                     const img = half.querySelector('img');
                     if (img && img.src) {
                         half.style.backgroundImage = `url("${img.src}")`;
-                        half.style.backgroundSize = 'cover';
+                        half.style.backgroundSize = 'contain';
                         half.style.backgroundPosition = 'center';
                         half.style.backgroundRepeat = 'no-repeat';
                         // O transform da metade fica num wrapper interno para não
@@ -113,7 +115,7 @@ export const core = {
                         if (t) {
                             half.style.backgroundImage = 'none';
                             const fill = document.createElement('div');
-                            fill.style.cssText = `position:absolute;inset:0;background-image:url("${img.src}");background-size:cover;background-position:center;background-repeat:no-repeat;transform:${t};transform-origin:center;`;
+                            fill.style.cssText = `position:absolute;inset:0;background-image:url("${img.src}");background-size:contain;background-position:center;background-repeat:no-repeat;transform:${t};transform-origin:center;`;
                             half.insertBefore(fill, half.firstChild);
                         }
                         img.remove();
