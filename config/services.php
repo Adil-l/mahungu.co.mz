@@ -29,8 +29,10 @@ return [
     ],
     'instagram' => [
         // O Instagram publica através da app do Facebook (mesmo App ID por omissão).
-        'client_id' => env('INSTAGRAM_CLIENT_ID', env('FACEBOOK_CLIENT_ID')),
-        'client_secret' => env('INSTAGRAM_CLIENT_SECRET', env('FACEBOOK_CLIENT_SECRET')),
+        // Usa-se ?: (não o 2º argumento de env) porque env('X', default) NÃO recorre
+        // ao default quando X existe vazio no .env (INSTAGRAM_CLIENT_ID=).
+        'client_id' => env('INSTAGRAM_CLIENT_ID') ?: env('FACEBOOK_CLIENT_ID'),
+        'client_secret' => env('INSTAGRAM_CLIENT_SECRET') ?: env('FACEBOOK_CLIENT_SECRET'),
         // Publicar no IG exige conta IG Business ligada a uma Página + estas permissões.
         'scopes' => env('INSTAGRAM_SCOPES', 'public_profile,pages_show_list,instagram_basic,instagram_content_publish,business_management'),
     ],
