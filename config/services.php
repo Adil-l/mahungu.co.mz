@@ -25,7 +25,9 @@ return [
         'client_secret' => env('FACEBOOK_CLIENT_SECRET'),
         // Permissões para publicar numa Página. Têm de estar adicionadas na app
         // do Facebook (Painel > Casos de uso / Permissões), senão dá "Invalid Scopes".
-        'scopes' => env('FACEBOOK_SCOPES', 'public_profile,pages_show_list,pages_manage_posts,pages_read_engagement'),
+        // business_management é necessário para que Páginas que pertencem a um
+        // Portefólio de negócios (Business) apareçam em /me/accounts.
+        'scopes' => env('FACEBOOK_SCOPES', 'public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,business_management'),
     ],
     'instagram' => [
         // O Instagram publica através da app do Facebook (mesmo App ID por omissão).
