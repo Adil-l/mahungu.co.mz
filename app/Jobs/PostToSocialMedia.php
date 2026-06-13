@@ -66,6 +66,14 @@ class PostToSocialMedia implements ShouldQueue
                     continue;
                 }
 
+                // Instagram com o mesmo token fixo: a conta IG Business está ligada
+                // à Página, e o token de sistema tem instagram_content_publish.
+                if ($platform === 'instagram' && config('services.facebook.page_token')) {
+                    $this->postToInstagramViaToken();
+                    $successCount++;
+                    continue;
+                }
+
                 $account = SocialAccount::where('user_id', $this->scheduledPost->user_id)
                     ->where('platform', $platform)
                     ->first();
@@ -266,6 +274,76 @@ class PostToSocialMedia implements ShouldQueue
         }
 
         Log::info("Publicado no Facebook (Página {$pageId}) via token fixo.");
+        return true;
+    }
+
+    /**
+     * Publica no Instagram da marca usando o token fixo (FACEBOOK_PAGE_TOKEN).
+     * Resolve a Página → a conta IG Business ligada → cria o container com o
+     * URL público da imagem (do bucket) → publica. Exige imagem e que o URL
+     * da imagem seja acessível publicamente (bucket público).
+     */
+    protected function postToInstagramViaToken(): bool
+    {
+        $token = config('services.facebook.page_token');
+        $pageId = config('services.facebook.page_id');
+        $pageToken = $token;
+
+        $pages = Http::get('https://graph.facebook.com/v19.0/me/accounts', [
+            'access_token' => $token,
+        ])->json('data', []);
+
+        if (!empty($pages)) {
+            $page = $pageId
+                ? (collect($pages)->firstWhere('id', $pageId) ?? $pages[0])
+                : $pages[0];
+            $pageId = $page['id'];
+            $pageToken = $page['access_token'] ?? $token;
+        }
+
+        if (!$pageId) {
+            throw new \Exception('Instagram: não foi possível resolver a Página a partir do token fixo.');
+        }
+
+        // Conta IG Business ligada à Página
+        $igId = Http::get("https://graph.facebook.com/v19.0/{$pageId}", [
+            'fields' => 'instagram_business_account',
+            'access_token' => $pageToken,
+        ])->json('instagram_business_account.id');
+
+        if (!$igId) {
+            throw new \Exception('A Página não tem uma conta Instagram Business ligada.');
+        }
+
+        $disk = Storage::disk(config('filesystems.media_disk'));
+        $mediaPath = $this->scheduledPost->media_path;
+        if (!$mediaPath || !$disk->exists($mediaPath)) {
+            throw new \Exception('O Instagram exige uma imagem para publicar.');
+        }
+
+        $imageUrl = $disk->url($mediaPath);
+        $content = $this->scheduledPost->content ?? '';
+
+        // 1) Cria o container de media (o IG vai buscar a imagem ao URL público)
+        $container = Http::post("https://graph.facebook.com/v19.0/{$igId}/media", [
+            'image_url' => $imageUrl,
+            'caption' => $content,
+            'access_token' => $pageToken,
+        ]);
+        if ($container->failed()) {
+            throw new \Exception('Instagram (container): ' . $container->json('error.message', 'erro ao preparar a imagem (o URL é público?).'));
+        }
+
+        // 2) Publica o container
+        $publish = Http::post("https://graph.facebook.com/v19.0/{$igId}/media_publish", [
+            'creation_id' => $container->json('id'),
+            'access_token' => $pageToken,
+        ]);
+        if ($publish->failed()) {
+            throw new \Exception('Instagram (publish): ' . $publish->json('error.message', 'erro ao publicar.'));
+        }
+
+        Log::info("Publicado no Instagram (conta {$igId}) via token fixo.");
         return true;
     }
 
