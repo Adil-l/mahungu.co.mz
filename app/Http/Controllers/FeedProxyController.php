@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
@@ -10,8 +11,9 @@ class FeedProxyController extends Controller
     /**
      * Proxy de feeds RSS (server-side → sem CORS, fiável).
      * GET /feed-proxy?url=<feed_url>  → devolve o XML do feed.
+     * Devolve Response (XML em sucesso) ou JsonResponse (erros 400/502).
      */
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request): Response|JsonResponse
     {
         $target = trim((string) $request->query('url', ''));
         $parts = parse_url($target);
