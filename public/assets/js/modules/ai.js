@@ -152,20 +152,45 @@ export const ai = {
      * Envia o prompt à cadeia de provedores e devolve o texto da primeira
      * resposta válida. Lança erro apenas se TODOS falharem.
      */
+    // Reconhece falhas por excesso de pedidos (rate limit) nos provedores
+    // grátis (llm7: 60/h, 10/min, 1/seg; Pollinations: 1 em fila por IP).
+    isRateLimit(err) {
+        const m = String((err && err.message) || '').toLowerCase();
+        return m.includes('429') || m.includes('rate') || m.includes('limit') || m.includes('queue');
+    },
+
     async ask(prompt) {
         const providers = [];
         if (this.apiKey) providers.push(['Gemini', (p) => this.callGemini(p)]);
         providers.push(['llm7', (p) => this.callLLM7(p)]);
         providers.push(['Pollinations', (p) => this.callPollinations(p)]);
 
+        // Tenta a cadeia de provedores; se TODOS falharem por rate-limit (429),
+        // espera (backoff) e tenta de novo — respeita o limite de ~1 pedido/seg.
+        const MAX_ROUNDS = 3;
         let lastError = null;
-        for (const [name, call] of providers) {
-            try {
-                return await call(prompt);
-            } catch (err) {
-                console.warn(`Mahungu AI: provedor ${name} falhou (${err.message}). Tentando próximo...`);
-                lastError = err;
+        for (let round = 0; round < MAX_ROUNDS; round++) {
+            for (const [name, call] of providers) {
+                try {
+                    return await call(prompt);
+                } catch (err) {
+                    lastError = err;
+                    console.warn(`Mahungu AI: provedor ${name} falhou (${err.message}).`);
+                }
             }
+            if (round < MAX_ROUNDS - 1 && this.isRateLimit(lastError)) {
+                const waitMs = 1500 * (round + 1); // 1.5s, depois 3s
+                console.warn(`Mahungu AI: provedores limitados (429). A aguardar ${waitMs}ms e a tentar de novo...`);
+                await new Promise(r => setTimeout(r, waitMs));
+            } else {
+                break;
+            }
+        }
+
+        if (this.isRateLimit(lastError)) {
+            const e = new Error('Limite de pedidos da IA atingido. Aguarde cerca de 1 minuto e tente de novo — ou configure uma Google API Key nas Definições para usar o Gemini sem estes limites.');
+            e.code = 'RATE_LIMIT';
+            throw e;
         }
         throw lastError || new Error('Nenhum provedor de IA disponível.');
     },

@@ -2574,7 +2574,7 @@ async function generateProposalContent(id) {
         ui.showToast('Proposta gerada e salva nas "Salvadas da IA"! ✨', 'success');
     } catch (err) {
         console.error('Erro ao gerar proposta:', err);
-        ui.showToast('Erro ao gerar com IA. Tente novamente.', 'error');
+        ui.showToast(err && err.code === 'RATE_LIMIT' ? err.message : 'Erro ao gerar com IA. Tente novamente.', 'error');
     }
 }
 
@@ -2592,6 +2592,7 @@ async function generateAllProposals() {
     if (btn) btn.disabled = true;
 
     let done = 0;
+    let rateLimited = false;
     for (let i = 0; i < novas.length; i++) {
         if (btn) {
             btn.innerHTML = `<i data-lucide="loader" class="spin"></i> Gerando ${i + 1}/${novas.length}...`;
@@ -2607,8 +2608,12 @@ async function generateAllProposals() {
             renderProposals(); // mostra cada flyer assim que fica pronto
             renderAISaved();
         } catch (err) {
+            if (err && err.code === 'RATE_LIMIT') rateLimited = true;
             console.error(`Erro ao gerar proposta "${novas[i].title}":`, err);
         }
+        // Ritmo entre gerações: respeita o limite de ~1 pedido/segundo das
+        // APIs gratuitas (evita 429 em cadeia no "Gerar Tudo").
+        if (i < novas.length - 1) await new Promise(r => setTimeout(r, 1500));
     }
 
     if (btn) {
@@ -2617,7 +2622,12 @@ async function generateAllProposals() {
         lucide.createIcons();
     }
     updateDashboardStats();
-    ui.showToast(`${done} de ${novas.length} propostas geradas!`, done > 0 ? 'success' : 'error');
+    const finalMsg = done > 0
+        ? `${done} de ${novas.length} propostas geradas!`
+        : (rateLimited
+            ? 'IA com limite de pedidos atingido. Aguarde ~1 min e tente de novo, ou configure a Google API Key nas Definições.'
+            : 'Erro ao gerar com IA. Tente novamente.');
+    ui.showToast(finalMsg, done > 0 ? 'success' : 'error');
 }
 
 async function clearAllProposals() {
