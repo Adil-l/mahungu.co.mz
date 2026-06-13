@@ -13,8 +13,23 @@
   --bg-dark: #0f101a;
   --glass-bg: rgba(255, 255, 255, 0.05);
   --glass-border: rgba(255, 255, 255, 0.1);
+  --text: #fff;
   --text-muted: #88899a;
   --sidebar-w: 280px;
+}
+
+/* ── MODO CLARO ── */
+/* Sobrepõe apenas as variáveis-base; o resto da UI herda. O editor de flyers
+   (#editor / .headline-editor / .cor-branca) NÃO é afetado — ver bloco no fim.
+   html.pre-light é aplicado pelo script inline no <head> para evitar flash;
+   o JS troca para body.theme-light e remove pre-light no arranque. */
+body.theme-light,
+html.pre-light {
+  --bg-dark: #eef0f5;
+  --glass-bg: #ffffff;
+  --glass-border: rgba(20, 22, 40, 0.12);
+  --text: #1b1d2e;
+  --text-muted: #5f6275;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -24,8 +39,9 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   display: flex;
   min-height: 100vh;
-  color: #fff;
+  color: var(--text);
   overflow-x: hidden;
+  transition: background 0.25s ease, color 0.25s ease;
 }
 
 body.editor-active {
@@ -81,33 +97,33 @@ body.editor-active {
 .nav-item:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
 .nav-item.active { background: rgba(212, 82, 42, 0.1); color: var(--primary); }
 
-/* ── BOTÃO RECOLHER ── */
-.sidebar-top { display: flex; justify-content: flex-end; flex-shrink: 0; }
+/* ── BOTÃO RECOLHER (fundo da sidebar) ── */
 .sidebar-toggle {
-  width: 32px; height: 32px; border-radius: 8px;
-  background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border);
+  flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+  padding: 11px 15px; border-radius: 10px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
   color: var(--text-muted); cursor: pointer; z-index: 13002;
-  display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+  font-size: 13px; font-weight: 600; transition: all 0.2s; width: 100%;
 }
-.sidebar-toggle:hover { color: #fff; background: rgba(255,255,255,0.1); }
-.sidebar-toggle i, .sidebar-toggle svg { width: 18px; height: 18px; }
+.sidebar-toggle:hover { color: var(--text); background: rgba(255,255,255,0.09); }
+.sidebar-toggle i, .sidebar-toggle svg { width: 18px; height: 18px; flex-shrink: 0; }
 
 /* ── SIDEBAR RECOLHIDA ── */
 .sidebar-left { transition: width 0.25s ease, padding 0.25s ease; }
 .main-content { transition: margin-left 0.25s ease, margin-right 0.3s ease; }
 body.sidebar-collapsed .sidebar-left { width: 78px; padding-left: 12px; padding-right: 12px; }
 body.sidebar-collapsed .main-content { margin-left: 78px; }
-body.sidebar-collapsed .sidebar-top { justify-content: center; }
 body.sidebar-collapsed .sidebar-header { justify-content: center; }
 body.sidebar-collapsed .sidebar-header img { max-width: 46px !important; margin: 0 auto; }
 body.sidebar-collapsed .nav-item { justify-content: center; padding: 12px 0; gap: 0; }
 body.sidebar-collapsed .nav-label { display: none; }
-body.sidebar-collapsed .ai-section-row { flex-direction: column; }
-body.sidebar-collapsed .btn-ai { justify-content: center; padding: 12px 0; }
+body.sidebar-collapsed .ai-section { padding: 0; background: transparent; border: none; }
+body.sidebar-collapsed .btn-ai { justify-content: center; padding: 14px 0; }
+body.sidebar-collapsed .sidebar-toggle { justify-content: center; padding: 11px 0; gap: 0; }
 /* userbox injetado pelo SpaController: esconder textos, manter avatar + ícone sair */
 body.sidebar-collapsed #mahungu-userbox { align-items: center; }
 body.sidebar-collapsed #mahungu-userbox > div > div:last-child { display: none; }
-body.sidebar-collapsed #mahungu-userbox button { font-size: 0 !important; }
+body.sidebar-collapsed #mahungu-userbox button { font-size: 0 !important; gap: 0 !important; }
 
 /* ── CARDS & GRUPOS ── */
 .stats-card {
@@ -1826,3 +1842,82 @@ body.editor-active #tab-editor {
 }
 .btn-icon-danger:hover { background: rgba(255,107,107,0.2); }
 .btn-icon-danger:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ════════════════════════════════════════════════════════════════ */
+/* MODO CLARO — overrides de cores hardcoded (#fff / vidro branco)    */
+/* Regra de ouro: NÃO tocar no editor de flyers (#editor e afins),    */
+/* que tem fundo de foto e texto branco/laranja por design.           */
+/* ════════════════════════════════════════════════════════════════ */
+
+/* Texto que estava #fff fixo → cor de texto do tema.
+   NÃO incluímos div/span (onde vive o texto do flyer no #editor), por isso o
+   editor fica intacto sem precisar de :not(). */
+body.theme-light .main-content :is(h1, h2, h3, h4, h5, h6, label, p, strong, small, th, td, li) {
+  color: var(--text);
+}
+body.theme-light :is(
+  .stat-value, .stat-label, .dialog-title, .dialog-text, .nav-label,
+  .history-title, .modal-eyebrow, .control-label, .section-subtitle, .form-group label
+) {
+  color: var(--text);
+}
+body.theme-light .text-muted,
+body.theme-light .stat-label,
+body.theme-light .history-date,
+body.theme-light .section-subtitle { color: var(--text-muted); }
+
+/* Navegação: hover deixa de ser #fff (invisível em fundo claro). */
+body.theme-light .nav-item:hover { color: var(--text); background: rgba(20,22,40,0.05); }
+body.theme-light .sidebar-toggle:hover { background: rgba(20,22,40,0.06); }
+
+/* Sidebars com superfície clara e sombra suave. */
+body.theme-light .sidebar-left,
+body.theme-light .sidebar-right {
+  background: #ffffff;
+  box-shadow: 0 0 30px rgba(20,22,40,0.08);
+}
+
+/* Inputs / selects / textareas claros. */
+body.theme-light input,
+body.theme-light select,
+body.theme-light textarea {
+  background: #f4f5f9 !important;
+  color: var(--text) !important;
+  border-color: var(--glass-border) !important;
+}
+body.theme-light input::placeholder,
+body.theme-light textarea::placeholder { color: #9a9cb0; }
+
+/* Superfícies de "vidro" que usavam branco translúcido (invisíveis em fundo claro). */
+body.theme-light .btn-tool,
+body.theme-light .dialog-btn-secondary,
+body.theme-light .status-badge.pendente { background: rgba(20,22,40,0.05); color: var(--text); }
+body.theme-light .btn-tool:hover,
+body.theme-light .close-modal:hover,
+body.theme-light .filter-chip:hover { background: rgba(20,22,40,0.09); color: var(--text); }
+
+/* Cards / modais — herdam var(--glass-bg)=branco; reforçar borda/sombra. */
+body.theme-light .modal-container,
+body.theme-light .dialog-container {
+  background: #ffffff;
+  box-shadow: 0 30px 70px rgba(20,22,40,0.18);
+}
+body.theme-light .modal-overlay,
+body.theme-light .dialog-overlay { background: rgba(20,22,40,0.45); }
+
+/* Filtros / chips. */
+body.theme-light .filter-chip { color: var(--text-muted); border-color: var(--glass-border); }
+
+/* Tabela de administração. */
+body.theme-light .admin-table tbody td { color: var(--text); }
+body.theme-light .admin-table tbody tr:hover { background: rgba(20,22,40,0.03); }
+
+/* Botão de tema selecionado. */
+.theme-switch { display: inline-flex; gap: 6px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 12px; padding: 5px; }
+.theme-switch button {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  background: transparent; border: none; color: var(--text-muted);
+  padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 600; transition: all 0.2s;
+}
+.theme-switch button i, .theme-switch button svg { width: 16px; height: 16px; }
+.theme-switch button.active { background: var(--primary); color: #fff; }

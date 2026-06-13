@@ -6,16 +6,19 @@
     <title>Mahungu Studio | Creative Platform</title>
     <link rel="stylesheet" href="/assets/css/style.css">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Aplica o tema antes do paint (evita flash de fundo escuro). -->
+    <script>
+        (function () {
+            try {
+                if (localStorage.getItem('mahungu_theme') === 'light') document.documentElement.classList.add('pre-light');
+            } catch (e) {}
+        })();
+    </script>
 </head>
 <body>
 
 <!-- Sidebar ESQUERDA: Navegação Global -->
 <aside class="sidebar-left">
-    <div class="sidebar-top">
-        <button class="sidebar-toggle" onclick="toggleSidebar()" title="Recolher menu" aria-label="Recolher/expandir menu">
-            <i data-lucide="panel-left-close"></i>
-        </button>
-    </div>
     <div class="sidebar-header">
         <img src="/assets/img/system/logo.png" alt="Mahungu" style="width: 100%; max-width: 150px; height: auto; display: block;">
     </div>
@@ -53,6 +56,10 @@
             <i data-lucide="user-circle"></i>
             <span class="nav-label">Perfil</span>
         </a>
+        <a href="javascript:void(0)" class="nav-item" onclick="openAISettings()" title="Configurações IA">
+            <i data-lucide="settings"></i>
+            <span class="nav-label">Configurações IA</span>
+        </a>
         <a href="javascript:void(0)" class="nav-item admin-only" data-tab="admin" style="display:none;" title="Administração">
             <i data-lucide="shield"></i>
             <span class="nav-label">Administração</span>
@@ -60,16 +67,16 @@
     </nav>
 
     <div class="control-group ai-section">
-        <div class="ai-section-row" style="display: flex; gap: 8px;">
-            <button class="btn-ai" style="flex: 1;" onclick="openAIChat()" title="Abrir Chat Mahungu AI">
-                <i data-lucide="sparkles" style="color: #7000ff"></i>
-                <span class="nav-label">Mahungu AI</span>
-            </button>
-            <button class="btn-tool" style="width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0;" onclick="openAISettings()" title="Configurações de IA">
-                <i data-lucide="settings" size="18"></i>
-            </button>
-        </div>
+        <button class="btn-ai" onclick="openAIChat()" title="Abrir Chat Mahungu AI">
+            <i data-lucide="sparkles" style="color: #7000ff"></i>
+            <span class="nav-label">Mahungu AI</span>
+        </button>
     </div>
+
+    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Recolher menu" aria-label="Recolher/expandir menu">
+        <i data-lucide="panel-left-close"></i>
+        <span class="nav-label">Recolher</span>
+    </button>
 </aside>
 
 <!-- Sidebar DIREITA: Ferramentas -->
@@ -390,6 +397,17 @@
                             <div class="form-group">
                                 <label>Número de Telefone</label>
                                 <input type="tel" id="profile-phone" value="+258 84 000 0000">
+                            </div>
+                            <div class="form-group profile-field-wide">
+                                <label>Aparência</label>
+                                <div class="theme-switch" id="theme-switch">
+                                    <button type="button" data-theme="dark" onclick="setTheme('dark')">
+                                        <i data-lucide="moon"></i> Escuro
+                                    </button>
+                                    <button type="button" data-theme="light" onclick="setTheme('light')">
+                                        <i data-lucide="sun"></i> Claro
+                                    </button>
+                                </div>
                             </div>
                         </div>
 

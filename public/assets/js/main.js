@@ -36,6 +36,8 @@ window.updateChart = updateChart;
 
 // Sidebar recolhível
 window.toggleSidebar = toggleSidebar;
+// Tema (escuro/claro)
+window.setTheme = setTheme;
 
 // Administração (apenas admin)
 window.switchAdminTab = switchAdminTab;
@@ -1137,6 +1139,7 @@ window.addEventListener('load', () => {
     loadProfileData();
     initAdminUI();
     initSidebarState();
+    initThemeState();
     updateDashboardStats();
 
     ai.init();
@@ -1587,6 +1590,30 @@ function toggleSidebar() {
 
 function initSidebarState() {
     applySidebarState(localStorage.getItem('mahungu_sidebar_collapsed') === '1');
+}
+
+// ── TEMA (ESCURO / CLARO) ──
+// Aplica o tema, atualiza o switch do perfil e guarda a preferência.
+function applyTheme(theme) {
+    const light = theme === 'light';
+    document.body.classList.toggle('theme-light', light);
+    document.querySelectorAll('#theme-switch button').forEach(b => {
+        b.classList.toggle('active', b.dataset.theme === (light ? 'light' : 'dark'));
+    });
+    storage.updateSetting('theme', light ? 'light' : 'dark');
+}
+
+function setTheme(theme) {
+    localStorage.setItem('mahungu_theme', theme);
+    applyTheme(theme);
+}
+
+function initThemeState() {
+    // Preferência guardada > definição do utilizador > escuro por defeito.
+    const saved = localStorage.getItem('mahungu_theme') || storage.getSetting('theme', 'dark');
+    applyTheme(saved === 'light' ? 'light' : 'dark');
+    // Remove a classe anti-flash do <html>; a partir daqui o tema vive em body.theme-light.
+    document.documentElement.classList.remove('pre-light');
 }
 
 function switchAdminTab(tab) {
