@@ -18,6 +18,15 @@ class DiagnosticarFacebook extends Command
     {
         $token = $this->option('token');
 
+        // Por omissão, diagnostica o token que REALMENTE publica (FACEBOOK_PAGE_TOKEN),
+        // a menos que se peça uma conta OAuth específica via --user.
+        if (!$token && !$this->option('user')) {
+            $token = config('services.facebook.page_token');
+            if ($token) {
+                $this->line('A usar FACEBOOK_PAGE_TOKEN (token fixo de publicação — o mesmo que o agendador usa).');
+            }
+        }
+
         if (!$token) {
             $query = SocialAccount::where('platform', 'facebook');
             if ($userId = $this->option('user')) {
@@ -26,12 +35,12 @@ class DiagnosticarFacebook extends Command
             $account = $query->latest('id')->first();
 
             if (!$account) {
-                $this->error('Nenhuma conta de Facebook ligada encontrada. Liga uma conta primeiro, ou passa --token=...');
+                $this->error('Sem FACEBOOK_PAGE_TOKEN no .env e sem conta de Facebook ligada. Usa --token=... ou --user=N.');
                 return self::FAILURE;
             }
 
             $token = $account->access_token;
-            $this->line("A usar a conta #{$account->id} (utilizador {$account->user_id}, '{$account->platform_username}').");
+            $this->line("A usar a conta OAuth #{$account->id} (utilizador {$account->user_id}, '{$account->platform_username}').");
         }
 
         // 1) Quem é o token (valida que o token funciona de todo)
