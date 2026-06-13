@@ -117,9 +117,17 @@ function proxyImageUrl(url) {
     return 'https://images.weserv.nl/?url=' + encodeURIComponent(url.replace(/^https?:\/\//i, ''));
 }
 
+// Foto do flyer em ALTA QUALIDADE: mesmo proxy, mas força JPEG com qualidade
+// alta (sem forçar dimensões, para não distorcer o layout). Para imagens locais
+// /data: devolve como está.
+function flyerPhotoUrl(url) {
+    const src = proxyImageUrl(url);
+    return src.startsWith('https://images.weserv.nl/') ? src + '&q=92&output=jpg' : src;
+}
+
 // Foto a usar no layout do flyer para uma proposta (com fallback à foto base).
 function proposalPhotoSrc(proposal) {
-    return proxyImageUrl(proposal.image) || DEFAULT_FLYER_PHOTO;
+    return flyerPhotoUrl(proposal.image) || DEFAULT_FLYER_PHOTO;
 }
 
 // Texto do post (legenda) associado ao flyer atualmente carregado no editor.
@@ -2062,7 +2070,7 @@ async function editProposalInEditor(id) {
         if (editor) {
             editor.innerHTML = headlineHtml(proposal.generatedTitle, proposal.generatedSummary);
         }
-        const photoSrc = proxyImageUrl(proposal.image);
+        const photoSrc = flyerPhotoUrl(proposal.image);
         if (photoImg && photoSrc) photoImg.src = photoSrc;
         // Foto nova começa encaixada (ver Ajustes de Imagem).
         core.editorState.zoom = 1;
@@ -2124,7 +2132,7 @@ async function approveAndSaveProposal(id) {
             if (editor) {
                 editor.innerHTML = headlineHtml(proposal.generatedTitle, proposal.generatedSummary);
             }
-            const photoSrc = proxyImageUrl(proposal.image);
+            const photoSrc = flyerPhotoUrl(proposal.image);
             if (photoImg && photoSrc) photoImg.src = photoSrc;
         }
         if (editor) invalidateFlyerSnapshot();
@@ -2418,11 +2426,14 @@ function applyGenerationToProposal(proposal, result) {
     proposal.cta = result.cta;
 }
 
-// Atribui uma imagem real (Openverse) quando a proposta não tem nenhuma.
-// Best-effort e silencioso: se a pesquisa falhar, fica a foto base.
+// Atribui uma imagem real quando a proposta não tem nenhuma. Ordem:
+// 1) a imagem do próprio artigo (og:image) — relevante e nítida;
+// 2) banco de imagens livres (Openverse) pelo tema.
+// Best-effort e silencioso: se tudo falhar, fica a foto base.
 async function ensureProposalImage(proposal) {
     if (proposal.image) return;
-    const found = await images.findBest(proposal.generatedTitle || proposal.title || proposal.category);
+    let found = await images.fromArticle(proposal.source_url || proposal.link || proposal.url);
+    if (!found) found = await images.findBest(proposal.generatedTitle || proposal.title || proposal.category);
     if (found) proposal.image = found;
 }
 

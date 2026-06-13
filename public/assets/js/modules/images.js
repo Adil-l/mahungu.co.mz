@@ -49,6 +49,43 @@ export const images = {
     },
 
     /**
+     * Extrai a imagem real do artigo (og:image / twitter:image). É a MELHOR
+     * fonte para flyers de notícias: relevante e em alta qualidade. Best-effort;
+     * usa um proxy CORS para ler o HTML da página.
+     * @param {string} articleUrl URL da notícia.
+     * @returns {Promise<string>} URL da imagem ou ''.
+     */
+    async fromArticle(articleUrl) {
+        const url = String(articleUrl || '').trim();
+        if (!/^https?:\/\//i.test(url)) return '';
+
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 12000);
+        try {
+            const proxy = 'https://api.allorigins.win/get?url=';
+            const res = await fetch(proxy + encodeURIComponent(url), { signal: controller.signal });
+            if (!res.ok) return '';
+            const data = await res.json();
+            const doc = new DOMParser().parseFromString(String(data.contents || ''), 'text/html');
+            const meta = sel => doc.querySelector(sel)?.getAttribute('content')?.trim() || '';
+            let img = meta('meta[property="og:image:secure_url"]')
+                || meta('meta[property="og:image"]')
+                || meta('meta[name="og:image"]')
+                || meta('meta[name="twitter:image"]')
+                || meta('meta[name="twitter:image:src"]')
+                || (doc.querySelector('link[rel="image_src"]')?.getAttribute('href')?.trim() || '');
+            if (img.startsWith('//')) img = 'https:' + img;
+            else if (img.startsWith('/')) { try { img = new URL(img, url).href; } catch (e) { /* ignora */ } }
+            return /^https?:\/\//i.test(img) ? img : '';
+        } catch (err) {
+            console.warn('ImagesService.fromArticle falhou:', err.message);
+            return '';
+        } finally {
+            clearTimeout(timer);
+        }
+    },
+
+    /**
      * Devolve o URL da melhor imagem para um termo (1º resultado) ou ''.
      * Útil para atribuição automática de foto a propostas sem imagem.
      */
