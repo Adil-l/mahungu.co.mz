@@ -813,6 +813,14 @@ async function renderScheduledPosts() {
             const statusLabel = post.status === 'pending' ? 'Agendado' : (post.status === 'posted' ? 'Publicado' : 'Falhou');
             const statusColor = post.status === 'pending' ? '#ff9800' : (post.status === 'posted' ? '#28a745' : '#ff4444');
 
+            // Mostra o motivo da falha (guardado em error_message: {plataforma: msg}).
+            const em = post.error_message;
+            const errorHtml = (em && typeof em === 'object' && Object.keys(em).length)
+                ? `<div style="margin-top:8px; padding:8px 10px; background:rgba(255,68,68,0.08); border:1px solid rgba(255,68,68,0.25); border-radius:6px; font-size:12px; color:#ff8a8a;">`
+                    + Object.entries(em).map(([k, v]) => `<div><strong>${escapeHtml(k)}:</strong> ${escapeHtml(String(v))}</div>`).join('')
+                    + `</div>`
+                : '';
+
             return `
                 <div class="management-item" style="margin-bottom: 15px;">
                     <div style="flex: 1;">
@@ -825,6 +833,7 @@ async function renderScheduledPosts() {
                         <h3 style="color: #fff; font-size: 15px; margin-bottom: 5px;">${escapeHtml((post.metadata && post.metadata.flyer_title) || (post.flyer && post.flyer.title) || 'Post de Texto')}</h3>
                         <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 10px;">${escapeHtml(post.content || '')}</p>
                         <div style="display: flex; gap: 5px;">${platforms}</div>
+                        ${errorHtml}
                     </div>
                     <div style="display: flex; gap: 8px;">
                         <button class="btn-tool" title="Excluir" onclick="deleteScheduledPost(${post.id})">
