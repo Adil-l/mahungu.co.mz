@@ -888,11 +888,14 @@ async function openSchedulerModal() {
     const hint = document.getElementById('schedule-caption-hint');
     if (hint) hint.style.display = 'none';
 
-    // Set default datetime (1 hour from now)
+    // Default: 1 hora a partir de agora. O input datetime-local espera hora
+    // LOCAL, por isso corrige-se o offset do fuso (UTC+2 em Maputo) antes de
+    // formatar — senão o default fica no passado e dá "must be after now".
     const now = new Date();
     now.setHours(now.getHours() + 1);
-    now.setMinutes(0);
-    document.getElementById('schedule-datetime').value = now.toISOString().slice(0, 16);
+    now.setMinutes(0, 0, 0);
+    const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    document.getElementById('schedule-datetime').value = localNow.toISOString().slice(0, 16);
 
     lucide.createIcons();
 }
@@ -922,7 +925,10 @@ async function saveScheduledPost() {
         await scheduler.saveScheduledPost({
             content: content,
             platforms: platforms,
-            scheduled_at: datetime,
+            // datetime-local é hora local; converte-se para ISO/UTC para o
+            // backend (em UTC) validar e guardar corretamente. Ao mostrar,
+            // o new Date(...).toLocaleString() volta a converter para local.
+            scheduled_at: new Date(datetime).toISOString(),
             metadata: metadata,
             // Envia a imagem do flyer para o servidor poder publicar à hora marcada.
             media_data_url: flyer ? flyer.image : null
