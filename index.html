@@ -66,17 +66,14 @@
         </a>
     </nav>
 
-    <div class="control-group ai-section">
-        <button class="btn-ai" onclick="openAIChat()" title="Abrir Chat Mahungu AI">
-            <i data-lucide="sparkles" style="color: #7000ff"></i>
-            <span class="nav-label">Mahungu AI</span>
+    <div class="sidebar-footer">
+        <button class="footer-icon-btn btn-ai-icon" onclick="openAIChat()" title="Abrir Chat Mahungu AI" aria-label="Mahungu AI">
+            <i data-lucide="sparkles"></i>
+        </button>
+        <button class="footer-icon-btn sidebar-toggle" onclick="toggleSidebar()" title="Recolher menu" aria-label="Recolher/expandir menu">
+            <i data-lucide="panel-left-close"></i>
         </button>
     </div>
-
-    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Recolher menu" aria-label="Recolher/expandir menu">
-        <i data-lucide="panel-left-close"></i>
-        <span class="nav-label">Recolher</span>
-    </button>
 </aside>
 
 <!-- Sidebar DIREITA: Ferramentas -->
@@ -756,7 +753,7 @@
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <div style="width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); display: flex; align-items: center; justify-content: center; color: #fff;"><i data-lucide="camera" width="20" height="20"></i></div>
                     <div>
-                        <div style="font-weight: 600; color: #fff;">Instagram</div>
+                        <div style="font-weight: 600; color: var(--text);">Instagram</div>
                         <div style="font-size: 11px; color: var(--text-muted);" id="status-instagram">Desconectado</div>
                     </div>
                 </div>
@@ -767,7 +764,7 @@
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <div style="width: 40px; height: 40px; border-radius: 10px; background: #1877f2; display: flex; align-items: center; justify-content: center; color: #fff;"><i data-lucide="thumbs-up" width="20" height="20"></i></div>
                     <div>
-                        <div style="font-weight: 600; color: #fff;">Facebook</div>
+                        <div style="font-weight: 600; color: var(--text);">Facebook</div>
                         <div style="font-size: 11px; color: var(--text-muted);" id="status-facebook">Desconectado</div>
                     </div>
                 </div>
@@ -778,7 +775,7 @@
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <div style="width: 40px; height: 40px; border-radius: 10px; background: #000; display: flex; align-items: center; justify-content: center; color: #fff;"><i data-lucide="music" width="20" height="20"></i></div>
                     <div>
-                        <div style="font-weight: 600; color: #fff;">TikTok</div>
+                        <div style="font-weight: 600; color: var(--text);">TikTok</div>
                         <div style="font-size: 11px; color: var(--text-muted);" id="status-tiktok">Desconectado</div>
                     </div>
                 </div>
@@ -789,7 +786,7 @@
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <div style="width: 40px; height: 40px; border-radius: 10px; background: #000; display: flex; align-items: center; justify-content: center; color: #fff;"><i data-lucide="bird" width="20" height="20"></i></div>
                     <div>
-                        <div style="font-weight: 600; color: #fff;">Twitter / X</div>
+                        <div style="font-weight: 600; color: var(--text);">Twitter / X</div>
                         <div style="font-size: 11px; color: var(--text-muted);" id="status-twitter">Desconectado</div>
                     </div>
                 </div>
@@ -800,7 +797,7 @@
                 <div style="display: flex; align-items: center; gap: 12px;">
                     <div style="width: 40px; height: 40px; border-radius: 10px; background: #fff; display: flex; align-items: center; justify-content: center; color: #000;"><i data-lucide="at-sign" width="20" height="20"></i></div>
                     <div>
-                        <div style="font-weight: 600; color: #fff;">Threads</div>
+                        <div style="font-weight: 600; color: var(--text);">Threads</div>
                         <div style="font-size: 11px; color: var(--text-muted);" id="status-threads">Desconectado</div>
                     </div>
                 </div>
@@ -1067,7 +1064,7 @@
             Deseja remover todas as propostas geradas? Esta ação não pode ser desfeita.
         </p>
         <div style="display: flex; gap: 10px;">
-            <button class="btn-main" style="flex: 1; background: rgba(255,255,255,0.1);" onclick="closeConfirmModal()">Cancelar</button>
+            <button class="btn-main btn-neutral" style="flex: 1;" onclick="closeConfirmModal()">Cancelar</button>
             <button class="btn-main" style="flex: 1; background: rgba(255, 68, 68, 0.1); color: #ff4444; border: 1px solid rgba(255, 68, 68, 0.3);" id="confirm-yes-btn">Confirmar</button>
         </div>
     </div>

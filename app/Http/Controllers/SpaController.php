@@ -75,7 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     (window.MAHUNGU_USER.name || '?').trim().charAt(0).toUpperCase() +
                 '</div>' +
                 '<div style="min-width:0;">' +
-                    '<div style="font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (window.MAHUNGU_USER.name || '') + '</div>' +
+                    '<div style="font-size:13px;font-weight:600;color:var(--text,#fff);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (window.MAHUNGU_USER.name || '') + '</div>' +
                     '<div style="font-size:11px;color:var(--text-muted,#8a8a99);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (window.MAHUNGU_USER.email || '') + '</div>' +
                 '</div>' +
             '</div>' +

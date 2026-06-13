@@ -97,16 +97,19 @@ body.editor-active {
 .nav-item:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
 .nav-item.active { background: rgba(212, 82, 42, 0.1); color: var(--primary); }
 
-/* ── BOTÃO RECOLHER (fundo da sidebar) ── */
-.sidebar-toggle {
-  flex-shrink: 0; display: flex; align-items: center; gap: 12px;
-  padding: 11px 15px; border-radius: 10px;
+/* ── RODAPÉ DA SIDEBAR: Mahungu AI + Recolher (ícones lado a lado) ── */
+.sidebar-footer { display: flex; gap: 10px; flex-shrink: 0; }
+.footer-icon-btn {
+  flex: 1; height: 46px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
   background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border);
-  color: var(--text-muted); cursor: pointer; z-index: 13002;
-  font-size: 13px; font-weight: 600; transition: all 0.2s; width: 100%;
+  color: var(--text-muted); cursor: pointer; transition: all 0.2s; z-index: 13002;
 }
-.sidebar-toggle:hover { color: var(--text); background: rgba(255,255,255,0.09); }
-.sidebar-toggle i, .sidebar-toggle svg { width: 18px; height: 18px; flex-shrink: 0; }
+.footer-icon-btn:hover { color: var(--text); background: rgba(255,255,255,0.09); }
+.footer-icon-btn i, .footer-icon-btn svg { width: 20px; height: 20px; }
+.btn-ai-icon { background: #12121a; border-color: #3d3d5c; color: #b98aff; }
+.btn-ai-icon i, .btn-ai-icon svg { color: #7000ff; }
+.btn-ai-icon:hover { border-color: #7000ff; box-shadow: 0 0 18px rgba(112, 0, 255, 0.25); background: #16161f; }
 
 /* ── SIDEBAR RECOLHIDA ── */
 .sidebar-left { transition: width 0.25s ease, padding 0.25s ease; }
@@ -117,9 +120,7 @@ body.sidebar-collapsed .sidebar-header { justify-content: center; }
 body.sidebar-collapsed .sidebar-header img { max-width: 46px !important; margin: 0 auto; }
 body.sidebar-collapsed .nav-item { justify-content: center; padding: 12px 0; gap: 0; }
 body.sidebar-collapsed .nav-label { display: none; }
-body.sidebar-collapsed .ai-section { padding: 0; background: transparent; border: none; }
-body.sidebar-collapsed .btn-ai { justify-content: center; padding: 14px 0; }
-body.sidebar-collapsed .sidebar-toggle { justify-content: center; padding: 11px 0; gap: 0; }
+body.sidebar-collapsed .sidebar-footer { flex-direction: column; }
 /* userbox injetado pelo SpaController: esconder textos, manter avatar + ícone sair */
 body.sidebar-collapsed #mahungu-userbox { align-items: center; }
 body.sidebar-collapsed #mahungu-userbox > div > div:last-child { display: none; }
@@ -1437,7 +1438,7 @@ body.editor-active #tab-editor {
 .meta-val {
     font-size: 13px;
     font-weight: 600;
-    color: #eee;
+    color: var(--text);
 }
 
 .caption-box {
@@ -1850,21 +1851,26 @@ body.editor-active #tab-editor {
 /* ════════════════════════════════════════════════════════════════ */
 
 /* Texto que estava #fff fixo → cor de texto do tema.
-   NÃO incluímos div/span (onde vive o texto do flyer no #editor), por isso o
-   editor fica intacto sem precisar de :not(). */
+   !important porque vários títulos têm style="color:#fff" inline (vence
+   especificidade). NÃO incluímos div/span (texto do flyer vive no #editor),
+   por isso o editor fica intacto sem precisar de :not(). */
 body.theme-light .main-content :is(h1, h2, h3, h4, h5, h6, label, p, strong, small, th, td, li) {
-  color: var(--text);
+  color: var(--text) !important;
 }
+/* Texto de contraste pleno (números, títulos de cartões/modais). */
 body.theme-light :is(
-  .stat-value, .stat-label, .dialog-title, .dialog-text, .nav-label,
-  .history-title, .modal-eyebrow, .control-label, .section-subtitle, .form-group label
+  .val, .stat-value, .chart-title, .dialog-title, .nav-label, .history-title,
+  .modal-header h2, .profile-avatar-info strong
 ) {
-  color: var(--text);
+  color: var(--text) !important;
 }
-body.theme-light .text-muted,
-body.theme-light .stat-label,
-body.theme-light .history-date,
-body.theme-light .section-subtitle { color: var(--text-muted); }
+/* Texto secundário/legendas → cinza-escuro legível. */
+body.theme-light :is(
+  .text-muted, .stat-label, .history-date, .section-subtitle, .control-label,
+  .modal-eyebrow, .dialog-text, .filter-chip, .profile-avatar-info span
+) {
+  color: var(--text-muted) !important;
+}
 
 /* Navegação: hover deixa de ser #fff (invisível em fundo claro). */
 body.theme-light .nav-item:hover { color: var(--text); background: rgba(20,22,40,0.05); }
@@ -1904,6 +1910,21 @@ body.theme-light .dialog-container {
 }
 body.theme-light .modal-overlay,
 body.theme-light .dialog-overlay { background: rgba(20,22,40,0.45); }
+/* Linhas das contas sociais (fundo translúcido branco → invisível em claro). */
+body.theme-light #social-accounts-modal div[style*="rgba(255,255,255,0.03)"] {
+  background: rgba(20,22,40,0.04) !important;
+  border-color: var(--glass-border) !important;
+}
+/* Status "Online" verde-néon do chat: escurecer para ler em fundo claro. */
+body.theme-light #ai-chat-modal [style*="color: #00ff88"] { color: #0a9d57 !important; }
+
+/* Painel lateral do modal de post (fundo escuro fixo → claro). */
+body.theme-light .modal-sidebar { background: #f7f8fb; border-left-color: var(--glass-border); }
+
+/* Botão neutro (secundário) — funciona em ambos os temas. */
+.btn-neutral { background: rgba(255,255,255,0.1); color: #fff; }
+body.theme-light .btn-neutral { background: rgba(20,22,40,0.08); color: var(--text); }
+body.theme-light .btn-neutral:hover { background: rgba(20,22,40,0.14); }
 
 /* Filtros / chips. */
 body.theme-light .filter-chip { color: var(--text-muted); border-color: var(--glass-border); }
