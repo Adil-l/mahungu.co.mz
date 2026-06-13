@@ -81,6 +81,12 @@ return [
         'key' => env('PEXELS_API_KEY'),
     ],
 
+    // Unsplash — fonte alternativa de fotos (chave grátis "Access Key" em
+    // unsplash.com/developers). Usada se o Pexels não devolver nada.
+    'unsplash' => [
+        'key' => env('UNSPLASH_ACCESS_KEY'),
+    ],
+
     // Liga/desliga modo de simulação: quando true, os posts são marcados como
     // publicados sem chamar as APIs reais (útil para demonstrar o fluxo sem a
     // aprovação da Meta). Ver App\Jobs\PostToSocialMedia.

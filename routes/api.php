@@ -35,8 +35,8 @@ Route::middleware(['auth'])->group(function () {
     // Gerador de hashtags (proxy RapidAPI/Hashtagy).
     Route::get('/hashtags', [HashtagController::class, 'generate']);
 
-    // Pesquisa de imagens (proxy Pexels — chave no servidor).
-    Route::get('/images/search', [ImageSearchController::class, 'pexels']);
+    // Pesquisa de imagens de reforço (proxy Pexels/Unsplash — chaves no servidor).
+    Route::get('/images/search', [ImageSearchController::class, 'search']);
 
     // Store partilhado entre utilizadores (Salvados/Aprovados visíveis por todos).
     Route::get('/sync/{kind}', [SyncController::class, 'index']);

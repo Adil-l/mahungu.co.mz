@@ -7,23 +7,29 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Proxy para a pesquisa de imagens no Pexels. A chave fica no servidor (.env,
- * PEXELS_API_KEY) e nunca é exposta ao browser. Usado como reforço quando a
- * notícia não traz imagem própria (og:image).
+ * Proxy para pesquisa de fotos de reforço (Pexels e Unsplash). As chaves ficam
+ * no servidor (.env) e nunca são expostas ao browser. Usado quando a notícia
+ * não traz imagem própria (og:image). Tenta Pexels e, se falhar, Unsplash.
  */
 class ImageSearchController extends Controller
 {
-    public function pexels(Request $request)
+    public function search(Request $request)
     {
         $request->validate([
             'q' => 'required|string|max:120',
         ]);
         $query = trim($request->input('q'));
 
+        $url = $this->fromPexels($query) ?: $this->fromUnsplash($query);
+
+        return response()->json(['url' => $url]);
+    }
+
+    private function fromPexels(string $query): string
+    {
         $key = config('services.pexels.key');
         if (empty($key)) {
-            // Sem chave: devolve vazio em silêncio (o frontend tem outros fallbacks).
-            return response()->json(['url' => '', 'needs_configuration' => true]);
+            return '';
         }
 
         try {
@@ -37,20 +43,42 @@ class ImageSearchController extends Controller
                 ]);
         } catch (\Throwable $e) {
             Log::warning('Pexels indisponível: ' . $e->getMessage());
-            return response()->json(['url' => '']);
+            return '';
         }
 
         if ($res->failed()) {
-            Log::warning('Pexels erro ' . $res->status());
-            return response()->json(['url' => '']);
+            return '';
         }
 
         $photo = $res->json('photos.0');
-        $url = $photo['src']['large2x'] ?? $photo['src']['large'] ?? $photo['src']['original'] ?? '';
+        return $photo['src']['large2x'] ?? $photo['src']['large'] ?? $photo['src']['original'] ?? '';
+    }
 
-        return response()->json([
-            'url' => $url,
-            'photographer' => $photo['photographer'] ?? null,
-        ]);
+    private function fromUnsplash(string $query): string
+    {
+        $key = config('services.unsplash.key');
+        if (empty($key)) {
+            return '';
+        }
+
+        try {
+            $res = Http::withHeaders(['Authorization' => 'Client-ID ' . $key])
+                ->timeout(15)
+                ->get('https://api.unsplash.com/search/photos', [
+                    'query' => $query,
+                    'per_page' => 1,
+                    'orientation' => 'portrait',
+                ]);
+        } catch (\Throwable $e) {
+            Log::warning('Unsplash indisponível: ' . $e->getMessage());
+            return '';
+        }
+
+        if ($res->failed()) {
+            return '';
+        }
+
+        $photo = $res->json('results.0');
+        return $photo['urls']['regular'] ?? $photo['urls']['full'] ?? '';
     }
 }

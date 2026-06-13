@@ -2428,14 +2428,14 @@ function applyGenerationToProposal(proposal, result) {
 
 // Atribui uma imagem quando a proposta não tem nenhuma, por ordem de qualidade:
 // 1) imagem do próprio artigo (og:image) — relevante e nítida;
-// 2) Pexels (foto profissional por tema);
+// 2) Pexels/Unsplash (foto profissional por tema);
 // 3) Openverse (banco de imagens livres);
 // 4) último recurso: geração por IA (garante que nunca fica sem imagem).
 async function ensureProposalImage(proposal) {
     if (proposal.image) return;
     const topic = proposal.generatedTitle || proposal.title || proposal.category;
     let found = await images.fromArticle(proposal.source_url || proposal.link || proposal.url);
-    if (!found) found = await images.fromPexels(topic);
+    if (!found) found = await images.fromStock(topic);
     if (!found) found = await images.findBest(topic);
     if (!found) found = images.aiGenerate(topic);
     if (found) proposal.image = found;

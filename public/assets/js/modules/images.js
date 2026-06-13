@@ -100,12 +100,12 @@ export const images = {
     },
 
     /**
-     * Pesquisa no Pexels (foto profissional, por tema) via proxy do servidor
-     * (a chave fica no .env). Devolve o URL da 1.ª foto ou ''.
+     * Pesquisa fotos de reforço (Pexels/Unsplash) via proxy do servidor (as
+     * chaves ficam no .env). Devolve o URL da 1.ª foto ou ''.
      * @param {string} query
      * @returns {Promise<string>}
      */
-    async fromPexels(query) {
+    async fromStock(query) {
         const q = String(query || '').trim();
         if (!q) return '';
         try {
@@ -117,7 +117,7 @@ export const images = {
             const data = await res.json();
             return data.url || '';
         } catch (err) {
-            console.warn('ImagesService.fromPexels falhou:', err.message);
+            console.warn('ImagesService.fromStock falhou:', err.message);
             return '';
         }
     },
