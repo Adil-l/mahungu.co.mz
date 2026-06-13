@@ -28,6 +28,12 @@ return [
         // business_management é necessário para que Páginas que pertencem a um
         // Portefólio de negócios (Business) apareçam em /me/accounts.
         'scopes' => env('FACEBOOK_SCOPES', 'public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,business_management'),
+        // Publicação na Página da marca com token fixo (Utilizador de Sistema ou
+        // token de Página), à semelhança do X. Evita o OAuth por utilizador e o
+        // problema de Páginas de negócio não aparecerem no me/accounts.
+        // page_id é opcional: se vazio, resolve-se a partir do token.
+        'page_token' => env('FACEBOOK_PAGE_TOKEN'),
+        'page_id' => env('FACEBOOK_PAGE_ID'),
     ],
     'instagram' => [
         // O Instagram publica através da app do Facebook (mesmo App ID por omissão).

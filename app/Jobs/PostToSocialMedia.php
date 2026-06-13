@@ -57,6 +57,15 @@ class PostToSocialMedia implements ShouldQueue
                     continue;
                 }
 
+                // Facebook com token fixo (Utilizador de Sistema/Página) no .env:
+                // publica na Página da marca sem depender da ligação OAuth por
+                // utilizador. É o caminho fiável para Páginas de um negócio.
+                if ($platform === 'facebook' && config('services.facebook.page_token')) {
+                    $this->postToFacebookPage();
+                    $successCount++;
+                    continue;
+                }
+
                 $account = SocialAccount::where('user_id', $this->scheduledPost->user_id)
                     ->where('platform', $platform)
                     ->first();
@@ -204,6 +213,60 @@ class PostToSocialMedia implements ShouldQueue
         Log::info("Publicado no X (tweet {$tweetId}) para o utilizador {$this->scheduledPost->user_id}.");
 
         return $tweetId;
+    }
+
+    /**
+     * Publica na Página da marca usando um token fixo do .env (FACEBOOK_PAGE_TOKEN),
+     * normalmente de um Utilizador de Sistema com a Página atribuída. Resolve a
+     * Página e o respetivo Page Access Token via /me/accounts (que, ao contrário
+     * do OAuth por utilizador, inclui Páginas de negócio atribuídas ao sistema).
+     * FACEBOOK_PAGE_ID é opcional: escolhe a Página certa quando há várias.
+     */
+    protected function postToFacebookPage(): bool
+    {
+        $token = config('services.facebook.page_token');
+        $pageId = config('services.facebook.page_id');
+        $pageToken = $token;
+
+        $pages = Http::get('https://graph.facebook.com/v19.0/me/accounts', [
+            'access_token' => $token,
+        ])->json('data', []);
+
+        if (!empty($pages)) {
+            $page = $pageId
+                ? (collect($pages)->firstWhere('id', $pageId) ?? $pages[0])
+                : $pages[0];
+            $pageId = $page['id'];
+            $pageToken = $page['access_token'] ?? $token;
+        } elseif (!$pageId) {
+            throw new \Exception(
+                'O token fixo do Facebook não vê nenhuma Página. Confirma que a Página '
+                . 'está atribuída ao Utilizador de Sistema, ou define FACEBOOK_PAGE_ID no .env.'
+            );
+        }
+
+        $content = $this->scheduledPost->content ?? '';
+        $mediaPath = $this->scheduledPost->media_path;
+
+        if ($mediaPath && Storage::disk('public')->exists($mediaPath)) {
+            $res = Http::attach('source', Storage::disk('public')->get($mediaPath), 'flyer.png')
+                ->post("https://graph.facebook.com/v19.0/{$pageId}/photos", [
+                    'caption' => $content,
+                    'access_token' => $pageToken,
+                ]);
+        } else {
+            $res = Http::post("https://graph.facebook.com/v19.0/{$pageId}/feed", [
+                'message' => $content,
+                'access_token' => $pageToken,
+            ]);
+        }
+
+        if ($res->failed()) {
+            throw new \Exception('Facebook: ' . $res->json('error.message', 'erro ao publicar na Página.'));
+        }
+
+        Log::info("Publicado no Facebook (Página {$pageId}) via token fixo.");
+        return true;
     }
 
     /**
