@@ -1229,6 +1229,13 @@ function onScheduleFlyerChange() {
         if (storyRadio) storyRadio.checked = true;
         onScheduleFormatChange();
     }
+    // Flyer normal (feed): repõe o formato "feed" (evita ficar preso em "story"
+    // de uma escolha anterior — garante que o que se posta corresponde ao item).
+    else if (flyer) {
+        const feedRadio = document.querySelector('input[name="postformat"][value="feed"]');
+        if (feedRadio) feedRadio.checked = true;
+        onScheduleFormatChange();
+    }
 }
 
 // ── Formato do post (feed | story | carrossel) ──
@@ -1294,12 +1301,19 @@ async function openSchedulerModal() {
     renderCarouselPreview();
     onScheduleFormatChange();
 
-    // Fill flyers select
+    // Fill flyers select — separa Flyers (feed/carrossel) de Stories (9:16) em
+    // grupos distintos, senão as duas versões do mesmo título ficam idênticas
+    // na lista e é impossível saber qual se vai postar.
     const select = document.getElementById('schedule-flyer');
     schedulerFlyers = await storage.getAllFlyers();
 
-    select.innerHTML = '<option value="">Sem Flyer (Apenas Texto)</option>' +
-        schedulerFlyers.map(f => `<option value="${f.id}">${escapeHtml(f.title)}</option>`).join('');
+    const optHtml = f => `<option value="${f.id}">${escapeHtml(f.title)}</option>`;
+    const posts = schedulerFlyers.filter(f => f.format !== 'story');
+    const stories = schedulerFlyers.filter(f => f.format === 'story');
+    let optionsHtml = '<option value="">Sem Flyer (Apenas Texto)</option>';
+    if (posts.length) optionsHtml += `<optgroup label="🖼️ Flyers (feed / carrossel)">${posts.map(optHtml).join('')}</optgroup>`;
+    if (stories.length) optionsHtml += `<optgroup label="📱 Stories (9:16)">${stories.map(optHtml).join('')}</optgroup>`;
+    select.innerHTML = optionsHtml;
     select.onchange = onScheduleFlyerChange;
 
     // Limpa legenda anterior e esconde a dica
