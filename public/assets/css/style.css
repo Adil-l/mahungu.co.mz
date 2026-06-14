@@ -95,7 +95,8 @@ body.editor-active {
   pointer-events: auto; flex-shrink: 0; white-space: nowrap;
 }
 .nav-item:hover { background: rgba(255, 255, 255, 0.05); color: #fff; }
-.nav-item.active { background: rgba(212, 82, 42, 0.1); color: var(--primary); }
+/* Estado ativo: laranja mais claro que --primary p/ contraste AA no tema escuro. */
+.nav-item.active { background: rgba(212, 82, 42, 0.1); color: #e8763e; }
 
 /* ── RODAPÉ DA SIDEBAR: Mahungu AI + Recolher (ícones lado a lado) ── */
 .sidebar-footer { display: flex; gap: 10px; flex-shrink: 0; }
@@ -1684,7 +1685,8 @@ body.editor-active #tab-editor {
     height: 20px;
     padding: 0 6px;
     border-radius: 10px;
-    background: var(--primary);
+    /* Tom mais escuro que --primary p/ garantir contraste AA (>=4.5:1) com texto branco. */
+    background: #a83a1a;
     color: #fff;
     font-size: 11px;
     font-weight: 700;
@@ -1789,7 +1791,7 @@ body.editor-active #tab-editor {
 }
 
 .filter-chip:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
-.filter-chip.active { background: rgba(212, 82, 42, 0.15); border-color: var(--primary); color: var(--primary); }
+.filter-chip.active { background: rgba(212, 82, 42, 0.15); border-color: var(--primary); color: #e8763e; }
 
 .filter-search {
     display: flex;
@@ -1957,6 +1959,9 @@ body.theme-light .btn-neutral:hover { background: rgba(20,22,40,0.14); }
 
 /* Filtros / chips. */
 body.theme-light .filter-chip { color: var(--text-muted); border-color: var(--glass-border); }
+/* Tema claro: laranja mais escuro nos estados ativos p/ contraste AA sobre fundo claro. */
+body.theme-light .nav-item.active { color: #a83a1a; }
+body.theme-light .filter-chip.active { color: #a83a1a; }
 
 /* Tabela de administração. */
 body.theme-light .admin-table tbody td { color: var(--text); }

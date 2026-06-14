@@ -2210,11 +2210,15 @@ async function approveAndSaveProposal(id) {
         return;
     }
 
+    // Pode ser chamada pelo botão do modal OU pelo botão "btn-mini" da lista
+    // (onde o modal não está aberto). Por isso o botão é opcional.
     const btn = document.querySelector('#proposal-review-modal .btn-success');
-    const originalHtml = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i data-lucide="loader" class="spin"></i> Salvando...';
-    lucide.createIcons();
+    const originalHtml = btn ? btn.innerHTML : null;
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader" class="spin"></i> Salvando...';
+        lucide.createIcons();
+    }
 
     try {
         // Carrega o conteúdo no editor para capturar. Se a proposta foi editada
@@ -2287,9 +2291,11 @@ async function approveAndSaveProposal(id) {
         console.error("Erro ao aprovar e salvar proposta:", err);
         ui.showToast("Erro ao aprovar e salvar proposta.", "error");
     } finally {
-        btn.innerHTML = originalHtml;
-        btn.disabled = false;
-        lucide.createIcons();
+        if (btn) {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            lucide.createIcons();
+        }
     }
 }
 
