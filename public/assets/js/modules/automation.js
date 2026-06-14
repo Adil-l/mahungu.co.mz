@@ -57,7 +57,8 @@ export const automation = {
                 try {
                     totalNew += await this.fetchFromSource(source);
                 } catch (err) {
-                    console.error(`Erro na fonte ${source.name}:`, err);
+                    // Fonte em baixo é esperado (feed mudou/bloqueia/lento) — aviso, não erro.
+                    console.warn(`Fonte indisponível: ${source.name} (${err.message})`);
                 }
             }
             this.lastChecked = Date.now();

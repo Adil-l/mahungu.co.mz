@@ -3046,14 +3046,12 @@ async function clearAllDataConfirm() {
 // Fontes padrão, organizadas por tipo de conteúdo.
 const DEFAULT_SOURCES = [
     // Moçambique
-    { name: "Notícias", url: "https://www.noticias.co.mz/feed", category: "Moçambique", active: true },
+    { name: "Notícias", url: "https://www.jornalnoticias.co.mz/feed/", category: "Moçambique", active: true },
     { name: "O País", url: "https://opais.co.mz/feed", category: "Moçambique", active: true },
     { name: "Folha de Maputo", url: "https://folhademaputo.co.mz/feed", category: "Moçambique", active: true },
     { name: "Carta de Moçambique", url: "https://cartamz.com/feed", category: "Moçambique", active: true },
-    { name: "Integrity", url: "https://integritymagazine.co.mz/feed", category: "Moçambique", active: true },
     { name: "Club of Mozambique", url: "https://clubofmozambique.com/feed", category: "Moçambique", active: true },
-    { name: "Savana", url: "https://savana.co.mz/feed", category: "Moçambique", active: true },
-    { name: "A Verdade", url: "https://verdade.co.mz/feed", category: "Moçambique", active: true },
+    { name: "Savana", url: "https://savana.co.mz/?feed=rss2", category: "Moçambique", active: true },
     { name: "Rádio Moçambique", url: "https://rm.co.mz/feed", category: "Moçambique", active: true },
     { name: "Zitamar News", url: "https://zitamar.com/feed", category: "Moçambique", active: true },
     { name: "360 Mozambique", url: "https://360mozambique.com/feed/", category: "Moçambique", active: true },
@@ -3061,7 +3059,6 @@ const DEFAULT_SOURCES = [
     { name: "AllAfrica Moçambique", url: "https://allafrica.com/tools/headlines/rdf/mozambique/headlines.rdf", category: "Moçambique", active: true },
     { name: "AllAfrica África Austral", url: "https://allafrica.com/tools/headlines/rdf/southernafrica/headlines.rdf", category: "Moçambique", active: true },
     // África em Português
-    { name: "DW África (PT)", url: "https://rss.dw.com/rdf/rss-pt-afr", category: "Moçambique", active: true },
     { name: "RFI Português", url: "https://www.rfi.fr/pt/rss", category: "Moçambique", active: true },
     // Desporto
     { name: "BBC Sport", url: "https://feeds.bbci.co.uk/sport/rss.xml", category: "Desporto", active: true },
@@ -3070,7 +3067,6 @@ const DEFAULT_SOURCES = [
     { name: "ESPN", url: "https://www.espn.com/espn/rss/news", category: "Desporto", active: true },
     // Política & Polémicas
     { name: "BBC África", url: "https://feeds.bbci.co.uk/news/world/africa/rss.xml", category: "Política", active: true },
-    { name: "Politico", url: "https://www.politico.com/rss/politics08.xml", category: "Política", active: true },
     // Tecnologia
     { name: "The Verge", url: "https://www.theverge.com/rss/index.xml", category: "Tecnologia", active: true },
     { name: "TechCrunch", url: "https://techcrunch.com/feed/", category: "Tecnologia", active: true },
@@ -3104,6 +3100,39 @@ async function seedDefaultSources() {
         await storage.saveSource({ ...s });
     }
     console.log("Fontes padrão importadas!");
+}
+
+// Fontes padrão cujo feed mudou de URL ou morreu — aplicado UMA vez ao
+// IndexedDB para corrigir/remover as que os utilizadores já tinham guardadas.
+// chave = URL antigo; valor = URL novo, ou null para remover a fonte.
+const SOURCE_REPAIRS = {
+    'https://www.noticias.co.mz/feed': 'https://www.jornalnoticias.co.mz/feed/',
+    'https://savana.co.mz/feed': 'https://savana.co.mz/?feed=rss2',
+    'https://verdade.co.mz/feed': null,                       // site em baixo
+    'https://rss.dw.com/rdf/rss-pt-afr': null,                // feed vazio
+    'https://www.politico.com/rss/politics08.xml': null,      // bloqueia bots (403)
+    'https://integritymagazine.co.mz/feed': null,             // bloqueia bots (403)
+};
+
+async function repairSources() {
+    if (storage.getSetting('sourcesRepairV1')) return;
+    try {
+        const norm = (u) => String(u || '').replace(/\/+$/, '');
+        const repairs = {};
+        for (const [k, v] of Object.entries(SOURCE_REPAIRS)) repairs[norm(k)] = v;
+        const sources = await storage.getAllSources();
+        for (const s of sources) {
+            const key = norm(s.url);
+            if (!(key in repairs)) continue;
+            const repl = repairs[key];
+            if (repl === null) await storage.deleteSource(s.id);
+            else if (repl !== s.url) await storage.saveSource({ ...s, url: repl });
+        }
+        storage.updateSetting('sourcesRepairV1', true);
+        console.log('Fontes reparadas (URLs atualizados / mortas removidas).');
+    } catch (e) {
+        console.warn('Reparação de fontes falhou:', e);
+    }
 }
 
 // Adiciona as fontes padrão em falta (compara por URL, sem duplicar).
@@ -3194,8 +3223,9 @@ async function initApp() {
         await storage.initPromise;
         console.log('Mahungu Studio: Banco de dados pronto.');
         
-        // Importar fontes padrão se necessário
+        // Importar fontes padrão se necessário + reparar URLs antigos/mortos
         await seedDefaultSources();
+        await repairSources();
 
         // Limpeza automática de propostas antigas (best-effort)
         try { await storage.pruneProposals(); } catch (e) { console.warn('Limpeza automática falhou:', e); }
