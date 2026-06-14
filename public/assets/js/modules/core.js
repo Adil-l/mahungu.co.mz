@@ -145,7 +145,10 @@ export const core = {
             document.body.appendChild(captureHost);
 
             const canvas = await html2canvas(flyerClone, {
-                scale: 2,
+                // 1080x1350 = tamanho nativo do design e o ideal para redes sociais
+                // (IG retrato). scale 1 é ~4x mais rápido/leve que scale 2, sem perda
+                // visível para publicar (PNG mantém o texto nítido).
+                scale: 1,
                 useCORS: true,
                 allowTaint: false, // Alterado para false para evitar problemas de segurança que bloqueiam o canvas
                 logging: false,
