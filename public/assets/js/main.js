@@ -943,14 +943,17 @@ async function confirmSaveToHistory() {
                 await new Promise(r => setTimeout(r, 80)); // deixa a imagem/layout assentar
                 slides.push(await core.captureCurrentFlyer());
             }
+            // Reaproveita o id se estiver a EDITAR um carrossel existente.
+            const existingC = editingFlyerId ? await storage.getFlyerById(editingFlyerId) : null;
             const entry = {
-                id: generateUniqueFlyerId(),
+                id: editingFlyerId || generateUniqueFlyerId(),
                 title: title,
                 category: category,
-                status: 'Aprovado',
-                date: new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }),
-                image: slides[0],         // 1º slide = miniatura/retrocompat
-                slides: slides,           // carrossel
+                status: existingC?.status || 'Aprovado',
+                date: existingC?.date || new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }),
+                image: slides[0],              // 1º slide = miniatura/retrocompat
+                slides: slides,                // imagens capturadas (publicação)
+                slideStates: pendingCarouselStates, // estados editáveis (p/ voltar a editar)
                 caption: editorPostMeta?.caption || '',
                 hashtags: editorPostMeta?.hashtags || [],
                 cta: editorPostMeta?.cta || ''
@@ -2577,7 +2580,24 @@ async function renderDashboardMetrics() {
 
 async function editFlyer(id) {
     const flyer = await storage.getFlyerById(id);
-    if (!flyer || !flyer.state) return;
+    if (!flyer) return;
+
+    // ── Carrossel: restaura os slides editáveis no modo carrossel ──
+    if (Array.isArray(flyer.slideStates) && flyer.slideStates.length >= 2) {
+        editingFlyerId = flyer.id;
+        editingProposalId = null;
+        editorPostMeta = { caption: flyer.caption || '', hashtags: flyer.hashtags || [], cta: flyer.cta || '' };
+        carouselSlides = flyer.slideStates.map(s => ({ ...s }));
+        activeSlideIndex = 0;
+        const editorNav = document.querySelector('.main-nav .nav-item[data-tab="editor"]');
+        showTab('editor', editorNav);
+        loadEditorState(carouselSlides[0]);
+        renderCarouselBar();
+        ui.showToast("Carrossel carregado. Clica nos slides para editar; Guardar atualiza-o.", "success");
+        return;
+    }
+
+    if (!flyer.state) return;
     // Estamos a editar um flyer aprovado: o próximo "Salvar" atualiza-o.
     editingFlyerId = flyer.id;
     editingProposalId = null;
@@ -3116,9 +3136,13 @@ async function uniteSelectedAsCarousel() {
 
     ui.showToast('A montar o carrossel… ✨', 'info');
     try {
-        // 1) captura cada proposta como um slide
+        // 1) captura cada proposta como um slide (e guarda o estado p/ editar depois)
         const slides = [];
-        for (const p of proposals) slides.push(await captureProposalSlide(p));
+        const slideStates = [];
+        for (const p of proposals) {
+            slides.push(await captureProposalSlide(p));
+            slideStates.push(snapshotEditor());
+        }
 
         // 2) legenda-resumo combinada pela IA (com fallback)
         let caption = '', hashtags = [], cta = '';
@@ -3141,6 +3165,7 @@ async function uniteSelectedAsCarousel() {
             date: new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }),
             image: slides[0],
             slides,
+            slideStates,
             caption, hashtags, cta
         };
         await storage.saveFlyer(entry);
