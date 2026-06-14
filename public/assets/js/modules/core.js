@@ -176,10 +176,15 @@ export const core = {
     waitForImages(root) {
         const images = Array.from(root.querySelectorAll('img'));
         return Promise.all(images.map(img => {
-            if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+            // Já terminou (carregada OU falhada) ou nem tem src (ex.: os <img>
+            // vazios do modo "fundo duplo") → não esperar, senão bloqueia para
+            // sempre (esses nunca disparam onload/onerror).
+            if (img.complete || !img.getAttribute('src')) return Promise.resolve();
             return new Promise(resolve => {
                 img.onload = resolve;
                 img.onerror = resolve;
+                // Salvaguarda: nunca bloquear mais de 5s por imagem.
+                setTimeout(resolve, 5000);
             });
         }));
     }
