@@ -146,6 +146,18 @@ let editingFlyerId = null;
 // editado é guardado em proposal.flyerState para preview e aprovação fiéis.
 let editingProposalId = null;
 
+// Evita CTA duplicado: a legenda gerada pela IA já costuma TERMINAR com o CTA
+// (fórmula FACTO+CONTEXTO+IMPACTO+PERGUNTA+CTA). Só devolve o cta se a legenda
+// ainda não o contiver (compara o texto normalizado e a assinatura da marca).
+function ctaIfMissing(caption, cta) {
+    if (!cta) return '';
+    const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const c = norm(caption);
+    if (!c) return cta;
+    if (c.includes(norm(cta)) || c.includes('siga a @mahungu_mz')) return '';
+    return cta;
+}
+
 // Monta o texto pronto a copiar para redes sociais.
 function buildCaptionText(meta) {
     if (!meta) return '';
@@ -153,7 +165,8 @@ function buildCaptionText(meta) {
     if (meta.caption) parts.push(meta.caption);
     if (Array.isArray(meta.hashtags) && meta.hashtags.length) parts.push(meta.hashtags.join(' '));
     else if (typeof meta.hashtags === 'string' && meta.hashtags.trim()) parts.push(meta.hashtags.trim());
-    if (meta.cta) parts.push(meta.cta);
+    const cta = ctaIfMissing(meta.caption, meta.cta);
+    if (cta) parts.push(cta);
     return parts.join('\n\n');
 }
 
@@ -933,7 +946,8 @@ function composeFlyerCaption(flyer) {
     if (!flyer) return '';
     const parts = [];
     if (flyer.caption) parts.push(flyer.caption.trim());
-    if (flyer.cta) parts.push(flyer.cta.trim());
+    const cta = ctaIfMissing(flyer.caption, flyer.cta);
+    if (cta) parts.push(cta.trim());
     if (Array.isArray(flyer.hashtags) && flyer.hashtags.length) {
         parts.push(flyer.hashtags.map(h => (h.startsWith('#') ? h : '#' + h)).join(' '));
     }
@@ -1465,22 +1479,23 @@ function renderModalCaptionBlock(entry) {
 
     currentModalCaption = buildCaptionText(entry);
     const genLabel = hasCaption(entry) ? 'Gerar nova' : 'Gerar legenda';
-    const genBtn = `<button class="btn-mini" onclick="generateFlyerCaption()" id="btn-gen-caption" title="${genLabel} com IA"><i data-lucide="sparkles"></i> ${genLabel}</button>`;
+    const genBtn = `<button class="btn-chip" onclick="generateFlyerCaption()" id="btn-gen-caption" title="${genLabel} com IA"><i data-lucide="sparkles"></i> ${genLabel}</button>`;
 
     if (hasCaption(entry)) {
         const tagsHtml = (Array.isArray(entry.hashtags) ? entry.hashtags : [])
             .map(h => `<span class="caption-tag">${escapeHtml(h)}</span>`).join(' ');
+        const ctaDisp = ctaIfMissing(entry.caption, entry.cta);
         captionBlock.innerHTML = `
             <div class="meta-label" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
                 <span>Legenda para redes</span>
                 <span style="display:flex; gap:6px;">
-                    <button class="btn-mini" onclick="copyCurrentCaption()" title="Copiar legenda"><i data-lucide="copy"></i> Copiar</button>
+                    <button class="btn-chip" onclick="copyCurrentCaption()" title="Copiar legenda"><i data-lucide="copy"></i> Copiar</button>
                     ${genBtn}
                 </span>
             </div>
             <p class="caption-text">${escapeHtml(entry.caption || '')}</p>
             ${tagsHtml ? `<div class="caption-tags">${tagsHtml}</div>` : ''}
-            ${entry.cta ? `<p class="caption-cta">${escapeHtml(entry.cta)}</p>` : ''}
+            ${ctaDisp ? `<p class="caption-cta">${escapeHtml(ctaDisp)}</p>` : ''}
         `;
     } else {
         captionBlock.innerHTML = `
