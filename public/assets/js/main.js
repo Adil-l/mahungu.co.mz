@@ -2049,6 +2049,14 @@ async function loadAdminLogs() {
     }
 }
 
+// Timestamp real de um flyer (o id é Date.now()*100000 + aleatório → reduzir à escala de ms).
+function flyerTimestamp(f) {
+    let ms = Number(f && f.id);
+    if (!Number.isFinite(ms)) return NaN;
+    if (ms > 8.64e15) ms = Math.floor(ms / 100000);
+    return ms;
+}
+
 async function updateDashboardStats() {
     const flyers = await storage.getAllFlyers();
     const stats = await storage.getDashboardStats();
@@ -2076,6 +2084,10 @@ async function updateDashboardStats() {
     }
 
     updateProposalsBadge();
+
+    // Métricas completas — só quando a dashboard está visível (evita chamar a API à toa).
+    const dashTab = document.getElementById('tab-dashboard');
+    if (dashTab && !dashTab.classList.contains('hidden')) renderDashboardMetrics();
 }
 
 async function updateChart(view, el) {
@@ -2097,7 +2109,7 @@ async function updateChart(view, el) {
             const m = d.getMonth();
             const y = d.getFullYear();
             const count = flyers.filter(f => {
-                const fd = new Date(f.id);
+                const fd = new Date(flyerTimestamp(f));
                 return fd.getMonth() === m && fd.getFullYear() === y;
             }).length;
             months.push({ name: monthNames[m], count });
@@ -2116,7 +2128,7 @@ async function updateChart(view, el) {
             const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
             const dayIdx = d.getDay();
             const dateStr = d.toDateString();
-            const count = flyers.filter(f => new Date(f.id).toDateString() === dateStr).length;
+            const count = flyers.filter(f => new Date(flyerTimestamp(f)).toDateString() === dateStr).length;
             days.push({ name: dayNames[dayIdx], count });
         }
         
@@ -2124,6 +2136,132 @@ async function updateChart(view, el) {
         barsContainer.innerHTML = days.map(d => `
             <div class="bar" style="height: ${(d.count / max) * 100}%" data-month="${d.name}" title="${d.count} flyers"></div>
         `).join('');
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DASHBOARD — métricas completas do sistema (ADICIONAL, não-destrutivo).
+// Lê flyers/propostas/fontes (IndexedDB) + agendamentos (API) e desenha
+// KPIs, um donut SVG e barras horizontais. Corre sempre que a dashboard
+// está visível (ao abrir a aba ou após qualquer ação que atualize stats).
+// ═══════════════════════════════════════════════════════════════════
+function dashKpi({ icon, value, label, color }) {
+    return `<div class="dash-kpi">
+        <div class="dash-kpi-icon" style="color:${color};background:${color}1f;"><i data-lucide="${icon}"></i></div>
+        <div><div class="dash-kpi-value">${value}</div><div class="dash-kpi-label">${label}</div></div>
+    </div>`;
+}
+
+function dashBarList(items) {
+    if (!items.length) return `<div class="dash-empty">Sem dados ainda.</div>`;
+    const max = Math.max(...items.map(i => i.value), 1);
+    return `<div class="dash-barlist">` + items.map(i => `
+        <div class="dash-barrow">
+            <span class="dash-barrow-label">${escapeHtml(i.label)}</span>
+            <span class="dash-barrow-track"><span class="dash-barrow-fill" style="width:${Math.round((i.value / max) * 100)}%;background:${i.color || 'var(--primary)'};"></span></span>
+            <span class="dash-barrow-val">${i.value}</span>
+        </div>`).join('') + `</div>`;
+}
+
+function dashDonut(segments, centerNum, centerSub) {
+    const total = segments.reduce((s, x) => s + x.value, 0);
+    const r = 54, C = 2 * Math.PI * r;
+    let off = 0;
+    const arcs = total > 0 ? segments.filter(s => s.value > 0).map(s => {
+        const dash = (s.value / total) * C;
+        const el = `<circle cx="70" cy="70" r="${r}" fill="none" stroke="${s.color}" stroke-width="15" stroke-dasharray="${dash} ${C - dash}" stroke-dashoffset="${-off}" transform="rotate(-90 70 70)"></circle>`;
+        off += dash;
+        return el;
+    }).join('') : '';
+    const legend = segments.map(s => `<div class="dash-leg"><span class="dash-leg-dot" style="background:${s.color}"></span>${s.label}<strong>${s.value}</strong></div>`).join('');
+    return `<div class="dash-donut">
+        <svg viewBox="0 0 140 140" class="dash-donut-svg">
+            <circle cx="70" cy="70" r="${r}" fill="none" stroke="var(--glass-border)" stroke-width="15"></circle>
+            ${arcs}
+            <text x="70" y="68" text-anchor="middle" class="dash-donut-num">${centerNum}</text>
+            <text x="70" y="88" text-anchor="middle" class="dash-donut-sub">${escapeHtml(centerSub)}</text>
+        </svg>
+        <div class="dash-legend">${legend}</div>
+    </div>`;
+}
+
+function dashPanel(title, inner) {
+    return `<div class="dash-panel"><div class="dash-panel-title">${title}</div>${inner}</div>`;
+}
+
+let _renderingMetrics = false;
+async function renderDashboardMetrics() {
+    const root = document.getElementById('dashboard-metrics');
+    if (!root || _renderingMetrics) return;
+    _renderingMetrics = true;
+    try {
+        let flyers = [], proposals = [], sources = [], scheduled = [];
+        try { flyers = await storage.getAllFlyers(); } catch (e) {}
+        try { proposals = await storage.getAllProposals(); } catch (e) {}
+        try { sources = await storage.getAllSources(); } catch (e) {}
+        try {
+            const res = await fetch('/api/scheduled-posts?per_page=500', {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (res.ok) { const j = await res.json(); scheduled = Array.isArray(j) ? j : (j.data ?? []); }
+        } catch (e) {}
+
+        // Agendamentos por estado
+        const sc = { pending: 0, processing: 0, posted: 0, partially_posted: 0, failed: 0 };
+        scheduled.forEach(p => { if (sc[p.status] != null) sc[p.status]++; });
+        const attempts = sc.posted + sc.failed + sc.partially_posted;
+        const successRate = attempts ? Math.round((sc.posted / attempts) * 100) : 0;
+
+        // Publicações por plataforma
+        const plat = {};
+        scheduled.forEach(p => (p.platforms || []).forEach(pl => { plat[pl] = (plat[pl] || 0) + 1; }));
+        const platItems = Object.entries(plat).sort((a, b) => b[1] - a[1])
+            .map(([k, v]) => ({ label: k.charAt(0).toUpperCase() + k.slice(1), value: v, color: '#7000ff' }));
+
+        // Propostas por estado (funil)
+        const pst = { new: 0, pending: 0, approved: 0, rejected: 0 };
+        proposals.forEach(p => { if (pst[p.status] != null) pst[p.status]++; });
+
+        // Fontes por categoria (ativas / total)
+        const catMap = {};
+        sources.forEach(s => { const c = s.category || 'Geral'; (catMap[c] ||= { total: 0, active: 0 }).total++; if (s.active) catMap[c].active++; });
+        const catItems = Object.entries(catMap).sort((a, b) => b[1].active - a[1].active)
+            .map(([k, v]) => ({ label: `${k} (${v.active}/${v.total})`, value: v.active, color: '#28a745' }));
+
+        // Flyers
+        const flyersAprovados = flyers.filter(f => f.status === 'Aprovado').length;
+
+        const kpis = [
+            dashKpi({ icon: 'send', value: sc.posted, label: 'Posts publicados', color: '#28a745' }),
+            dashKpi({ icon: 'clock', value: sc.pending + sc.processing, label: 'Agendados', color: '#ff9800' }),
+            dashKpi({ icon: 'alert-triangle', value: sc.failed + sc.partially_posted, label: 'Com falha', color: '#ff4444' }),
+            dashKpi({ icon: 'target', value: successRate + '%', label: 'Taxa de sucesso', color: '#7000ff' }),
+            dashKpi({ icon: 'image', value: flyersAprovados, label: 'Flyers aprovados', color: '#D4522A' }),
+            dashKpi({ icon: 'rss', value: sources.filter(s => s.active).length, label: 'Fontes ativas', color: '#00b8d4' }),
+        ].join('');
+
+        root.innerHTML = `
+            <div class="dash-section-title">Métricas do sistema</div>
+            <div class="dash-kpis">${kpis}</div>
+            <div class="dash-grid">
+                ${dashPanel('Estado dos agendamentos', dashDonut([
+                    { label: 'Publicados', value: sc.posted, color: '#28a745' },
+                    { label: 'Agendados', value: sc.pending + sc.processing, color: '#ff9800' },
+                    { label: 'Com falha', value: sc.failed + sc.partially_posted, color: '#ff4444' },
+                ], scheduled.length, 'no total'))}
+                ${dashPanel('Publicações por plataforma', dashBarList(platItems))}
+                ${dashPanel('Funil de propostas', dashBarList([
+                    { label: 'Novas', value: pst.new, color: '#6c7a89' },
+                    { label: 'Pendentes', value: pst.pending, color: '#ff9800' },
+                    { label: 'Aprovadas', value: pst.approved, color: '#28a745' },
+                    { label: 'Rejeitadas', value: pst.rejected, color: '#ff4444' },
+                ]))}
+                ${dashPanel('Fontes por categoria (ativas)', dashBarList(catItems))}
+            </div>`;
+        if (window.lucide) lucide.createIcons();
+    } finally {
+        _renderingMetrics = false;
     }
 }
 

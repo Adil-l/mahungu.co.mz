@@ -973,6 +973,34 @@ body.editor-active #tab-editor {
 .sched-del i, .sched-del svg { width: 17px; height: 17px; }
 .sched-del:hover { color: #ff4444; border-color: rgba(255,68,68,.4); background: rgba(255,68,68,.08); }
 
+/* ── DASHBOARD: métricas completas (KPIs, donut, barras) ── */
+.dash-metrics { margin-top: 24px; display: flex; flex-direction: column; gap: 16px; }
+.dash-section-title { font-size: 16px; font-weight: 800; color: var(--text); }
+.dash-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.dash-kpi { display: flex; align-items: center; gap: 14px; padding: 18px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 14px; }
+.dash-kpi-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.dash-kpi-icon i, .dash-kpi-icon svg { width: 22px; height: 22px; }
+.dash-kpi-value { font-size: 26px; font-weight: 800; color: var(--text); line-height: 1.1; }
+.dash-kpi-label { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; }
+.dash-panel { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 14px; padding: 18px 20px; }
+.dash-panel-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 16px; }
+.dash-empty { font-size: 13px; color: var(--text-muted); padding: 8px 0; }
+.dash-donut { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.dash-donut-svg { width: 140px; height: 140px; flex-shrink: 0; }
+.dash-donut-num { fill: var(--text); font-size: 26px; font-weight: 800; }
+.dash-donut-sub { fill: var(--text-muted); font-size: 9px; text-transform: uppercase; letter-spacing: .5px; }
+.dash-legend { display: flex; flex-direction: column; gap: 9px; flex: 1; min-width: 130px; }
+.dash-leg { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
+.dash-leg strong { color: var(--text); margin-left: auto; }
+.dash-leg-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.dash-barlist { display: flex; flex-direction: column; gap: 12px; }
+.dash-barrow { display: flex; align-items: center; gap: 12px; }
+.dash-barrow-label { font-size: 12px; color: var(--text-muted); width: 40%; min-width: 90px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-barrow-track { flex: 1; height: 8px; background: var(--glass-border); border-radius: 999px; overflow: hidden; }
+.dash-barrow-fill { display: block; height: 100%; border-radius: 999px; min-width: 2px; transition: width .4s ease; }
+.dash-barrow-val { font-size: 13px; font-weight: 700; color: var(--text); width: 30px; text-align: right; }
+
 .profile-actions {
     display: flex;
     gap: 14px;
