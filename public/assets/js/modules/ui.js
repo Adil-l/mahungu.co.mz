@@ -113,6 +113,55 @@ class UIService {
     confirm(title, text, icon = 'help-circle') {
         return this.showDialog({ title, text, icon, type: 'confirm' });
     }
+
+    /**
+     * Diálogo com campo de texto (substitui o prompt() nativo do browser).
+     * @returns {Promise<string|null>} valor escrito, ou null se cancelar.
+     */
+    prompt(title, text = '', defaultValue = '', { confirmText = 'OK', cancelText = 'Cancelar', placeholder = '', icon = 'pencil' } = {}) {
+        return new Promise((resolve) => {
+            const overlay = document.getElementById('ui-dialog-overlay');
+            const iconEl = document.getElementById('ui-dialog-icon');
+            const titleEl = document.getElementById('ui-dialog-title');
+            const textEl = document.getElementById('ui-dialog-text');
+            const buttonsEl = document.getElementById('ui-dialog-buttons');
+
+            iconEl.innerHTML = `<i data-lucide="${icon}"></i>`;
+            titleEl.textContent = title;
+            textEl.textContent = text;
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'dialog-input';
+            input.value = defaultValue || '';
+            input.placeholder = placeholder;
+            textEl.insertAdjacentElement('afterend', input);
+
+            const cleanup = (val) => { input.remove(); overlay.classList.remove('active'); resolve(val); };
+
+            buttonsEl.innerHTML = '';
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'dialog-btn dialog-btn-secondary';
+            cancelBtn.textContent = cancelText;
+            cancelBtn.onclick = () => cleanup(null);
+            buttonsEl.appendChild(cancelBtn);
+
+            const confirmBtn = document.createElement('button');
+            confirmBtn.className = 'dialog-btn dialog-btn-primary';
+            confirmBtn.textContent = confirmText;
+            confirmBtn.onclick = () => cleanup(input.value);
+            buttonsEl.appendChild(confirmBtn);
+
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); confirmBtn.click(); }
+                else if (e.key === 'Escape') { cancelBtn.click(); }
+            };
+
+            overlay.classList.add('active');
+            lucide.createIcons();
+            setTimeout(() => input.focus(), 50);
+        });
+    }
 }
 
 export const ui = new UIService();

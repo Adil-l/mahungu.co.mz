@@ -525,8 +525,8 @@ async function renderSources() {
     const filterBar = `
         <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--glass-border);">
             <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
-                <button class="btn-mini" onclick="setAllSourcesActive(true)" title="Ativar todas as fontes"><i data-lucide="check-check"></i> Ativar todas</button>
-                <button class="btn-mini" onclick="setAllSourcesActive(false)" title="Desativar todas as fontes"><i data-lucide="power-off"></i> Desativar todas</button>
+                <button class="btn-chip" onclick="setAllSourcesActive(true)" title="Ativar todas as fontes"><i data-lucide="check-check"></i> Ativar todas</button>
+                <button class="btn-chip" onclick="setAllSourcesActive(false)" title="Desativar todas as fontes"><i data-lucide="power-off"></i> Desativar todas</button>
                 <span style="margin-left:auto; font-size:12px; color:var(--text-muted);">${activeTotal}/${sources.length} ativas</span>
             </div>
             <div class="filter-chips">
@@ -886,7 +886,7 @@ async function renderScheduledPosts() {
         container.innerHTML = posts.map(post => {
             const date = new Date(post.scheduled_at).toLocaleString('pt-PT');
             const platforms = post.platforms.map(p => `
-                <span class="caption-tag" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+                <span class="caption-tag" style="background: var(--glass-bg); border: 1px solid var(--glass-border);">
                     ${p}
                 </span>`).join(' ');
             
@@ -910,7 +910,7 @@ async function renderScheduledPosts() {
                             </span>
                             <span style="font-size: 12px; color: var(--text-muted);"><i data-lucide="clock" size="12" style="display:inline; vertical-align:middle;"></i> ${date}</span>
                         </div>
-                        <h3 style="color: #fff; font-size: 15px; margin-bottom: 5px;">${escapeHtml((post.metadata && post.metadata.flyer_title) || (post.flyer && post.flyer.title) || 'Post de Texto')}</h3>
+                        <h3 style="color: var(--text); font-size: 15px; margin-bottom: 5px;">${escapeHtml((post.metadata && post.metadata.flyer_title) || (post.flyer && post.flyer.title) || 'Post de Texto')}</h3>
                         <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 10px;">${escapeHtml(post.content || '')}</p>
                         <div style="display: flex; gap: 5px;">${platforms}</div>
                         ${errorHtml}
@@ -1144,7 +1144,7 @@ async function generateHashtags() {
     const textarea = document.getElementById('schedule-content');
     const current = textarea ? textarea.value.trim() : '';
     const suggestion = current.split(/\s+/).filter(Boolean).slice(0, 3).join(' ');
-    const keyword = prompt('Palavra-chave para gerar hashtags:', suggestion);
+    const keyword = await ui.prompt('Gerar hashtags', 'Palavra-chave para gerar hashtags:', suggestion, { placeholder: 'ex: futebol, Moçambique', confirmText: 'Gerar' });
     if (keyword === null) return;
     const kw = keyword.trim();
     if (!kw) { ui.showToast('Escreve uma palavra-chave.', 'info'); return; }
