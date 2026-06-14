@@ -1222,6 +1222,13 @@ function onScheduleFlyerChange() {
         onScheduleFormatChange();
         renderCarouselPreview();
     }
+    // Flyer-story (9:16): seleciona automaticamente o formato Story para que a
+    // arte vertical saia como STORIES no Instagram (e não como post de feed).
+    else if (flyer && flyer.format === 'story') {
+        const storyRadio = document.querySelector('input[name="postformat"][value="story"]');
+        if (storyRadio) storyRadio.checked = true;
+        onScheduleFormatChange();
+    }
 }
 
 // ── Formato do post (feed | story | carrossel) ──
@@ -2064,6 +2071,7 @@ async function renderStories() {
                     ${hasCaption(item) ? '<span class="thumb-caption-flag" title="Tem legenda"><i data-lucide="message-square-text" size="14"></i></span>' : ''}
                 </button>
                 <div class="history-actions-overlay">
+                    <button class="btn-mini" onclick="scheduleStory(${item.id})" title="Agendar/Publicar como Story"><i data-lucide="send"></i></button>
                     <button class="btn-mini" onclick="editFlyer(${item.id})" title="Editar"><i data-lucide="edit-3"></i></button>
                     <button class="btn-mini" onclick="deleteHistoryItem(${item.id}, event)" title="Excluir"><i data-lucide="trash-2"></i></button>
                     <button class="btn-mini" onclick="downloadDataUrl('${item.image}', '${fileName}.png')" title="Baixar"><i data-lucide="download"></i></button>
@@ -2081,6 +2089,20 @@ async function renderStories() {
     lucide.createIcons();
 }
 window.renderStories = renderStories;
+
+// Abre o agendador já com este story 9:16 selecionado. O formato "Story" é
+// auto-marcado por onScheduleFlyerChange (flyer.format === 'story'), garantindo
+// que a arte vertical sai como STORIES no Instagram — publicação igual à dos posts.
+async function scheduleStory(id) {
+    await openSchedulerModal();
+    const select = document.getElementById('schedule-flyer');
+    if (select) {
+        select.value = String(id);
+        onScheduleFlyerChange();
+    }
+    ui.showToast('Agenda o Story: confirma plataforma e hora.', 'info');
+}
+window.scheduleStory = scheduleStory;
 
 async function deleteHistoryItem(id, event) {
     if (event) event.stopPropagation();
