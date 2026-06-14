@@ -1,12 +1,10 @@
 import { storage } from './storage.js';
 
-// Proxies para obter os feeds RSS no browser.
-// 1º: proxy server-side da própria app (same-origin, sem CORS, fiável).
-// 2º/3º: proxies públicos como fallback (caso a app seja aberta sem PHP).
+// Obtém os feeds RSS pelo proxy server-side da própria app (same-origin, sem
+// CORS, fiável). NÃO usar proxies públicos (allorigins/corsproxy): no browser
+// são sempre bloqueados por CORS — só geravam erros na consola sem funcionar.
 const FEED_PROXIES = [
     (url) => `/feed-proxy?url=${encodeURIComponent(url)}`,
-    (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    (url) => `https://corsproxy.org/?url=${encodeURIComponent(url)}`,
 ];
 
 const FETCH_TIMEOUT_MS = 25000;

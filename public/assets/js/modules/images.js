@@ -51,7 +51,7 @@ export const images = {
     /**
      * Extrai a imagem real do artigo (og:image / twitter:image). É a MELHOR
      * fonte para flyers de notícias: relevante e em alta qualidade. Best-effort;
-     * usa um proxy CORS para ler o HTML da página.
+     * lê o HTML da página pelo /feed-proxy server-side (same-origin, sem CORS).
      * @param {string} articleUrl URL da notícia.
      * @returns {Promise<string>} URL da imagem ou ''.
      */
@@ -62,11 +62,11 @@ export const images = {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 12000);
         try {
-            const proxy = 'https://api.allorigins.win/get?url=';
-            const res = await fetch(proxy + encodeURIComponent(url), { signal: controller.signal });
+            // Proxy server-side da própria app (same-origin, sem CORS).
+            const res = await fetch('/feed-proxy?url=' + encodeURIComponent(url), { signal: controller.signal });
             if (!res.ok) return '';
-            const data = await res.json();
-            const doc = new DOMParser().parseFromString(String(data.contents || ''), 'text/html');
+            const html = await res.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
             const meta = sel => doc.querySelector(sel)?.getAttribute('content')?.trim() || '';
             let img = meta('meta[property="og:image:secure_url"]')
                 || meta('meta[property="og:image"]')
