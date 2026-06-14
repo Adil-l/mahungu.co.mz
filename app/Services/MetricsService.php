@@ -99,6 +99,62 @@ class MetricsService
         return $out;
     }
 
+    /**
+     * Métricas de UM post publicado (facebook|instagram). Usa campos do nó
+     * (likes/comentários — sempre fiáveis) + insights (alcance/saves — best-effort).
+     * Devolve array normalizado: likes, comments, shares, saved, reach, impressions.
+     */
+    public function postMetrics(string $platform, string $postId, string $token): array
+    {
+        if ($platform === 'instagram') {
+            $node = Http::get("{$this->base}/{$postId}", [
+                'fields' => 'like_count,comments_count',
+                'access_token' => $token,
+            ])->json();
+            $m = [
+                'likes' => $node['like_count'] ?? null,
+                'comments' => $node['comments_count'] ?? null,
+            ];
+            try {
+                $ins = Http::get("{$this->base}/{$postId}/insights", [
+                    'metric' => 'reach,saved,shares',
+                    'access_token' => $token,
+                ])->json('data', []);
+                $m['reach'] = $this->readMetric($ins, 'reach');
+                $m['saved'] = $this->readMetric($ins, 'saved');
+                $m['shares'] = $this->readMetric($ins, 'shares');
+            } catch (\Throwable $e) {
+                Log::info("IG post insights {$postId}: " . $e->getMessage());
+            }
+            return $m;
+        }
+
+        if ($platform === 'facebook') {
+            $node = Http::get("{$this->base}/{$postId}", [
+                'fields' => 'likes.summary(true).limit(0),comments.summary(true).limit(0),shares',
+                'access_token' => $token,
+            ])->json();
+            $m = [
+                'likes' => $node['likes']['summary']['total_count'] ?? null,
+                'comments' => $node['comments']['summary']['total_count'] ?? null,
+                'shares' => $node['shares']['count'] ?? null,
+            ];
+            try {
+                $ins = Http::get("{$this->base}/{$postId}/insights", [
+                    'metric' => 'post_impressions,post_impressions_unique',
+                    'access_token' => $token,
+                ])->json('data', []);
+                $m['impressions'] = $this->readMetric($ins, 'post_impressions');
+                $m['reach'] = $this->readMetric($ins, 'post_impressions_unique');
+            } catch (\Throwable $e) {
+                Log::info("FB post insights {$postId}: " . $e->getMessage());
+            }
+            return $m;
+        }
+
+        return [];
+    }
+
     /** Lê um valor de métrica do array de insights (tolera total_value e values[]). */
     protected function readMetric(array $data, string $name): ?int
     {

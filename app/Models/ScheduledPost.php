@@ -43,6 +43,11 @@ class ScheduledPost extends Model
         return $this->belongsTo(Flyer::class);
     }
 
+    public function metrics()
+    {
+        return $this->hasMany(PostMetric::class);
+    }
+
     /**
      * Posts pendentes cuja data já passou (prontos para processar).
      */

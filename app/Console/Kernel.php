@@ -17,6 +17,8 @@ class Kernel extends ConsoleKernel
         // execução morrer a meio o cadeado fica preso 24h e BLOQUEIA todas as
         // publicações seguintes ("Has Mutex" no schedule:list).
         $schedule->command('mahungu:process-scheduled-posts')->everyMinute()->withoutOverlapping(10);
+        // Métricas reais dos posts já publicados (likes/alcance) — de hora a hora.
+        $schedule->command('mahungu:fetch-metrics')->hourly()->withoutOverlapping(30);
     }
 
     /**

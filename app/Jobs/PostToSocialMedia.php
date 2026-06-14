@@ -22,6 +22,9 @@ class PostToSocialMedia implements ShouldQueue
 
     protected $scheduledPost;
 
+    /** Ids dos posts publicados, por plataforma (p/ métricas por-post). */
+    protected array $postIds = [];
+
     public function __construct(ScheduledPost $scheduledPost)
     {
         $this->scheduledPost = $scheduledPost;
@@ -95,18 +98,21 @@ class PostToSocialMedia implements ShouldQueue
         }
 
         if ($successCount === count($platforms)) {
-            $this->scheduledPost->update(['status' => 'posted', 'error_message' => null]);
+            $update = ['status' => 'posted', 'error_message' => null];
         } elseif ($successCount > 0) {
-            $this->scheduledPost->update([
-                'status' => 'partially_posted',
-                'error_message' => $errors,
-            ]);
+            $update = ['status' => 'partially_posted', 'error_message' => $errors];
         } else {
-            $this->scheduledPost->update([
-                'status' => 'failed',
-                'error_message' => $errors,
-            ]);
+            $update = ['status' => 'failed', 'error_message' => $errors];
         }
+
+        // Guarda os ids dos posts publicados (p/ ir buscar métricas depois).
+        if (!empty($this->postIds)) {
+            $meta = $this->scheduledPost->metadata ?? [];
+            $meta['platform_post_ids'] = array_merge($meta['platform_post_ids'] ?? [], $this->postIds);
+            $update['metadata'] = $meta;
+        }
+
+        $this->scheduledPost->update($update);
     }
 
     /**
@@ -189,6 +195,7 @@ class PostToSocialMedia implements ShouldQueue
             throw new \Exception('Threads (publish): ' . $publish->json('error.message', 'erro ao publicar.'));
         }
 
+        $this->postIds['threads'] = $publish->json('id');
         Log::info("Publicado no Threads (conta {$userId}) para o utilizador {$account->user_id}.");
         return true;
     }
@@ -218,6 +225,7 @@ class PostToSocialMedia implements ShouldQueue
         }
 
         $tweetId = $twitter->postTweet($content, $mediaIds);
+        $this->postIds['twitter'] = $tweetId;
         Log::info("Publicado no X (tweet {$tweetId}) para o utilizador {$this->scheduledPost->user_id}.");
 
         return $tweetId;
@@ -273,6 +281,7 @@ class PostToSocialMedia implements ShouldQueue
             throw new \Exception('Facebook: ' . $res->json('error.message', 'erro ao publicar na Página.'));
         }
 
+        $this->postIds['facebook'] = $res->json('post_id') ?? $res->json('id');
         Log::info("Publicado no Facebook (Página {$pageId}) via token fixo.");
         return true;
     }
@@ -325,7 +334,7 @@ class PostToSocialMedia implements ShouldQueue
         $content = $this->scheduledPost->content ?? '';
 
         // Cria o container, espera o IG processar a imagem e publica.
-        $this->publishInstagramPhoto($igId, $imageUrl, $content, $pageToken);
+        $this->postIds['instagram'] = $this->publishInstagramPhoto($igId, $imageUrl, $content, $pageToken);
 
         Log::info("Publicado no Instagram (conta {$igId}) via token fixo.");
         return true;
@@ -372,6 +381,7 @@ class PostToSocialMedia implements ShouldQueue
             throw new \Exception('Facebook: ' . $res->json('error.message', 'erro desconhecido ao publicar.'));
         }
 
+        $this->postIds['facebook'] = $res->json('post_id') ?? $res->json('id');
         Log::info("Publicado no Facebook (página {$pageId}) para o utilizador {$account->user_id}.");
         return true;
     }
@@ -415,7 +425,7 @@ class PostToSocialMedia implements ShouldQueue
         $imageUrl = Storage::disk(config('filesystems.media_disk'))->url($mediaPath);
 
         // 4-5) Cria o container, espera o IG processar a imagem e publica.
-        $this->publishInstagramPhoto($igId, $imageUrl, $content, $pageToken);
+        $this->postIds['instagram'] = $this->publishInstagramPhoto($igId, $imageUrl, $content, $pageToken);
 
         Log::info("Publicado no Instagram (conta {$igId}) para o utilizador {$account->user_id}.");
         return true;
@@ -428,7 +438,7 @@ class PostToSocialMedia implements ShouldQueue
      * ainda está em IN_PROGRESS. Se a imagem não for acessível publicamente o
      * container vai a ERROR — aqui isso é reportado de forma clara.
      */
-    protected function publishInstagramPhoto(string $igId, string $imageUrl, string $caption, string $token): void
+    protected function publishInstagramPhoto(string $igId, string $imageUrl, string $caption, string $token): ?string
     {
         $container = Http::post("https://graph.facebook.com/v19.0/{$igId}/media", [
             'image_url' => $imageUrl,
@@ -467,5 +477,7 @@ class PostToSocialMedia implements ShouldQueue
         if ($publish->failed()) {
             throw new \Exception('Instagram (publish): ' . $publish->json('error.message', 'erro ao publicar.'));
         }
+
+        return $publish->json('id');
     }
 }
