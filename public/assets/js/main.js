@@ -883,43 +883,39 @@ async function renderScheduledPosts() {
             return;
         }
 
-        container.innerHTML = posts.map(post => {
-            const date = new Date(post.scheduled_at).toLocaleString('pt-PT');
-            const platforms = post.platforms.map(p => `
-                <span class="caption-tag" style="background: var(--glass-bg); border: 1px solid var(--glass-border);">
-                    ${p}
-                </span>`).join(' ');
-            
-            const statusLabel = post.status === 'pending' ? 'Agendado' : (post.status === 'posted' ? 'Publicado' : 'Falhou');
-            const statusColor = post.status === 'pending' ? '#ff9800' : (post.status === 'posted' ? '#28a745' : '#ff4444');
+        const PLATFORM_ICONS = { instagram: 'instagram', facebook: 'facebook', tiktok: 'music', twitter: 'twitter', threads: 'at-sign' };
+        const STATUS = { pending: ['Agendado', 'pending'], processing: ['A processar', 'pending'], posted: ['Publicado', 'posted'], partially_posted: ['Parcial', 'pending'], failed: ['Falhou', 'failed'] };
 
-            // Mostra o motivo da falha (guardado em error_message: {plataforma: msg}).
+        container.innerHTML = posts.map(post => {
+            const date = new Date(post.scheduled_at).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const [statusLabel, statusClass] = STATUS[post.status] || ['—', 'pending'];
+
+            const platforms = (post.platforms || []).map(p =>
+                `<span class="sched-platform"><i data-lucide="${PLATFORM_ICONS[p] || 'share-2'}"></i> ${escapeHtml(p)}</span>`
+            ).join('');
+
+            const title = (post.metadata && post.metadata.flyer_title) || (post.flyer && post.flyer.title) || 'Post de Texto';
+            const content = post.content || '';
+
+            // Motivo da falha (error_message: {plataforma: msg}).
             const em = post.error_message;
             const errorHtml = (em && typeof em === 'object' && Object.keys(em).length)
-                ? `<div style="margin-top:8px; padding:8px 10px; background:rgba(255,68,68,0.08); border:1px solid rgba(255,68,68,0.25); border-radius:6px; font-size:12px; color:#ff8a8a;">`
-                    + Object.entries(em).map(([k, v]) => `<div><strong>${escapeHtml(k)}:</strong> ${escapeHtml(String(v))}</div>`).join('')
-                    + `</div>`
+                ? `<div class="sched-error">` + Object.entries(em).map(([k, v]) => `<div><strong>${escapeHtml(k)}:</strong> ${escapeHtml(String(v))}</div>`).join('') + `</div>`
                 : '';
 
             return `
-                <div class="management-item" style="margin-bottom: 15px;">
-                    <div style="flex: 1;">
-                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-                            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: ${statusColor}; border: 1px solid ${statusColor}33; padding: 2px 8px; border-radius: 4px;">
-                                ${statusLabel}
-                            </span>
-                            <span style="font-size: 12px; color: var(--text-muted);"><i data-lucide="clock" size="12" style="display:inline; vertical-align:middle;"></i> ${date}</span>
+                <div class="sched-card">
+                    <div class="sched-card-main">
+                        <div class="sched-card-top">
+                            <span class="sched-status ${statusClass}">${statusLabel}</span>
+                            <span class="sched-date"><i data-lucide="clock"></i> ${date}</span>
                         </div>
-                        <h3 style="color: var(--text); font-size: 15px; margin-bottom: 5px;">${escapeHtml((post.metadata && post.metadata.flyer_title) || (post.flyer && post.flyer.title) || 'Post de Texto')}</h3>
-                        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 10px;">${escapeHtml(post.content || '')}</p>
-                        <div style="display: flex; gap: 5px;">${platforms}</div>
+                        <div class="sched-title">${escapeHtml(title)}</div>
+                        <div class="sched-caption" title="${escapeHtml(content)}">${escapeHtml(content)}</div>
+                        <div class="sched-platforms">${platforms}</div>
                         ${errorHtml}
                     </div>
-                    <div style="display: flex; gap: 8px;">
-                        <button class="btn-tool" title="Excluir" onclick="deleteScheduledPost(${post.id})">
-                            <i data-lucide="trash-2" size="18"></i>
-                        </button>
-                    </div>
+                    <button class="sched-del" title="Excluir" onclick="deleteScheduledPost(${post.id})"><i data-lucide="trash-2"></i></button>
                 </div>
             `;
         }).join('');
