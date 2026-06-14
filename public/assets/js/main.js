@@ -1041,7 +1041,7 @@ async function saveScheduledPost() {
 }
 
 async function deleteScheduledPost(id) {
-    if (!confirm("Tem certeza que deseja excluir este agendamento?")) return;
+    if (!(await ui.confirm("Excluir agendamento", "Tem a certeza que deseja excluir este agendamento?", "trash-2"))) return;
     try {
         await scheduler.deleteScheduledPost(id);
         ui.showToast("Agendamento excluído.", "success");
@@ -1130,7 +1130,7 @@ async function connectSocial(platform) {
 }
 
 async function disconnectSocial(platform) {
-    if (!confirm(`Deseja desconectar sua conta do ${platform}?`)) return;
+    if (!(await ui.confirm("Desconectar conta", `Deseja desconectar a sua conta do ${platform}?`, "unplug"))) return;
     try {
         await scheduler.disconnectSocialAccount(platform);
         ui.showToast("Conta desconectada.", "success");
@@ -3089,20 +3089,21 @@ async function handleBackupFileUpload(event) {
 }
 
 async function clearAllDataConfirm() {
-    const confirmClear = confirm(
-        "⚠️ AVISO: Isto vai limpar TODOS os dados (flyers, propostas, fontes, configurações).\n\n" +
-        "Certifique-se de que tem um backup antes de continuar!\n\n" +
-        "Deseja realmente continuar?"
+    const confirmClear = await ui.confirm(
+        "Limpar todos os dados",
+        "Isto vai apagar TODOS os dados (flyers, propostas, fontes, configurações). Certifique-se de que tem um backup antes de continuar. Deseja realmente continuar?",
+        "alert-triangle"
     );
-    
+
     if (!confirmClear) return;
-    
+
     // Segunda confirmação
-    const doubleClear = confirm(
-        "Esta é a sua última chance.\n\n" +
-        "Tem a certeza que quer apagar TUDO?"
+    const doubleClear = await ui.confirm(
+        "Última confirmação",
+        "Esta é a sua última chance. Tem a certeza que quer apagar TUDO?",
+        "alert-triangle"
     );
-    
+
     if (!doubleClear) return;
 
     try {
