@@ -721,11 +721,12 @@ async function confirmSaveToHistory() {
                     imgSrc: document.querySelector('.layer-photo .photo-single').src
                 };
                 proposal.status = 'pending'; // continua em "Salvadas" até aprovar
-                await storage.saveProposal(proposal);
-                await shareProposal(proposal); // visível para todos
+                await storage.saveProposal(proposal); // local = fonte da verdade
                 closeSaveModal();
                 ui.showToast('Alterações salvas nas Salvadas da IA!', 'success');
                 if (!document.getElementById('tab-ai-saved').classList.contains('hidden')) renderAISaved();
+                // Partilha com o servidor em segundo plano (não bloqueia a UI).
+                shareProposal(proposal).catch(e => console.error('Sync em segundo plano falhou:', e));
                 return;
             }
         }
@@ -752,9 +753,7 @@ async function confirmSaveToHistory() {
                 imgSrc: document.querySelector('.layer-photo .photo-single').src
             }
         };
-        await storage.saveFlyer(entry);
-        await shareFlyer(entry); // visível para todos
-        await storage.syncFlyerToServer(entry);
+        await storage.saveFlyer(entry); // local = fonte da verdade (rápido)
         // Liga o editor a este flyer: salvar de novo continua a atualizá-lo.
         editingFlyerId = entry.id;
         closeSaveModal();
@@ -762,6 +761,9 @@ async function confirmSaveToHistory() {
         // Reflete a alteração nas listas visíveis sem duplicar.
         if (!document.getElementById('tab-history').classList.contains('hidden')) renderHistory();
         if (!document.getElementById('tab-ai-saved').classList.contains('hidden')) renderAISaved();
+        // Sincroniza com o servidor em PARALELO e em segundo plano (não bloqueia a UI).
+        Promise.all([shareFlyer(entry), storage.syncFlyerToServer(entry)])
+            .catch(e => console.error('Sync em segundo plano falhou:', e));
     } catch (err) {
         ui.showToast("Erro ao salvar.", "error");
     } finally {
@@ -2257,8 +2259,7 @@ async function approveAndSaveProposal(id) {
                 imgSrc: document.querySelector('.layer-photo .photo-single').src
             }
         };
-        await storage.saveFlyer(newEntry);
-        await shareFlyer(newEntry); // visível para todos
+        await storage.saveFlyer(newEntry); // local = fonte da verdade (rápido)
         // Liga o editor a este flyer: se o utilizador o editar e salvar, atualiza.
         editingFlyerId = newEntry.id;
         editorPostMeta = {
@@ -2269,8 +2270,7 @@ async function approveAndSaveProposal(id) {
 
         // Update proposal status — promovida: sai de "Salvadas", vai p/ "Aprovadas".
         proposal.status = 'approved';
-        await storage.saveProposal(proposal);
-        await shareProposal(proposal); // status propagado a todos (sai de Salvados)
+        await storage.saveProposal(proposal); // local
         // O editor deixa de estar ligado à proposta (agora é o flyer aprovado).
         editingProposalId = null;
         updateDashboardStats();
@@ -2280,6 +2280,9 @@ async function approveAndSaveProposal(id) {
         renderAISaved();
         ui.showToast("Proposta aprovada e flyer salvo!", "success");
         if (document.getElementById('tab-history').classList.contains('hidden') === false) renderHistory();
+        // Sincroniza com o servidor em PARALELO e em segundo plano (não bloqueia a UI).
+        Promise.all([shareFlyer(newEntry), shareProposal(proposal)])
+            .catch(e => console.error('Sync em segundo plano falhou:', e));
     } catch (err) {
         console.error("Erro ao aprovar e salvar proposta:", err);
         ui.showToast("Erro ao aprovar e salvar proposta.", "error");
