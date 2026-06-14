@@ -160,7 +160,11 @@ export const core = {
                 proxy: null // Removido proxy para evitar falhas externas
             });
 
-            const dataUrl = canvas.toDataURL('image/png');
+            // JPEG (qualidade alta) em vez de PNG: MESMA resolução (1080x1350),
+            // mas ~5-8x mais pequeno. Essencial porque a imagem é guardada e
+            // sincronizada com o servidor — PNG base64 (vários MB) esgotava a
+            // memória da instância (erros 500). q=0.92 mantém o texto nítido.
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
             captureHost.remove();
             return dataUrl;
         } catch (err) {

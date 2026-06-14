@@ -1140,7 +1140,7 @@ async function downloadFlyer() {
         const dataUrl = await core.captureCurrentFlyer();
         lastFlyerSnapshot = dataUrl;
         updateHistoryThumbnail(dataUrl);
-        downloadDataUrl(dataUrl, 'Mahungu_Flyer_' + new Date().getTime() + '.png');
+        downloadDataUrl(dataUrl, 'Mahungu_Flyer_' + new Date().getTime() + '.jpg');
     } catch (err) {
         ui.showToast("Erro ao gerar imagem.", "error");
     } finally {

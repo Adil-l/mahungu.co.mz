@@ -15,12 +15,30 @@ class SyncController extends Controller
     {
         abort_unless(in_array($kind, self::KINDS, true), 404);
 
-        // Devolve só os payloads (objetos do cliente).
-        return SharedItem::where('kind', $kind)
-            ->get()
-            ->map(fn ($item) => json_decode($item->payload, true))
-            ->filter()
-            ->values();
+        // Os payloads já são JSON válido (guardados via json_encode). Streamamos
+        // a concatenação direta SEM os descodificar/recodificar todos para
+        // memória — caso contrário, com imagens grandes, esgota a RAM (erros 500).
+        // lazy() lê em lotes, mantendo a memória baixa mesmo com muitos itens.
+        return response()->stream(function () use ($kind) {
+            echo '[';
+            $first = true;
+            SharedItem::where('kind', $kind)
+                ->select('id', 'payload')
+                ->lazy(50)
+                ->each(function ($item) use (&$first) {
+                    $p = $item->payload;
+                    if ($p === null || $p === '' || $p === 'null') {
+                        return;
+                    }
+                    echo $first ? '' : ',';
+                    echo $p;
+                    $first = false;
+                });
+            echo ']';
+        }, 200, [
+            'Content-Type' => 'application/json',
+            'X-Accel-Buffering' => 'no',
+        ]);
     }
 
     /** Cria ou atualiza um item partilhado (upsert por client_id). */
