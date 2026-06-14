@@ -508,7 +508,33 @@ async function renderSources() {
         return;
     }
 
-    container.innerHTML = sources.map(s => `
+    // Barra de filtro / ações em massa por categoria.
+    const pref = ['Moçambique', 'Desporto', 'Política', 'Tecnologia', 'Entretenimento', 'Global'];
+    const cats = [...new Set(sources.map(s => s.category || 'Geral'))]
+        .sort((a, b) => {
+            const ia = pref.indexOf(a), ib = pref.indexOf(b);
+            return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+        })
+        .map(name => {
+            const inCat = sources.filter(s => (s.category || 'Geral') === name);
+            const activeCount = inCat.filter(s => s.active).length;
+            return { name, total: inCat.length, activeCount, allActive: activeCount === inCat.length };
+        });
+    const activeTotal = sources.filter(s => s.active).length;
+
+    const filterBar = `
+        <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--glass-border);">
+            <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                <button class="btn-mini" onclick="setAllSourcesActive(true)" title="Ativar todas as fontes"><i data-lucide="check-check"></i> Ativar todas</button>
+                <button class="btn-mini" onclick="setAllSourcesActive(false)" title="Desativar todas as fontes"><i data-lucide="power-off"></i> Desativar todas</button>
+                <span style="margin-left:auto; font-size:12px; color:var(--text-muted);">${activeTotal}/${sources.length} ativas</span>
+            </div>
+            <div class="filter-chips">
+                ${cats.map(c => `<button class="filter-chip ${c.allActive ? 'active' : ''}" onclick="toggleCategorySources('${c.name.replace(/'/g, "\\'")}')" title="Ligar/desligar todas as fontes de ${escapeHtml(c.name)}">${escapeHtml(c.name)} <span style="opacity:.65;">${c.activeCount}/${c.total}</span></button>`).join('')}
+            </div>
+        </div>`;
+
+    const list = sources.map(s => `
         <div class="management-item">
             <div class="m-thumb" style="display: flex; align-items: center; justify-content: center; background: ${s.active ? 'rgba(40, 167, 69, 0.1)' : 'rgba(255, 68, 68, 0.1)'}; color: ${s.active ? '#28a745' : '#ff4444'};">
                 <i data-lucide="rss"></i>
@@ -524,8 +550,36 @@ async function renderSources() {
             </div>
         </div>
     `).join('');
+
+    container.innerHTML = filterBar + list;
     lucide.createIcons();
 }
+
+// Ações em massa nas fontes (local, igual ao toggle individual).
+async function setAllSourcesActive(active) {
+    const sources = await storage.getAllSources();
+    for (const s of sources) {
+        if (s.active !== active) { s.active = active; await storage.saveSource(s); }
+    }
+    renderSources();
+    ui.showToast(active ? 'Todas as fontes ativadas.' : 'Todas as fontes desativadas.', 'info');
+}
+window.setAllSourcesActive = setAllSourcesActive;
+
+// Liga/desliga todas as fontes de uma categoria. Se já estão todas ativas,
+// desativa-as; caso contrário, ativa todas (permite "só desporto", "+ Moçambique", etc.).
+async function toggleCategorySources(category) {
+    const sources = await storage.getAllSources();
+    const inCat = sources.filter(s => (s.category || 'Geral') === category);
+    if (inCat.length === 0) return;
+    const target = !inCat.every(s => s.active);
+    for (const s of inCat) {
+        if (s.active !== target) { s.active = target; await storage.saveSource(s); }
+    }
+    renderSources();
+    ui.showToast(`${category}: ${target ? 'ativadas' : 'desativadas'}.`, 'info');
+}
+window.toggleCategorySources = toggleCategorySources;
 
 async function toggleSourceActive(id) {
     const sources = await storage.getAllSources();
