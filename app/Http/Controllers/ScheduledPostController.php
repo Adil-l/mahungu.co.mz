@@ -142,6 +142,40 @@ class ScheduledPostController extends Controller
     }
 
     /**
+     * Cria um Story do Instagram a partir da imagem de um post já agendado/publicado
+     * (reutiliza o mesmo ficheiro de media) e publica-o de imediato.
+     */
+    public function shareStory(ScheduledPost $scheduledPost)
+    {
+        if ($scheduledPost->user_id !== Auth::id()) {
+            abort(403);
+        }
+        if (!$scheduledPost->media_path) {
+            return response()->json(['message' => 'Este post não tem imagem para partilhar como Story.'], 422);
+        }
+
+        $story = ScheduledPost::create([
+            'user_id' => Auth::id(),
+            'flyer_id' => $scheduledPost->flyer_id,
+            'content' => '', // Stories não levam legenda
+            'platforms' => ['instagram'],
+            'media_path' => $scheduledPost->media_path, // reutiliza a mesma imagem (mesmo ficheiro no disco)
+            'media_type' => 'story',
+            'scheduled_at' => now(),
+            'metadata' => [
+                'story_of' => $scheduledPost->id,
+                'flyer_title' => $scheduledPost->metadata['flyer_title'] ?? null,
+            ],
+            'status' => 'pending',
+        ]);
+
+        // Publica já (sync em produção → inline; senão o agendador apanha no próximo minuto).
+        \App\Jobs\PostToSocialMedia::dispatch($story);
+
+        return response()->json(['ok' => true, 'id' => $story->id, 'status' => $story->fresh()->status]);
+    }
+
+    /**
      * Reagenda um post que falhou ou foi parcialmente postado, voltando-o para 'pending'.
      */
     public function retry(Request $request, ScheduledPost $scheduledPost)

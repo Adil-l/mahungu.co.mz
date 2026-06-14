@@ -18,6 +18,21 @@ export const scheduler = {
         return Array.isArray(json) ? json : (json.data ?? []);
     },
 
+    // Partilha a imagem de um post como Story do Instagram (publica de imediato).
+    async shareStory(id) {
+        const response = await fetch(`/api/scheduled-posts/${id}/share-story`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            }
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || 'Erro ao partilhar nos Stories');
+        return data;
+    },
+
     async saveScheduledPost(postData) {
         const response = await fetch('/api/scheduled-posts', {
             method: 'POST',

@@ -46,6 +46,8 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/sync/{kind}/{clientId}', [SyncController::class, 'destroy']);
 
     Route::apiResource('scheduled-posts', ScheduledPostController::class);
+    // Partilhar a imagem de um post (agendado/publicado) como Story do Instagram.
+    Route::post('/scheduled-posts/{scheduledPost}/share-story', [ScheduledPostController::class, 'shareStory']);
 
     // Métricas/insights reais (IG + Página FB) via token de Sistema.
     Route::get('/insights/summary', [InsightsController::class, 'summary']);

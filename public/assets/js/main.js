@@ -977,7 +977,10 @@ async function renderScheduledPosts() {
                         ${metricsHtml}
                         ${errorHtml}
                     </div>
-                    <button class="sched-del" title="Excluir" onclick="deleteScheduledPost(${post.id})"><i data-lucide="trash-2"></i></button>
+                    <div class="sched-actions">
+                        ${post.media_path ? `<button class="sched-act" title="Partilhar nos Stories" onclick="shareToStory(${post.id})"><i data-lucide="zap"></i></button>` : ''}
+                        <button class="sched-del" title="Excluir" onclick="deleteScheduledPost(${post.id})"><i data-lucide="trash-2"></i></button>
+                    </div>
                 </div>
             `;
         }).join('');
@@ -1159,6 +1162,20 @@ async function saveScheduledPost() {
         ui.showToast(err.message, "error");
     }
 }
+
+async function shareToStory(id) {
+    if (!(await ui.confirm("Partilhar nos Stories", "Publicar a imagem deste post como Story no Instagram agora?", "zap"))) return;
+    ui.showToast("A publicar nos Stories…", "info");
+    try {
+        const r = await scheduler.shareStory(id);
+        const failed = r && r.status === 'failed';
+        ui.showToast(failed ? "Falhou ao publicar o Story (vê o cartão)." : "Story enviado!", failed ? "error" : "success");
+        renderScheduledPosts();
+    } catch (err) {
+        ui.showToast(err.message || "Erro ao partilhar nos Stories.", "error");
+    }
+}
+window.shareToStory = shareToStory;
 
 async function deleteScheduledPost(id) {
     if (!(await ui.confirm("Excluir agendamento", "Tem a certeza que deseja excluir este agendamento?", "trash-2"))) return;
