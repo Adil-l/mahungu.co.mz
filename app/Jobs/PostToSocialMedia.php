@@ -264,7 +264,17 @@ class PostToSocialMedia implements ShouldQueue
         $content = $this->scheduledPost->content ?? '';
         $mediaPath = $this->scheduledPost->media_path;
 
-        if ($mediaPath && Storage::disk(config('filesystems.media_disk'))->exists($mediaPath)) {
+        $hasMedia = $mediaPath && Storage::disk(config('filesystems.media_disk'))->exists($mediaPath);
+
+        // Story da Página (token de sistema): usa o fluxo próprio /photo_stories
+        // em vez do /photos do feed — senão o "story" sai como post normal.
+        if ($hasMedia && $this->scheduledPost->media_type === 'story') {
+            $this->postIds['facebook'] = $this->postFacebookPhotoStory($pageId, $pageToken, $mediaPath);
+            Log::info("Publicado Story no Facebook (Página {$pageId}) via token fixo.");
+            return true;
+        }
+
+        if ($hasMedia) {
             $res = Http::attach('source', Storage::disk(config('filesystems.media_disk'))->get($mediaPath), 'flyer.png')
                 ->post("https://graph.facebook.com/v19.0/{$pageId}/photos", [
                     'caption' => $content,
@@ -371,8 +381,19 @@ class PostToSocialMedia implements ShouldQueue
         $pageId = $page['id'];
         $pageToken = $page['access_token'];
 
-        if ($mediaPath && Storage::disk(config('filesystems.media_disk'))->exists($mediaPath)) {
-            // Publica a imagem na Página.
+        $hasMedia = $mediaPath && Storage::disk(config('filesystems.media_disk'))->exists($mediaPath);
+
+        // Story da Página do Facebook: tem um fluxo PRÓPRIO (não é o /photos do
+        // feed). Sobe a foto como não-publicada e depois publica-a em
+        // /photo_stories. Sem isto, um "story" saía como post normal no feed.
+        if ($hasMedia && $this->scheduledPost->media_type === 'story') {
+            $this->postIds['facebook'] = $this->postFacebookPhotoStory($pageId, $pageToken, $mediaPath);
+            Log::info("Publicado Story no Facebook (página {$pageId}) para o utilizador {$account->user_id}.");
+            return true;
+        }
+
+        if ($hasMedia) {
+            // Publica a imagem na Página (post de feed).
             $res = Http::attach('source', Storage::disk(config('filesystems.media_disk'))->get($mediaPath), 'flyer.png')
                 ->post("https://graph.facebook.com/v19.0/{$pageId}/photos", [
                     'caption' => $content,
@@ -393,6 +414,39 @@ class PostToSocialMedia implements ShouldQueue
         $this->postIds['facebook'] = $res->json('post_id') ?? $res->json('id');
         Log::info("Publicado no Facebook (página {$pageId}) para o utilizador {$account->user_id}.");
         return true;
+    }
+
+    /**
+     * Publica um Story de FOTO numa Página do Facebook. Fluxo em 2 passos da
+     * Graph API: (1) sobe a foto como NÃO publicada (published=false,
+     * temporary=true) para obter o photo_id; (2) publica-a como Story em
+     * /photo_stories. A foto deve ser vertical (9:16) — a captura de story do
+     * editor já é 1080x1920. Requer a permissão pages_manage_posts.
+     */
+    protected function postFacebookPhotoStory(string $pageId, string $pageToken, string $mediaPath): ?string
+    {
+        // 1) Upload da foto SEM a publicar no feed (fica disponível p/ o Story).
+        $upload = Http::attach('source', Storage::disk(config('filesystems.media_disk'))->get($mediaPath), 'story.jpg')
+            ->post("https://graph.facebook.com/v19.0/{$pageId}/photos", [
+                'published' => 'false',
+                'temporary' => 'true',
+                'access_token' => $pageToken,
+            ]);
+        if ($upload->failed()) {
+            throw new \Exception('Facebook (Story/upload): ' . $upload->json('error.message', 'erro ao preparar a imagem do Story.'));
+        }
+        $photoId = $upload->json('id');
+
+        // 2) Publica a foto como Story da Página.
+        $publish = Http::post("https://graph.facebook.com/v19.0/{$pageId}/photo_stories", [
+            'photo_id' => $photoId,
+            'access_token' => $pageToken,
+        ]);
+        if ($publish->failed()) {
+            throw new \Exception('Facebook (Story/publish): ' . $publish->json('error.message', 'erro ao publicar o Story.'));
+        }
+
+        return $publish->json('post_id') ?? $publish->json('id');
     }
 
     /**
