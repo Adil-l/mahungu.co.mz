@@ -778,6 +778,44 @@ function loadLastEdit() {
     applyBackgroundState();
 }
 
+// ── Carrossel no editor: junta vários slides (capturas) num só post ──
+let carouselDraft = [];          // dataURLs já capturados
+let pendingCarouselSlides = null; // marca o save-modal em modo carrossel
+
+function updateCarouselUI() {
+    const countEl = document.getElementById('carousel-count');
+    if (countEl) countEl.textContent = carouselDraft.length;
+    const saveBtn = document.getElementById('btn-save-carousel');
+    const clearBtn = document.getElementById('btn-clear-carousel');
+    if (saveBtn) saveBtn.style.display = carouselDraft.length >= 2 ? '' : 'none';
+    if (clearBtn) clearBtn.style.display = carouselDraft.length >= 1 ? '' : 'none';
+}
+
+async function addSlideToCarousel() {
+    try {
+        const dataUrl = await core.captureCurrentFlyer();
+        carouselDraft.push(dataUrl);
+        updateCarouselUI();
+        ui.showToast(`Slide ${carouselDraft.length} adicionado. Edita a próxima notícia e adiciona, ou guarda o carrossel.`, 'success');
+    } catch (e) {
+        ui.showToast('Erro ao capturar o slide.', 'error');
+    }
+}
+window.addSlideToCarousel = addSlideToCarousel;
+
+function clearCarouselDraft() {
+    carouselDraft = [];
+    updateCarouselUI();
+}
+window.clearCarouselDraft = clearCarouselDraft;
+
+function saveCarousel() {
+    if (carouselDraft.length < 2) return ui.showToast('Adiciona pelo menos 2 slides ao carrossel.', 'info');
+    pendingCarouselSlides = carouselDraft.slice();
+    openSaveModal();
+}
+window.saveCarousel = saveCarousel;
+
 function openSaveModal() {
     const modal = document.getElementById('save-modal');
     const defaultTitle = document.getElementById('editor').textContent.split('\n')[0].trim().substring(0, 30);
@@ -829,6 +867,32 @@ async function confirmSaveToHistory() {
                 shareProposal(proposal).catch(e => console.error('Sync em segundo plano falhou:', e));
                 return;
             }
+        }
+
+        // ── Guardar um CARROSSEL (slides já capturados via "Adicionar slide") ──
+        if (pendingCarouselSlides && pendingCarouselSlides.length >= 2) {
+            const slides = pendingCarouselSlides;
+            const entry = {
+                id: generateUniqueFlyerId(),
+                title: title,
+                category: category,
+                status: 'Aprovado',
+                date: new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }),
+                image: slides[0],         // 1º slide = miniatura/retrocompat
+                slides: slides,           // carrossel
+                caption: editorPostMeta?.caption || '',
+                hashtags: editorPostMeta?.hashtags || [],
+                cta: editorPostMeta?.cta || ''
+            };
+            await storage.saveFlyer(entry);
+            pendingCarouselSlides = null;
+            clearCarouselDraft();
+            editingFlyerId = entry.id;
+            closeSaveModal();
+            ui.showToast(`Carrossel com ${slides.length} slides guardado!`, 'success');
+            if (!document.getElementById('tab-history').classList.contains('hidden')) renderHistory();
+            Promise.all([shareFlyer(entry), storage.syncFlyerToServer(entry)]).catch(e => console.error('Sync em segundo plano falhou:', e));
+            return;
         }
 
         const dataUrl = await core.captureCurrentFlyer();
@@ -1020,6 +1084,15 @@ function onScheduleFlyerChange() {
     // Só sobrescreve se o utilizador ainda não escreveu nada (evita perder edições).
     if (caption && !textarea.value.trim()) textarea.value = caption;
     if (hint) hint.style.display = caption ? 'block' : 'none';
+
+    // Flyer-carrossel: o slide 1 é a imagem; os restantes vão como slides extra.
+    if (flyer && Array.isArray(flyer.slides) && flyer.slides.length > 1) {
+        schedulerCarouselSlides = flyer.slides.slice(1);
+        const carRadio = document.querySelector('input[name="postformat"][value="carousel"]');
+        if (carRadio) carRadio.checked = true;
+        onScheduleFormatChange();
+        renderCarouselPreview();
+    }
 }
 
 // ── Formato do post (feed | story | carrossel) ──
@@ -1789,6 +1862,7 @@ async function renderHistory() {
                 <button class="history-thumb" onclick="viewHistoryItem(${item.id})">
                     <img src="${item.image}" class="ready" alt="${safeTitle}">
                     <span class="status-badge ${statusClass}">${escapeHtml(status)}</span>
+                    ${(Array.isArray(item.slides) && item.slides.length > 1) ? `<span class="carousel-badge"><i data-lucide="images"></i> ${item.slides.length}</span>` : ''}
                     <span class="thumb-view"><i data-lucide="eye" size="18"></i></span>
                     ${hasCaption(item) ? '<span class="thumb-caption-flag" title="Tem legenda"><i data-lucide="message-square-text" size="14"></i></span>' : ''}
                 </button>
