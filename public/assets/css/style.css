@@ -67,7 +67,12 @@ body.editor-active {
 }
 
 .sidebar-left { left: 0; border-right-width: 1px; box-shadow: 10px 0 30px rgba(0,0,0,0.3); }
-.sidebar-right { right: 0; border-left-width: 1px; box-shadow: -10px 0 30px rgba(0,0,0,0.3); }
+.sidebar-right { right: 0; border-left-width: 1px; box-shadow: -10px 0 30px rgba(0,0,0,0.3); overflow-y: auto; overscroll-behavior: contain; }
+/* Barra de ferramentas (direita) com muitos controlos: scroll discreto p/ não cortar Salvar/Exportar em ecrãs baixos. */
+.sidebar-right::-webkit-scrollbar { width: 8px; }
+.sidebar-right::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 8px; }
+.sidebar-right::-webkit-scrollbar-track { background: transparent; }
+.sidebar-right { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.14) transparent; }
 
 .sidebar-header h1 { font-size: 18px; font-weight: 800; color: var(--primary); text-transform: uppercase; }
 
