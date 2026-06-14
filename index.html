@@ -888,6 +888,22 @@
             </div>
 
             <div class="form-group">
+                <label>Formato</label>
+                <div class="platform-chips" id="schedule-format">
+                    <label class="platform-chip"><input type="radio" name="postformat" value="feed" checked onchange="onScheduleFormatChange()"><i data-lucide="square"></i> Publicação</label>
+                    <label class="platform-chip"><input type="radio" name="postformat" value="story" onchange="onScheduleFormatChange()"><i data-lucide="zap"></i> Story</label>
+                    <label class="platform-chip"><input type="radio" name="postformat" value="carousel" onchange="onScheduleFormatChange()"><i data-lucide="images"></i> Carrossel</label>
+                </div>
+                <p id="schedule-format-hint" style="display:none; font-size:11px; color:var(--text-muted); margin-top:6px;"></p>
+            </div>
+
+            <div class="form-group" id="schedule-carousel-group" style="display:none;">
+                <label>Slides do carrossel (o flyer é o slide 1)</label>
+                <button type="button" class="btn-chip" onclick="addCarouselSlides()"><i data-lucide="image-plus"></i> Adicionar imagens</button>
+                <div id="schedule-carousel-preview" class="sched-carousel-preview"></div>
+            </div>
+
+            <div class="form-group">
                 <label>Data e hora</label>
                 <input type="datetime-local" id="schedule-datetime">
             </div>

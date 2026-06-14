@@ -16,6 +16,8 @@ class ScheduledPost extends Model
         'flyer_id',
         'content',
         'media_path',
+        'media_type',
+        'carousel_paths',
         'platforms',
         'scheduled_at',
         'status',
@@ -25,6 +27,7 @@ class ScheduledPost extends Model
 
     protected $casts = [
         'platforms' => 'array',
+        'carousel_paths' => 'array',
         'metadata' => 'array',
         'scheduled_at' => 'datetime',
         'error_message' => 'array', // permite salvar/ler erros como array diretamente

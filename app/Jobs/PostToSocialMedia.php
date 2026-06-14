@@ -330,13 +330,22 @@ class PostToSocialMedia implements ShouldQueue
             throw new \Exception('O Instagram exige uma imagem para publicar.');
         }
 
-        $imageUrl = $disk->url($mediaPath);
         $content = $this->scheduledPost->content ?? '';
 
-        // Cria o container, espera o IG processar a imagem e publica.
-        $this->postIds['instagram'] = $this->publishInstagramPhoto($igId, $imageUrl, $content, $pageToken);
+        // Carrossel: slide 1 = media_path, slides 2..N = carousel_paths.
+        if ($this->scheduledPost->media_type === 'carousel' && !empty($this->scheduledPost->carousel_paths)) {
+            $urls = array_map(fn ($p) => $disk->url($p), array_merge([$mediaPath], $this->scheduledPost->carousel_paths));
+            $this->postIds['instagram'] = $this->publishInstagramCarousel($igId, $urls, $content, $pageToken);
+            Log::info("Publicado no Instagram (conta {$igId}) via token fixo [CAROUSEL].");
+            return true;
+        }
 
-        Log::info("Publicado no Instagram (conta {$igId}) via token fixo.");
+        // Foto única ou Story.
+        $imageUrl = $disk->url($mediaPath);
+        $igMediaType = ($this->scheduledPost->media_type === 'story') ? 'STORIES' : 'IMAGE';
+        $this->postIds['instagram'] = $this->publishInstagramPhoto($igId, $imageUrl, $content, $pageToken, $igMediaType);
+
+        Log::info("Publicado no Instagram (conta {$igId}) via token fixo [{$igMediaType}].");
         return true;
     }
 
@@ -425,9 +434,10 @@ class PostToSocialMedia implements ShouldQueue
         $imageUrl = Storage::disk(config('filesystems.media_disk'))->url($mediaPath);
 
         // 4-5) Cria o container, espera o IG processar a imagem e publica.
-        $this->postIds['instagram'] = $this->publishInstagramPhoto($igId, $imageUrl, $content, $pageToken);
+        $igMediaType = ($this->scheduledPost->media_type === 'story') ? 'STORIES' : 'IMAGE';
+        $this->postIds['instagram'] = $this->publishInstagramPhoto($igId, $imageUrl, $content, $pageToken, $igMediaType);
 
-        Log::info("Publicado no Instagram (conta {$igId}) para o utilizador {$account->user_id}.");
+        Log::info("Publicado no Instagram (conta {$igId}) para o utilizador {$account->user_id} [{$igMediaType}].");
         return true;
     }
 
@@ -438,19 +448,40 @@ class PostToSocialMedia implements ShouldQueue
      * ainda está em IN_PROGRESS. Se a imagem não for acessível publicamente o
      * container vai a ERROR — aqui isso é reportado de forma clara.
      */
-    protected function publishInstagramPhoto(string $igId, string $imageUrl, string $caption, string $token): ?string
+    protected function publishInstagramPhoto(string $igId, string $imageUrl, string $caption, string $token, string $mediaType = 'IMAGE'): ?string
     {
-        $container = Http::post("https://graph.facebook.com/v19.0/{$igId}/media", [
-            'image_url' => $imageUrl,
-            'caption' => $caption,
-            'access_token' => $token,
-        ]);
+        $params = ['image_url' => $imageUrl, 'access_token' => $token];
+        if ($mediaType === 'STORIES') {
+            $params['media_type'] = 'STORIES'; // Stories não levam legenda
+        } else {
+            $params['caption'] = $caption;
+        }
+        $container = Http::post("https://graph.facebook.com/v19.0/{$igId}/media", $params);
         if ($container->failed()) {
             throw new \Exception('Instagram (container): ' . $container->json('error.message', 'erro ao preparar a imagem (o URL é público?).'));
         }
         $creationId = $container->json('id');
 
-        // Espera o container ficar FINISHED (o IG processa a imagem em background).
+        $this->waitForContainer($creationId, $token);
+
+        $publish = Http::post("https://graph.facebook.com/v19.0/{$igId}/media_publish", [
+            'creation_id' => $creationId,
+            'access_token' => $token,
+        ]);
+        if ($publish->failed()) {
+            throw new \Exception('Instagram (publish): ' . $publish->json('error.message', 'erro ao publicar.'));
+        }
+
+        return $publish->json('id');
+    }
+
+    /**
+     * Espera um container de media do Instagram ficar FINISHED (processamento
+     * assíncrono). Lança exceção clara se falhar (ERROR = URL não público) ou
+     * se exceder o tempo. Usado por fotos, stories e carrossel.
+     */
+    protected function waitForContainer(string $creationId, string $token): void
+    {
         $status = null;
         for ($i = 0; $i < 12; $i++) {
             $statusRes = Http::get("https://graph.facebook.com/v19.0/{$creationId}", [
@@ -459,23 +490,64 @@ class PostToSocialMedia implements ShouldQueue
             ]);
             $status = $statusRes->json('status_code');
             if ($status === 'FINISHED') {
-                break;
+                return;
             }
             if ($status === 'ERROR') {
-                throw new \Exception('Instagram: o processamento da imagem falhou (ERROR) — normalmente o URL da imagem não está acessível publicamente (usar MEDIA_DISK=s3 com bucket público). ' . $statusRes->json('status', ''));
+                throw new \Exception('Instagram: o processamento falhou (ERROR) — normalmente o URL da imagem não está acessível publicamente (usar MEDIA_DISK=s3 com bucket público). ' . $statusRes->json('status', ''));
             }
             sleep(2);
         }
-        if ($status !== 'FINISHED') {
-            throw new \Exception('Instagram: a imagem não ficou pronta a tempo (status: ' . ($status ?? 'desconhecido') . '). Tenta novamente.');
+        throw new \Exception('Instagram: o conteúdo não ficou pronto a tempo (status: ' . ($status ?? 'desconhecido') . '). Tenta novamente.');
+    }
+
+    /**
+     * Publica um CARROSSEL no Instagram: cria um container-filho por imagem
+     * (is_carousel_item), espera todos, cria o container CAROUSEL e publica.
+     * Requer 2 a 10 imagens, todas com URL público.
+     */
+    protected function publishInstagramCarousel(string $igId, array $imageUrls, string $caption, string $token): ?string
+    {
+        $imageUrls = array_values(array_filter($imageUrls));
+        if (count($imageUrls) < 2) {
+            throw new \Exception('Instagram: um carrossel precisa de pelo menos 2 imagens.');
+        }
+        $imageUrls = array_slice($imageUrls, 0, 10); // o IG aceita no máximo 10
+
+        $children = [];
+        foreach ($imageUrls as $url) {
+            $c = Http::post("https://graph.facebook.com/v19.0/{$igId}/media", [
+                'image_url' => $url,
+                'is_carousel_item' => 'true',
+                'access_token' => $token,
+            ]);
+            if ($c->failed()) {
+                throw new \Exception('Instagram (carrossel/item): ' . $c->json('error.message', 'erro ao preparar uma imagem.'));
+            }
+            $children[] = $c->json('id');
         }
 
+        foreach ($children as $childId) {
+            $this->waitForContainer($childId, $token);
+        }
+
+        $parent = Http::post("https://graph.facebook.com/v19.0/{$igId}/media", [
+            'media_type' => 'CAROUSEL',
+            'children' => implode(',', $children),
+            'caption' => $caption,
+            'access_token' => $token,
+        ]);
+        if ($parent->failed()) {
+            throw new \Exception('Instagram (carrossel): ' . $parent->json('error.message', 'erro ao preparar o carrossel.'));
+        }
+        $parentId = $parent->json('id');
+        $this->waitForContainer($parentId, $token);
+
         $publish = Http::post("https://graph.facebook.com/v19.0/{$igId}/media_publish", [
-            'creation_id' => $creationId,
+            'creation_id' => $parentId,
             'access_token' => $token,
         ]);
         if ($publish->failed()) {
-            throw new \Exception('Instagram (publish): ' . $publish->json('error.message', 'erro ao publicar.'));
+            throw new \Exception('Instagram (carrossel/publish): ' . $publish->json('error.message', 'erro ao publicar.'));
         }
 
         return $publish->json('id');

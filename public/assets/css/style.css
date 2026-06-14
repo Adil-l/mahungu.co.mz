@@ -924,6 +924,13 @@ body.editor-active #tab-editor {
 .platform-chip:hover { border-color: var(--primary); }
 .platform-chip:has(input:checked) { background: var(--primary-hover); border-color: var(--primary-hover); color: #fff; }
 
+/* Pré-visualização dos slides do carrossel no modal de agendamento */
+.sched-carousel-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.sched-carousel-preview .cslide { position: relative; width: 60px; height: 75px; border-radius: 8px; overflow: hidden; border: 1px solid var(--glass-border); }
+.sched-carousel-preview .cslide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sched-carousel-preview .cslide-n { position: absolute; bottom: 2px; left: 2px; font-size: 10px; font-weight: 700; color: #fff; background: rgba(0,0,0,.6); border-radius: 4px; padding: 0 5px; }
+.sched-carousel-preview .cslide-x { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; line-height: 16px; text-align: center; border: none; border-radius: 50%; background: rgba(0,0,0,.65); color: #fff; cursor: pointer; font-size: 14px; padding: 0; }
+
 /* ── Cartão de post agendado/publicado (aba Agendamento) ── */
 .sched-card {
     display: flex;

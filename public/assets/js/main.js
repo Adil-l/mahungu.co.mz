@@ -1019,9 +1019,68 @@ function onScheduleFlyerChange() {
     if (hint) hint.style.display = caption ? 'block' : 'none';
 }
 
+// ── Formato do post (feed | story | carrossel) ──
+let schedulerCarouselSlides = []; // dataURLs dos slides extra (2..N)
+
+function onScheduleFormatChange() {
+    const format = document.querySelector('input[name="postformat"]:checked')?.value || 'feed';
+    const group = document.getElementById('schedule-carousel-group');
+    const hint = document.getElementById('schedule-format-hint');
+    if (group) group.style.display = (format === 'carousel') ? 'block' : 'none';
+    if (hint) {
+        if (format === 'story') { hint.style.display = 'block'; hint.textContent = 'O flyer sai como Story do Instagram (visível 24h).'; }
+        else if (format === 'carousel') { hint.style.display = 'block'; hint.textContent = 'Slide 1 = flyer; adiciona as imagens seguintes. Aplica-se ao Instagram.'; }
+        else { hint.style.display = 'none'; }
+    }
+}
+window.onScheduleFormatChange = onScheduleFormatChange;
+
+function renderCarouselPreview() {
+    const box = document.getElementById('schedule-carousel-preview');
+    if (!box) return;
+    box.innerHTML = schedulerCarouselSlides.map((src, i) =>
+        `<div class="cslide"><img src="${src}" alt=""><span class="cslide-n">${i + 2}</span><button type="button" class="cslide-x" onclick="removeCarouselSlide(${i})" title="Remover">&times;</button></div>`
+    ).join('');
+}
+
+function addCarouselSlides() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    input.onchange = (e) => {
+        const files = Array.from(e.target.files || []);
+        let pending = files.length;
+        if (!pending) return;
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                if (schedulerCarouselSlides.length < 9) schedulerCarouselSlides.push(ev.target.result); // máx. 9 + flyer = 10
+                if (--pending === 0) renderCarouselPreview();
+            };
+            reader.readAsDataURL(file);
+        });
+    };
+    input.click();
+}
+window.addCarouselSlides = addCarouselSlides;
+
+function removeCarouselSlide(i) {
+    schedulerCarouselSlides.splice(i, 1);
+    renderCarouselPreview();
+}
+window.removeCarouselSlide = removeCarouselSlide;
+
 async function openSchedulerModal() {
     const modal = document.getElementById('scheduler-modal');
     modal.classList.add('active');
+
+    // Reset do formato e dos slides do carrossel.
+    schedulerCarouselSlides = [];
+    const feedRadio = document.querySelector('input[name="postformat"][value="feed"]');
+    if (feedRadio) feedRadio.checked = true;
+    renderCarouselPreview();
+    onScheduleFormatChange();
 
     // Fill flyers select
     const select = document.getElementById('schedule-flyer');
@@ -1060,6 +1119,8 @@ async function saveScheduledPost() {
     
     const platforms = Array.from(document.querySelectorAll('input[name="platforms"]:checked')).map(cb => cb.value);
     
+    const format = document.querySelector('input[name="postformat"]:checked')?.value || 'feed';
+
     if (platforms.length === 0) return ui.showToast("Selecione pelo menos uma plataforma.", "info");
     if (!content) return ui.showToast("A legenda não pode estar vazia.", "info");
     if (!datetime) return ui.showToast("Selecione a data e hora.", "info");
@@ -1068,6 +1129,14 @@ async function saveScheduledPost() {
     // ao flyer vai em metadata em vez de flyer_id (que tem FK para a tabela vazia).
     const flyer = schedulerFlyers.find(f => String(f.id) === String(flyerId));
     const metadata = flyer ? { flyer_title: flyer.title, flyer_local_id: flyer.id } : null;
+
+    // Story e Carrossel precisam de imagem (o flyer = slide 1).
+    if ((format === 'story' || format === 'carousel') && !flyer) {
+        return ui.showToast('Story e Carrossel precisam de um flyer. Escolhe um flyer acima.', 'info');
+    }
+    if (format === 'carousel' && schedulerCarouselSlides.length < 1) {
+        return ui.showToast('Adiciona pelo menos 1 imagem (o slide 2) para o carrossel.', 'info');
+    }
 
     try {
         await scheduler.saveScheduledPost({
@@ -1079,7 +1148,9 @@ async function saveScheduledPost() {
             scheduled_at: new Date(datetime).toISOString(),
             metadata: metadata,
             // Envia a imagem do flyer para o servidor poder publicar à hora marcada.
-            media_data_url: flyer ? flyer.image : null
+            media_data_url: flyer ? flyer.image : null,
+            media_type: format,
+            carousel_data_urls: format === 'carousel' ? schedulerCarouselSlides : undefined
         });
         ui.showToast("Post agendado com sucesso!", "success");
         closeSchedulerModal();
