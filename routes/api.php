@@ -4,6 +4,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\FlyerController;
 use App\Http\Controllers\HashtagController;
 use App\Http\Controllers\ImageSearchController;
+use App\Http\Controllers\InsightsController;
 use App\Http\Controllers\ProposalController;
 use App\Http\Controllers\NewsSourceController;
 use App\Http\Controllers\UserController;
@@ -44,6 +45,10 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/sync/{kind}/{clientId}', [SyncController::class, 'destroy']);
 
     Route::apiResource('scheduled-posts', ScheduledPostController::class);
+
+    // Métricas/insights reais (IG + Página FB) via token de Sistema.
+    Route::get('/insights/summary', [InsightsController::class, 'summary']);
+
     Route::get('/social-accounts', [SocialAccountController::class, 'index']);
     Route::delete('/social-accounts/{platform}', [SocialAccountController::class, 'destroy']);
     Route::post('/social-accounts/{platform}/connect', [SocialAccountController::class, 'connect']);

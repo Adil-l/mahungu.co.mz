@@ -2207,6 +2207,16 @@ async function renderDashboardMetrics() {
             if (res.ok) { const j = await res.json(); scheduled = Array.isArray(j) ? j : (j.data ?? []); }
         } catch (e) {}
 
+        // Insights REAIS da Meta (IG + Página FB) — best-effort; só aparece se houver token/dados.
+        let insights = null;
+        try {
+            const r = await fetch('/api/insights/summary', {
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin'
+            });
+            if (r.ok) { const j = await r.json(); if (j && j.ok) insights = j; }
+        } catch (e) {}
+
         // Agendamentos por estado
         const sc = { pending: 0, processing: 0, posted: 0, partially_posted: 0, failed: 0 };
         scheduled.forEach(p => { if (sc[p.status] != null) sc[p.status]++; });
@@ -2241,7 +2251,25 @@ async function renderDashboardMetrics() {
             dashKpi({ icon: 'rss', value: sources.filter(s => s.active).length, label: 'Fontes ativas', color: '#00b8d4' }),
         ].join('');
 
+        // Insights reais da Meta (só aparece quando há token + dados — ex.: em produção).
+        const nfmt = (n) => Number(n).toLocaleString('pt-PT');
+        let socialHtml = '';
+        if (insights) {
+            const ig = insights.instagram, fb = insights.facebook, cards = [];
+            if (ig) {
+                if (ig.followers != null) cards.push(dashKpi({ icon: 'instagram', value: nfmt(ig.followers), label: 'Seguidores IG' + (ig.username ? ' @' + ig.username : ''), color: '#E1306C' }));
+                if (ig.reach_28d != null) cards.push(dashKpi({ icon: 'eye', value: nfmt(ig.reach_28d), label: 'Alcance IG (28d)', color: '#E1306C' }));
+                if (ig.media_count != null) cards.push(dashKpi({ icon: 'grid', value: nfmt(ig.media_count), label: 'Publicações IG', color: '#E1306C' }));
+            }
+            if (fb) {
+                const fans = fb.fans != null ? fb.fans : fb.followers;
+                if (fans != null) cards.push(dashKpi({ icon: 'facebook', value: nfmt(fans), label: 'Fãs Facebook', color: '#1877F2' }));
+            }
+            if (cards.length) socialHtml = `<div class="dash-section-title">Redes sociais (tempo real)</div><div class="dash-kpis">${cards.join('')}</div>`;
+        }
+
         root.innerHTML = `
+            ${socialHtml}
             <div class="dash-section-title">Métricas do sistema</div>
             <div class="dash-kpis">${kpis}</div>
             <div class="dash-grid">
