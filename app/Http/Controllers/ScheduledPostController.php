@@ -12,7 +12,7 @@ class ScheduledPostController extends Controller
 {
     public function index(Request $request)
     {
-        $query = ScheduledPost::with('flyer')
+        $query = ScheduledPost::with(['flyer', 'metrics'])
             ->where('user_id', Auth::id());
 
         // Filtro opcional por status (?status=pending)

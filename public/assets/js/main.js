@@ -916,6 +916,21 @@ async function renderScheduledPosts() {
                 ? `<div class="sched-error">` + Object.entries(em).map(([k, v]) => `<div><strong>${escapeHtml(k)}:</strong> ${escapeHtml(String(v))}</div>`).join('') + `</div>`
                 : '';
 
+            // Métricas reais (likes/comentários/alcance) — quando já foram buscadas.
+            const metricStat = (icon, val, title) => (val != null) ? `<span title="${title}"><i data-lucide="${icon}"></i> ${Number(val).toLocaleString('pt-PT')}</span>` : '';
+            const metricsHtml = (Array.isArray(post.metrics) && post.metrics.length)
+                ? `<div class="sched-metrics">` + post.metrics.map(mt => {
+                    const stats = [
+                        metricStat('heart', mt.likes, 'Gostos'),
+                        metricStat('message-circle', mt.comments, 'Comentários'),
+                        metricStat('eye', mt.reach, 'Alcance'),
+                        metricStat('share-2', mt.shares, 'Partilhas'),
+                        metricStat('bookmark', mt.saved, 'Guardados'),
+                    ].filter(Boolean).join('');
+                    return stats ? `<span class="sched-metric-group"><i data-lucide="${PLATFORM_ICONS[mt.platform] || 'share-2'}"></i>${stats}</span>` : '';
+                }).filter(Boolean).join('') + `</div>`
+                : '';
+
             return `
                 <div class="sched-card">
                     <div class="sched-card-main">
@@ -926,6 +941,7 @@ async function renderScheduledPosts() {
                         <div class="sched-title">${escapeHtml(title)}</div>
                         <div class="sched-caption" title="${escapeHtml(content)}">${escapeHtml(content)}</div>
                         <div class="sched-platforms">${platforms}</div>
+                        ${metricsHtml}
                         ${errorHtml}
                     </div>
                     <button class="sched-del" title="Excluir" onclick="deleteScheduledPost(${post.id})"><i data-lucide="trash-2"></i></button>

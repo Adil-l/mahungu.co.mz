@@ -972,6 +972,12 @@ body.editor-active #tab-editor {
 }
 .sched-del i, .sched-del svg { width: 17px; height: 17px; }
 .sched-del:hover { color: #ff4444; border-color: rgba(255,68,68,.4); background: rgba(255,68,68,.08); }
+/* Métricas reais por-post (likes/alcance) no cartão de agendamento */
+.sched-metrics { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
+.sched-metric-group { display: inline-flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-muted); }
+.sched-metric-group > i, .sched-metric-group > svg { width: 14px; height: 14px; opacity: .7; }
+.sched-metric-group span { display: inline-flex; align-items: center; gap: 4px; font-weight: 600; color: var(--text); }
+.sched-metric-group span i, .sched-metric-group span svg { width: 13px; height: 13px; }
 
 /* ── DASHBOARD: métricas completas (KPIs, donut, barras) ── */
 .dash-metrics { margin-top: 24px; display: flex; flex-direction: column; gap: 16px; }
