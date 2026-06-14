@@ -13,7 +13,10 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $schedule->command('app:fetch-rss')->everyFifteenMinutes();
-        $schedule->command('mahungu:process-scheduled-posts')->everyMinute()->withoutOverlapping();
+        // withoutOverlapping(10): o cadeado expira em 10 min. Sem o limite, se uma
+        // execução morrer a meio o cadeado fica preso 24h e BLOQUEIA todas as
+        // publicações seguintes ("Has Mutex" no schedule:list).
+        $schedule->command('mahungu:process-scheduled-posts')->everyMinute()->withoutOverlapping(10);
     }
 
     /**
