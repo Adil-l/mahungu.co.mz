@@ -29,6 +29,10 @@
             <i data-lucide="layout-dashboard"></i>
             <span class="nav-label">Dashboard</span>
         </a>
+        <a href="javascript:void(0)" class="nav-item" data-tab="metrics" title="Métricas">
+            <i data-lucide="bar-chart-3"></i>
+            <span class="nav-label">Métricas</span>
+        </a>
         <a href="javascript:void(0)" class="nav-item" data-tab="editor" title="Painel de Edição">
             <i data-lucide="pen-tool"></i>
             <span class="nav-label">Painel de Edição</span>
@@ -48,6 +52,10 @@
         <a href="javascript:void(0)" class="nav-item" data-tab="history" title="Posts Aprovados">
             <i data-lucide="history"></i>
             <span class="nav-label">Posts Aprovados</span>
+        </a>
+        <a href="javascript:void(0)" class="nav-item" data-tab="stories" title="Stories">
+            <i data-lucide="smartphone"></i>
+            <span class="nav-label">Stories</span>
         </a>
         <a href="javascript:void(0)" class="nav-item" data-tab="scheduler" title="Agendamento">
             <i data-lucide="calendar"></i>
@@ -128,7 +136,15 @@
         </button>
     </div>
 
-    <div class="control-group" id="carousel-controls" style="margin-top: auto;">
+    <div class="control-group" style="margin-top: auto;">
+        <div class="control-label">Formato do post</div>
+        <button class="btn-main" id="btn-toggle-story" onclick="toggleStoryFormat()" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">
+            <i data-lucide="smartphone"></i> <span id="btn-toggle-story-label">Transformar em Stories</span>
+        </button>
+        <p id="story-format-hint" style="display:none; color: var(--text-muted); font-size: 11px; margin-top: 6px; line-height: 1.4;">Formato vertical 9:16. Ao guardar, vai para a aba <strong>Stories</strong>.</p>
+    </div>
+
+    <div class="control-group" id="carousel-controls">
         <div class="control-label">Carrossel (várias notícias num post)</div>
         <button class="btn-main" id="btn-enter-carousel" onclick="enterCarouselMode()" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">
             <i data-lucide="images"></i> Criar carrossel
@@ -199,8 +215,19 @@
             </div>
         </div>
 
-        <!-- MÉTRICAS COMPLETAS DO SISTEMA (gerado por renderDashboardMetrics) -->
-        <div id="dashboard-metrics" class="dash-metrics"></div>
+    </section>
+
+    <!-- MÉTRICAS (aba dedicada) -->
+    <section id="tab-metrics" class="tab-content hidden">
+        <div class="content-wrapper">
+            <div class="sidebar-header" style="margin-bottom: 8px;">
+                <h1 style="color: #fff; font-size: 24px;">Métricas</h1>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 28px;">Análise completa do sistema e das redes sociais, com gráficos para leitura rápida.</p>
+
+            <!-- MÉTRICAS COMPLETAS DO SISTEMA (gerado por renderDashboardMetrics) -->
+            <div id="dashboard-metrics" class="dash-metrics"></div>
+        </div>
     </section>
 
     <!-- EDITOR -->
@@ -345,6 +372,26 @@
                 </div>
             </div>
             <div class="history-grid">
+                <!-- Renderizado via JS -->
+            </div>
+        </div>
+    </section>
+
+    <!-- STORIES (formato 9:16) -->
+    <section id="tab-stories" class="tab-content hidden">
+        <div class="content-wrapper">
+            <div class="sidebar-header" style="margin-bottom: 8px;">
+                <h1 style="color: #fff; font-size: 24px;">Stories</h1>
+            </div>
+            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 24px;">Posts no formato vertical 9:16. Transforma um flyer ou uma proposta em Story no Painel de Edição.</p>
+            <div class="filter-bar">
+                <div class="filter-chips" id="stories-filter-chips"></div>
+                <div class="filter-search">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="stories-search" placeholder="Pesquisar stories..." oninput="onStoriesSearch(this.value)">
+                </div>
+            </div>
+            <div class="stories-grid" id="stories-container">
                 <!-- Renderizado via JS -->
             </div>
         </div>

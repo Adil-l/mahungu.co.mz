@@ -198,6 +198,7 @@ function fitHeadline(editorEl) {
 let proposalsFilter = { category: 'Todas', query: '' };
 let aiSavedFilter = { category: 'Todas', query: '' };
 let historyFilter = { category: 'Todas', query: '' };
+let storiesFilter = { category: 'Todas', query: '' };
 
 // Filtra itens por categoria + texto (campos definidos por fieldsFn).
 function applyContentFilter(items, filter, fieldsFn) {
@@ -252,12 +253,24 @@ function onHistorySearch(value) {
     renderHistory();
 }
 
+function setStoriesCategory(cat) {
+    storiesFilter.category = cat;
+    renderStories();
+}
+
+function onStoriesSearch(value) {
+    storiesFilter.query = value;
+    renderStories();
+}
+
 window.setProposalsCategory = setProposalsCategory;
 window.onProposalsSearch = onProposalsSearch;
 window.setAISavedCategory = setAISavedCategory;
 window.onAISavedSearch = onAISavedSearch;
 window.setHistoryCategory = setHistoryCategory;
 window.onHistorySearch = onHistorySearch;
+window.setStoriesCategory = setStoriesCategory;
+window.onStoriesSearch = onStoriesSearch;
 
 // Chamado pela automação ao fim de cada ciclo de monitoramento.
 // Atualiza dashboard + badge e, se a aba Propostas estiver aberta, a lista —
@@ -785,6 +798,37 @@ let carouselSlides = [];          // estados dos slides
 let activeSlideIndex = -1;        // -1 = fora do modo carrossel
 let pendingCarouselStates = null; // marca o save-modal em modo carrossel
 
+// Formato do editor: 'feed' (1080×1350) ou 'story' (9:16, 1080×1920). O canvas
+// é o mesmo .flyer; o modo 'story' só adiciona a classe .is-story (ver core.js
+// e style.css). Ao guardar em modo story, o flyer leva format:'story' e vai
+// para a aba "Stories" (em vez de "Posts Aprovados").
+let editorFormat = 'feed';
+
+function setEditorFormat(format) {
+    editorFormat = format === 'story' ? 'story' : 'feed';
+    const isStory = editorFormat === 'story';
+    document.querySelector('.flyer')?.classList.toggle('is-story', isStory);
+    document.querySelector('.flyer-wrapper')?.classList.toggle('is-story', isStory);
+    const label = document.getElementById('btn-toggle-story-label');
+    if (label) label.textContent = isStory ? 'Voltar a Feed' : 'Transformar em Stories';
+    const hint = document.getElementById('story-format-hint');
+    if (hint) hint.style.display = isStory ? 'block' : 'none';
+    document.getElementById('btn-toggle-story')?.classList.toggle('active', isStory);
+    core.setScale();
+    invalidateFlyerSnapshot();
+}
+
+function toggleStoryFormat() {
+    setEditorFormat(editorFormat === 'story' ? 'feed' : 'story');
+    ui.showToast(
+        editorFormat === 'story'
+            ? 'Formato Stories (9:16). Ajusta o conteúdo e "Salvar" guarda-o em Stories.'
+            : 'De volta ao formato Feed (1080×1350).',
+        'info'
+    );
+}
+window.toggleStoryFormat = toggleStoryFormat;
+
 function snapshotEditor() {
     const editor = document.getElementById('editor');
     const photo = document.querySelector('.layer-photo .photo-single');
@@ -979,6 +1023,9 @@ async function confirmSaveToHistory() {
             title: title,
             category: category,
             status: existing?.status || 'Aprovado',
+            // 'feed' (1080×1350) ou 'story' (9:16). Os stories aparecem na aba
+            // "Stories"; "Posts Aprovados" só mostra os de feed.
+            format: editorFormat,
             date: existing?.date || new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }),
             image: dataUrl,
             // Legenda associada (se o flyer veio de uma proposta carregada no editor)
@@ -995,9 +1042,15 @@ async function confirmSaveToHistory() {
         // Liga o editor a este flyer: salvar de novo continua a atualizá-lo.
         editingFlyerId = entry.id;
         closeSaveModal();
-        ui.showToast(isUpdate ? "Flyer atualizado!" : "Flyer salvo!", "success");
+        const isStorySave = editorFormat === 'story';
+        ui.showToast(
+            isUpdate ? (isStorySave ? "Story atualizado!" : "Flyer atualizado!")
+                     : (isStorySave ? "Story guardado!" : "Flyer salvo!"),
+            "success"
+        );
         // Reflete a alteração nas listas visíveis sem duplicar.
         if (!document.getElementById('tab-history').classList.contains('hidden')) renderHistory();
+        if (!document.getElementById('tab-stories').classList.contains('hidden')) renderStories();
         if (!document.getElementById('tab-ai-saved').classList.contains('hidden')) renderAISaved();
         // Sincroniza com o servidor em PARALELO e em segundo plano (não bloqueia a UI).
         Promise.all([shareFlyer(entry), storage.syncFlyerToServer(entry)])
@@ -1035,8 +1088,10 @@ function showTab(tabId, el) {
     lucide.createIcons();
 
     if (tabId === 'history') renderHistory();
+    if (tabId === 'stories') renderStories();
     if (tabId === 'news-sources') renderSources();
     if (tabId === 'dashboard') updateDashboardStats();
+    if (tabId === 'metrics') renderDashboardMetrics();
     if (tabId === 'proposals') renderProposals();
     if (tabId === 'ai-saved') renderAISaved();
     if (tabId === 'scheduler') renderScheduledPosts();
@@ -1888,7 +1943,8 @@ function downloadDataUrl(dataUrl, fileName) {
 }
 
 async function renderHistory() {
-    const history = await storage.getAllFlyers();
+    // "Posts Aprovados" só mostra flyers de feed; os stories (9:16) têm aba própria.
+    const history = (await storage.getAllFlyers()).filter(f => f.format !== 'story');
     const grid = document.querySelector('.history-grid');
     if (!grid) return;
     grid.style.display = 'grid';
@@ -1959,6 +2015,72 @@ async function renderHistory() {
     grid.innerHTML = html;
     lucide.createIcons();
 }
+
+// ── STORIES (formato 9:16) ── reutiliza o cartão e as ações de renderHistory;
+// lista apenas os flyers com format:'story'. "Posts Aprovados" mostra o resto.
+async function renderStories() {
+    const grid = document.getElementById('stories-container');
+    if (!grid) return;
+    grid.style.display = 'grid';
+
+    const stories = (await storage.getAllFlyers()).filter(f => f.format === 'story');
+
+    if (stories.length === 0) {
+        const chipsEl = document.getElementById('stories-filter-chips');
+        if (chipsEl) chipsEl.innerHTML = '';
+        grid.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; padding: 50px; color: var(--text-muted);">
+                <i data-lucide="smartphone" size="48" style="margin-bottom: 15px; opacity: 0.2;"></i>
+                <p>Ainda não há stories. No Painel de Edição usa <strong>"Transformar em Stories"</strong>, ou nas <strong>Salvadas da IA</strong> clica no ícone de telemóvel.</p>
+            </div>`;
+        lucide.createIcons();
+        return;
+    }
+
+    const allCategories = [...new Set(stories.map(i => i.category || 'Geral'))].sort();
+    renderFilterChips('stories-filter-chips', allCategories, storiesFilter.category, 'setStoriesCategory');
+
+    const filtered = applyContentFilter(stories, storiesFilter, i => [i.title, i.category, i.caption]);
+    if (filtered.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">Nenhum story corresponde ao filtro/pesquisa.</div>';
+        return;
+    }
+
+    const sorted = [...filtered].sort((a, b) => (b.id || 0) - (a.id || 0));
+    let currentGroup = '';
+    let html = '';
+    sorted.forEach(item => {
+        const label = getGroupLabel(item.id);
+        if (label !== currentGroup) { currentGroup = label; html += `<div class="date-group-header">${label}</div>`; }
+        const cat = item.category || 'Geral';
+        const safeTitle = escapeHtml(item.title || 'Sem título');
+        const fileName = ('Mahungu_Story_' + (item.title || 'story')).replace(/[^a-z0-9_-]+/gi, '_');
+        html += `
+            <article class="history-item" data-category="${escapeHtml(cat)}">
+                <button class="history-thumb" onclick="viewHistoryItem(${item.id})">
+                    <img src="${item.image}" class="ready" alt="${safeTitle}">
+                    <span class="status-badge story">9:16</span>
+                    <span class="thumb-view"><i data-lucide="eye" size="18"></i></span>
+                    ${hasCaption(item) ? '<span class="thumb-caption-flag" title="Tem legenda"><i data-lucide="message-square-text" size="14"></i></span>' : ''}
+                </button>
+                <div class="history-actions-overlay">
+                    <button class="btn-mini" onclick="editFlyer(${item.id})" title="Editar"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-mini" onclick="deleteHistoryItem(${item.id}, event)" title="Excluir"><i data-lucide="trash-2"></i></button>
+                    <button class="btn-mini" onclick="downloadDataUrl('${item.image}', '${fileName}.png')" title="Baixar"><i data-lucide="download"></i></button>
+                </div>
+                <div class="history-info">
+                    <h3 class="history-title" title="${safeTitle}">${safeTitle}</h3>
+                    <div class="history-meta">
+                        <span class="history-cat-badge">${escapeHtml(cat)}</span>
+                        <span class="history-date">${escapeHtml(item.date || '')}</span>
+                    </div>
+                </div>
+            </article>`;
+    });
+    grid.innerHTML = html;
+    lucide.createIcons();
+}
+window.renderStories = renderStories;
 
 async function deleteHistoryItem(id, event) {
     if (event) event.stopPropagation();
@@ -2370,9 +2492,8 @@ async function updateDashboardStats() {
 
     updateProposalsBadge();
 
-    // Métricas completas — só quando a dashboard está visível (evita chamar a API à toa).
-    const dashTab = document.getElementById('tab-dashboard');
-    if (dashTab && !dashTab.classList.contains('hidden')) renderDashboardMetrics();
+    // As métricas completas vivem agora na aba "Métricas" (renderDashboardMetrics
+    // é chamado por showTab('metrics')). A Dashboard mostra só o essencial.
 }
 
 async function updateChart(view, el) {
@@ -2474,6 +2595,37 @@ function dashPanel(title, inner) {
     return `<div class="dash-panel"><div class="dash-panel-title">${title}</div>${inner}</div>`;
 }
 
+// Gráfico de linha/área (SVG puro, sem libs). points = números; labels = rótulos
+// do eixo X (mostra-se o 1º e o último). Usado na aba Métricas para tendências.
+function dashSparkline(points, { color = '#7000ff', labels = [], unit = '' } = {}) {
+    if (!points || !points.length) return `<div class="dash-empty">Sem dados ainda.</div>`;
+    const W = 320, H = 80, pad = 8;
+    const max = Math.max(...points, 1);
+    const n = points.length;
+    const stepX = n > 1 ? (W - pad * 2) / (n - 1) : 0;
+    const xy = points.map((v, i) => [
+        pad + i * stepX,
+        pad + (H - pad * 2) * (1 - v / max)
+    ]);
+    const line = xy.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+    const area = `${pad.toFixed(1)},${(H - pad).toFixed(1)} ${line} ${(pad + (n - 1) * stepX).toFixed(1)},${(H - pad).toFixed(1)}`;
+    const dots = xy.map(([x, y], i) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${i === n - 1 ? 4 : 2.5}" fill="${color}"></circle>`).join('');
+    const total = points.reduce((s, v) => s + v, 0);
+    const last = points[n - 1];
+    return `<div class="dash-spark">
+        <svg viewBox="0 0 ${W} ${H}" class="dash-spark-svg" style="width:100%;height:auto;display:block;">
+            <polygon points="${area}" fill="${color}" opacity="0.13"></polygon>
+            <polyline points="${line}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"></polyline>
+            ${dots}
+        </svg>
+        <div class="dash-spark-foot">
+            <span>${escapeHtml(labels[0] || '')}</span>
+            <span class="dash-spark-now">${last}${unit ? ' ' + unit : ''} agora · ${total} no total</span>
+            <span>${escapeHtml(labels[n - 1] || '')}</span>
+        </div>
+    </div>`;
+}
+
 let _renderingMetrics = false;
 async function renderDashboardMetrics() {
     const root = document.getElementById('dashboard-metrics');
@@ -2524,8 +2676,20 @@ async function renderDashboardMetrics() {
         const catItems = Object.entries(catMap).sort((a, b) => b[1].active - a[1].active)
             .map(([k, v]) => ({ label: `${k} (${v.active}/${v.total})`, value: v.active, color: '#28a745' }));
 
-        // Flyers
-        const flyersAprovados = flyers.filter(f => f.status === 'Aprovado').length;
+        // Flyers (feed vs story) e stories guardados (formato 9:16)
+        const storiesCount = flyers.filter(f => f.format === 'story').length;
+        const flyersAprovados = flyers.filter(f => f.status === 'Aprovado' && f.format !== 'story').length;
+
+        // Tendência — flyers criados nos últimos 6 meses (gráfico de linha/área)
+        const _now = new Date();
+        const _mNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const trendPts = [], trendLbls = [];
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(_now.getFullYear(), _now.getMonth() - i, 1);
+            const m = d.getMonth(), y = d.getFullYear();
+            trendPts.push(flyers.filter(f => { const fd = new Date(flyerTimestamp(f)); return fd.getMonth() === m && fd.getFullYear() === y; }).length);
+            trendLbls.push(_mNames[m]);
+        }
 
         const kpis = [
             dashKpi({ icon: 'send', value: sc.posted, label: 'Posts publicados', color: '#28a745' }),
@@ -2533,6 +2697,7 @@ async function renderDashboardMetrics() {
             dashKpi({ icon: 'alert-triangle', value: sc.failed + sc.partially_posted, label: 'Com falha', color: '#ff4444' }),
             dashKpi({ icon: 'target', value: successRate + '%', label: 'Taxa de sucesso', color: '#7000ff' }),
             dashKpi({ icon: 'image', value: flyersAprovados, label: 'Flyers aprovados', color: '#D4522A' }),
+            dashKpi({ icon: 'smartphone', value: storiesCount, label: 'Stories guardados', color: '#E1306C' }),
             dashKpi({ icon: 'rss', value: sources.filter(s => s.active).length, label: 'Fontes ativas', color: '#00b8d4' }),
         ].join('');
 
@@ -2555,14 +2720,21 @@ async function renderDashboardMetrics() {
 
         root.innerHTML = `
             ${socialHtml}
-            <div class="dash-section-title">Métricas do sistema</div>
+            <div class="dash-section-title">Resumo do sistema</div>
             <div class="dash-kpis">${kpis}</div>
-            <div class="dash-grid">
+
+            <div class="dash-section-title">Tendência</div>
+            <div class="dash-grid dash-grid-2">
+                ${dashPanel('Flyers criados (últimos 6 meses)', dashSparkline(trendPts, { labels: trendLbls, color: '#7000ff', unit: 'flyers' }))}
                 ${dashPanel('Estado dos agendamentos', dashDonut([
                     { label: 'Publicados', value: sc.posted, color: '#28a745' },
                     { label: 'Agendados', value: sc.pending + sc.processing, color: '#ff9800' },
                     { label: 'Com falha', value: sc.failed + sc.partially_posted, color: '#ff4444' },
                 ], scheduled.length, 'no total'))}
+            </div>
+
+            <div class="dash-section-title">Distribuição</div>
+            <div class="dash-grid">
                 ${dashPanel('Publicações por plataforma', dashBarList(platItems))}
                 ${dashPanel('Funil de propostas', dashBarList([
                     { label: 'Novas', value: pst.new, color: '#6c7a89' },
@@ -2591,6 +2763,7 @@ async function editFlyer(id) {
         activeSlideIndex = 0;
         const editorNav = document.querySelector('.main-nav .nav-item[data-tab="editor"]');
         showTab('editor', editorNav);
+        setEditorFormat('feed'); // carrossel é sempre feed
         loadEditorState(carouselSlides[0]);
         renderCarouselBar();
         ui.showToast("Carrossel carregado. Clica nos slides para editar; Guardar atualiza-o.", "success");
@@ -2621,6 +2794,8 @@ async function editFlyer(id) {
     applyBackgroundState();
     const editorNav = document.querySelector('.main-nav .nav-item[data-tab="editor"]');
     showTab('editor', editorNav);
+    // Repõe o formato do flyer (story 9:16 ou feed) — permite re-editar stories.
+    setEditorFormat(flyer.format === 'story' ? 'story' : 'feed');
     ui.showToast("Carregado para edição!", "success");
 }
 
@@ -2733,8 +2908,24 @@ async function editProposalInEditor(id) {
     closeProposalModal();
     const editorNav = document.querySelector('.main-nav .nav-item[data-tab="editor"]');
     showTab('editor', editorNav);
+    setEditorFormat('feed'); // proposta abre em feed (transformToStory muda depois)
     ui.showToast("Proposta carregada no editor!", "success");
 }
+
+// Transforma uma proposta (Salvada da IA) num Story 9:16: reutiliza o mesmo
+// carregamento no editor e ativa o formato story. O "Salvar" cria um NOVO
+// story (não mexe na proposta), que vai para a aba "Stories".
+async function transformToStory(proposalId) {
+    await editProposalInEditor(proposalId); // carrega no editor (em feed) e mostra a aba
+    // O próximo "Salvar" cria um story novo, sem tocar na proposta original.
+    editingProposalId = null;
+    editingFlyerId = null;
+    setEditorFormat('story');
+    const editor = document.getElementById('editor');
+    if (editor) fitHeadline(editor); // re-ajusta o texto ao canvas vertical
+    ui.showToast('Proposta em formato Story (9:16). Ajusta e "Salvar" guarda-a em Stories.', 'success');
+}
+window.transformToStory = transformToStory;
 
 async function approveAndSaveProposal(id) {
     const proposal = await storage.getProposalById(id);
@@ -3068,6 +3259,7 @@ async function renderAISaved() {
             </div>
             <div class="proposal-card-actions">
                 <button class="btn-mini" onclick="editProposalInEditor(${p.id})" title="Abrir no Editor"><i data-lucide="pen-tool"></i></button>
+                <button class="btn-mini" onclick="transformToStory(${p.id})" title="Transformar em Story (9:16)"><i data-lucide="smartphone"></i></button>
                 <button class="btn-mini" onclick="approveAndSaveProposal(${p.id})" title="Aprovar e Salvar"><i data-lucide="check-circle"></i></button>
                 <button class="btn-reject" onclick="rejectProposal(${p.id})" title="Rejeitar"><i data-lucide="x-circle"></i></button>
             </div>

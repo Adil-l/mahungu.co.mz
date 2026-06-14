@@ -27,8 +27,10 @@ export const core = {
         const availableWidth = window.innerWidth - sidebarsWidth - horizontalPadding;
         const availableHeight = window.innerHeight - verticalPadding;
 
+        // Formato Stories (9:16) usa o mesmo .flyer com .is-story → 1080×1920.
+        const isStory = !!document.querySelector('.flyer.is-story');
         const targetWidth = 1080;
-        const targetHeight = 1350;
+        const targetHeight = isStory ? 1920 : 1350;
 
         const scale = Math.max(0.15, Math.min(1, availableWidth / targetWidth, availableHeight / targetHeight));
 
@@ -75,6 +77,10 @@ export const core = {
         const editor = document.getElementById('editor');
         if (editor) editor.blur();
 
+        // Story (9:16) = mesmo .flyer com .is-story → captura 1080×1920.
+        const isStory = flyer.classList.contains('is-story');
+        const capHeight = isStory ? 1920 : 1350;
+
         try {
             if (document.fonts && document.fonts.ready) {
                 await document.fonts.ready;
@@ -84,7 +90,7 @@ export const core = {
             await new Promise(r => setTimeout(r, 100));
 
             const captureHost = document.createElement('div');
-            captureHost.className = 'capture-host';
+            captureHost.className = 'capture-host' + (isStory ? ' is-story' : '');
             const flyerClone = flyer.cloneNode(true);
             flyerClone.style.transform = 'none';
             flyerClone.style.left = '0';
@@ -145,18 +151,18 @@ export const core = {
             document.body.appendChild(captureHost);
 
             const canvas = await html2canvas(flyerClone, {
-                // 1080x1350 = tamanho nativo do design e o ideal para redes sociais
-                // (IG retrato). scale 1 é ~4x mais rápido/leve que scale 2, sem perda
-                // visível para publicar (PNG mantém o texto nítido).
+                // 1080x1350 (feed) ou 1080x1920 (story 9:16) = tamanhos nativos do
+                // design e ideais para redes sociais (IG retrato/story). scale 1 é
+                // ~4x mais rápido/leve que scale 2, sem perda visível para publicar.
                 scale: 1,
                 useCORS: true,
                 allowTaint: false, // Alterado para false para evitar problemas de segurança que bloqueiam o canvas
                 logging: false,
                 backgroundColor: '#040830',
                 width: 1080,
-                height: 1350,
+                height: capHeight,
                 windowWidth: 1080,
-                windowHeight: 1350,
+                windowHeight: capHeight,
                 proxy: null // Removido proxy para evitar falhas externas
             });
 

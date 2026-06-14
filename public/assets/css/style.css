@@ -304,6 +304,23 @@ body.editor-active #tab-editor {
 .layer-logo img { width: 100%; display: block; }
 .layer-texto { position: absolute; top: 1010px; left: 0; width: 1080px; height: 270px; padding: 0 40px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; z-index: 10; }
 
+/* ── Formato STORIES (9:16 — 1080×1920) ─────────────────────────────────
+   O mesmo .flyer com o modificador .is-story: muda só as dimensões e
+   reposiciona os layers (foto, onda, barras, logo, texto) para vertical,
+   reaproveitando a identidade do feed. TODOS os controlos do editor
+   continuam a funcionar (operam sobre .flyer/#editor). Template PROVISÓRIO
+   — o layout definitivo entra quando o cliente enviar o HTML/CSS; aí só
+   este bloco muda, sem tocar na lógica. ─────────────────────────────── */
+.flyer-wrapper.is-story { width: 1080px; height: 1920px; }
+.flyer.is-story { width: 1080px; height: 1920px; }
+.flyer.is-story .layer-photo,
+.flyer.is-story .layer-photo .photo-single,
+.flyer.is-story .photo-split { height: 1920px; }
+.flyer.is-story .photo-half { height: 1920px; }
+.flyer.is-story .layer-meio-fundo { bottom: -160px; height: 1000px; }
+.flyer.is-story .layer-logo { top: 1480px; width: 320px; }
+.flyer.is-story .layer-texto { top: 1545px; height: 360px; }
+
 .headline-editor { 
   font-family: 'Paralucent', sans-serif; 
   font-weight: bold !important; 
@@ -598,6 +615,15 @@ body.editor-active #tab-editor {
     gap: 24px;
 }
 
+/* ── STORIES GRID (9:16) — reutiliza o cartão .history-item; só a
+   miniatura muda de proporção (vertical). ── */
+.stories-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 24px;
+}
+.stories-grid .history-thumb { aspect-ratio: 1080/1920; }
+
 .history-item {
     background: var(--glass-bg);
     border: 1px solid var(--glass-border);
@@ -732,6 +758,7 @@ body.editor-active #tab-editor {
 .status-badge.aprovado { background: rgba(40, 167, 69, 0.1); color: #28a745; }
 .status-badge.publicado { background: rgba(13, 202, 240, 0.12); color: #0ddcf0; }
 .status-badge.rejeitado { background: rgba(255, 68, 68, 0.1); color: #ff4444; }
+.status-badge.story { background: rgba(225, 48, 108, 0.14); color: #ff5c97; font-weight: 700; }
 
 /* Sobre a miniatura, usar pílula escura sólida para legibilidade sobre a foto
    (mantém a cor do texto definida acima por estado). */
@@ -1040,6 +1067,15 @@ body.editor-active #tab-editor {
 .dash-barrow-track { flex: 1; height: 8px; background: var(--glass-border); border-radius: 999px; overflow: hidden; }
 .dash-barrow-fill { display: block; height: 100%; border-radius: 999px; min-width: 2px; transition: width .4s ease; }
 .dash-barrow-val { font-size: 13px; font-weight: 700; color: var(--text); width: 30px; text-align: right; }
+
+/* Grelha de 2 colunas (tendência: linha + donut lado a lado) */
+.dash-grid-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+
+/* Gráfico de linha/área (sparkline SVG) */
+.dash-spark { display: flex; flex-direction: column; gap: 10px; }
+.dash-spark-svg { width: 100%; height: auto; overflow: visible; }
+.dash-spark-foot { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-muted); gap: 8px; }
+.dash-spark-now { font-weight: 700; color: var(--text); white-space: nowrap; }
 
 .profile-actions {
     display: flex;
@@ -1551,6 +1587,7 @@ body.editor-active #tab-editor {
     opacity: 0;
     z-index: -1;
 }
+.capture-host.is-story { height: 1920px; }
 
 /* ── HISTORY ITEM ACTIONS ── */
 .history-item { position: relative; }
