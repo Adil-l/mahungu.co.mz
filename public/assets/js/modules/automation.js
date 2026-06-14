@@ -55,7 +55,9 @@ export const automation = {
 
             for (const source of activeSources) {
                 try {
-                    totalNew += await this.fetchFromSource(source);
+                    totalNew += (source.type === 'instagram')
+                        ? await this.fetchFromInstagram(source)
+                        : await this.fetchFromSource(source);
                 } catch (err) {
                     // Fonte em baixo é esperado (feed mudou/bloqueia/lento) — aviso, não erro.
                     console.warn(`Fonte indisponível: ${source.name} (${err.message})`);
@@ -166,6 +168,70 @@ export const automation = {
         if (newItemsCount > 0 || skippedOld > 0) {
             console.log(`✅ [${source.name}] ${newItemsCount} novas` + (skippedOld ? ` (${skippedOld} antigas ignoradas)` : '') + '.');
         }
+        return newItemsCount;
+    },
+
+    // Fonte = conta Instagram pública (business/creator). Usa o Business Discovery
+    // do servidor (o token fica server-side) e cria propostas com a legenda do post.
+    // Para contas IG guardamos o @username no campo `url` da fonte.
+    async fetchFromInstagram(source) {
+        const username = (source.url || source.username || '').trim();
+        if (!username) return 0;
+
+        const res = await fetch(`/api/instagram/discover?username=${encodeURIComponent(username)}`, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!data || !data.ok) throw new Error((data && data.error) || 'Business Discovery falhou');
+
+        const media = Array.isArray(data.media) ? data.media : [];
+        const freshDays = Math.max(1, Number(storage.getSetting('maxNewsAgeDays', DEFAULT_FRESH_DAYS)) || DEFAULT_FRESH_DAYS);
+        let newItemsCount = 0;
+
+        for (const m of media) {
+            const link = m.permalink;
+            const caption = (m.caption || '').trim();
+            if (!link || !caption) continue;
+
+            // Mesmo filtro de recência/viralidade do RSS (usa comentários do post).
+            const publishedAt = m.timestamp ? this.parsePubDate(m.timestamp) : null;
+            if (publishedAt != null) {
+                const ageDays = (Date.now() - publishedAt) / DAY_MS;
+                if (ageDays > freshDays) {
+                    const comments = Number(m.comments_count) || 0;
+                    let keep;
+                    if (ageDays <= VIRAL_MAX_DAYS) keep = this.looksViral(caption, source.category, comments);
+                    else if (ageDays <= EVERGREEN_MAX_DAYS) keep = this.looksStronglyViral(caption, source.category, comments);
+                    else keep = false;
+                    if (!keep) continue;
+                }
+            }
+
+            const id = this.generateId(link);
+            if (await storage.getProposalById(id)) continue;
+
+            const title = (caption.split('\n')[0].trim() || caption).substring(0, 100);
+            const image = (m.media_type === 'VIDEO' ? (m.thumbnail_url || m.media_url) : (m.media_url || m.thumbnail_url)) || '';
+
+            await storage.saveProposal({
+                id,
+                title,
+                summary: caption.replace(/\s+/g, ' ').trim().substring(0, 200),
+                sourceUrl: link,
+                sourceName: source.name,
+                category: source.category || 'Geral',
+                date: publishedAt != null ? new Date(publishedAt).toLocaleDateString('pt-PT') : new Date().toLocaleDateString('pt-PT'),
+                image,
+                status: 'new',
+                publishedAt,
+                timestamp: publishedAt != null ? publishedAt : Date.now()
+            });
+            newItemsCount++;
+        }
+
+        if (newItemsCount > 0) console.log(`✅ [IG @${username}] ${newItemsCount} novas.`);
         return newItemsCount;
     },
 

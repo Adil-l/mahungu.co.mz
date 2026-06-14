@@ -155,6 +155,39 @@ class MetricsService
         return [];
     }
 
+    /**
+     * Business Discovery: lê os posts recentes de uma conta IG PÚBLICA
+     * business/creator (ex.: páginas de notícias) — para usar como "fonte".
+     * Só funciona para contas business/creator públicas (não pessoais).
+     */
+    public function businessDiscovery(string $username, int $limit = 12): array
+    {
+        $username = ltrim(trim($username), '@');
+        if ($username === '') {
+            return ['ok' => false, 'error' => 'Indica o nome de utilizador do Instagram.'];
+        }
+
+        $t = $this->resolveTargets();
+        if (!empty($t['error'])) {
+            return ['ok' => false, 'error' => $t['error']];
+        }
+        if (empty($t['igId'])) {
+            return ['ok' => false, 'error' => 'É preciso uma conta Instagram Business ligada à Página para usar fontes do Instagram.'];
+        }
+
+        $field = "business_discovery.username({$username}){media.limit({$limit}){caption,media_url,thumbnail_url,permalink,timestamp,media_type,like_count,comments_count}}";
+        $res = Http::get("{$this->base}/{$t['igId']}", [
+            'fields' => $field,
+            'access_token' => $t['pageToken'],
+        ]);
+
+        if ($res->failed()) {
+            return ['ok' => false, 'error' => $res->json('error.message', "Não foi possível ler @{$username} (a conta existe e é business/creator pública?).")];
+        }
+
+        return ['ok' => true, 'media' => $res->json('business_discovery.media.data', [])];
+    }
+
     /** Lê um valor de métrica do array de insights (tolera total_value e values[]). */
     protected function readMetric(array $data, string $name): ?int
     {

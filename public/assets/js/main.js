@@ -550,11 +550,11 @@ async function renderSources() {
     const list = sources.map(s => `
         <div class="management-item">
             <div class="m-thumb" style="display: flex; align-items: center; justify-content: center; background: ${s.active ? 'rgba(40, 167, 69, 0.1)' : 'rgba(255, 68, 68, 0.1)'}; color: ${s.active ? '#28a745' : '#ff4444'};">
-                <i data-lucide="rss"></i>
+                <i data-lucide="${s.type === 'instagram' ? 'instagram' : 'rss'}"></i>
             </div>
             <div class="m-info">
                 <div class="m-title">${s.name} ${s.active ? '' : '<span style="font-size:10px; color:#ff4444; margin-left:6px;">Inativa</span>'}</div>
-                <div class="m-meta">${s.category} • ${s.url}</div>
+                <div class="m-meta">${s.category} • ${s.type === 'instagram' ? 'Instagram @' + escapeHtml(s.url) : escapeHtml(s.url)}</div>
             </div>
             <div class="m-actions">
                 <button class="btn-mini" onclick="toggleSourceActive(${s.id})" title="Alternar"><i data-lucide="power"></i></button>
@@ -604,12 +604,28 @@ async function toggleSourceActive(id) {
 }
 window.toggleSourceActive = toggleSourceActive;
 
+// Ajusta o rótulo/placeholder do campo URL conforme o tipo de fonte.
+function onSourceTypeChange() {
+    const type = document.getElementById('source-type')?.value || 'rss';
+    const label = document.getElementById('source-url-label');
+    const url = document.getElementById('source-url');
+    if (type === 'instagram') {
+        if (label) label.textContent = 'Nome de utilizador do Instagram';
+        if (url) url.placeholder = '@pagina_de_noticias';
+    } else {
+        if (label) label.textContent = 'URL do Feed RSS';
+        if (url) url.placeholder = 'https://exemplo.com/rss';
+    }
+}
+window.onSourceTypeChange = onSourceTypeChange;
+
 async function openSourceModal(id = null) {
     const modal = document.getElementById('source-modal');
     const idInput = document.getElementById('source-id');
     const nameInput = document.getElementById('source-name');
     const urlInput = document.getElementById('source-url');
     const catInput = document.getElementById('source-category');
+    const typeInput = document.getElementById('source-type');
 
     if (id) {
         const sources = await storage.getAllSources();
@@ -619,14 +635,17 @@ async function openSourceModal(id = null) {
             nameInput.value = s.name;
             urlInput.value = s.url;
             catInput.value = s.category;
+            if (typeInput) typeInput.value = s.type || 'rss';
         }
     } else {
         idInput.value = "";
         nameInput.value = "";
         urlInput.value = "";
         catInput.value = "Notícias";
+        if (typeInput) typeInput.value = 'rss';
     }
 
+    onSourceTypeChange();
     modal.classList.add('active');
     lucide.createIcons();
 }
@@ -636,12 +655,26 @@ function closeSourceModal() {
 }
 
 async function saveSource() {
+    const idVal = document.getElementById('source-id').value;
+    const type = document.getElementById('source-type')?.value || 'rss';
+
+    // Preserva o estado ativo/inativo ao editar (não reativar por engano).
+    let active = true;
+    if (idVal) {
+        const existing = (await storage.getAllSources()).find(x => String(x.id) === String(idVal));
+        if (existing && typeof existing.active === 'boolean') active = existing.active;
+    }
+
+    let url = document.getElementById('source-url').value.trim();
+    if (type === 'instagram') url = url.replace(/^@/, '').trim(); // guarda só o username
+
     const source = {
-        id: document.getElementById('source-id').value ? parseInt(document.getElementById('source-id').value) : Date.now(),
+        id: idVal ? parseInt(idVal) : Date.now(),
         name: document.getElementById('source-name').value.trim(),
-        url: document.getElementById('source-url').value.trim(),
+        url,
         category: document.getElementById('source-category').value,
-        active: true
+        type,
+        active
     };
 
     if (!source.name || !source.url) return ui.showToast("Preencha todos os campos.", "error");

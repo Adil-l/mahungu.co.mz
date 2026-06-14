@@ -912,7 +912,14 @@
         
         <input type="hidden" id="source-id">
         <div class="form-group"><label>Nome do Portal</label><input type="text" id="source-name" placeholder="Ex: Portal de Notícias"></div>
-        <div class="form-group"><label>URL do Feed RSS</label><input type="url" id="source-url" placeholder="https://exemplo.com/rss"></div>
+        <div class="form-group">
+            <label>Tipo de fonte</label>
+            <select id="source-type" class="custom-select" onchange="onSourceTypeChange()">
+                <option value="rss">RSS (website)</option>
+                <option value="instagram">Instagram (página pública)</option>
+            </select>
+        </div>
+        <div class="form-group"><label id="source-url-label">URL do Feed RSS</label><input type="text" id="source-url" placeholder="https://exemplo.com/rss"></div>
         <div class="form-group">
             <label>Categoria</label>
             <select id="source-category" class="custom-select">
