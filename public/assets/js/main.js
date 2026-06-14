@@ -2380,7 +2380,14 @@ function miniFlyerHTML(proposal) {
 // Auxiliar para agrupar propostas e histórico por data (Hoje, Ontem, etc.)
 function getGroupLabel(timestamp) {
     if (!timestamp) return 'Antigos';
-    const d = new Date(timestamp);
+    // Os ids de flyer são Date.now()*100000 + aleatório (~1.75e17), acima do
+    // limite válido de Date (~8.64e15 ms) → davam "Invalid Date". Reduzir à
+    // escala de milissegundos antes de construir a data.
+    let ms = Number(timestamp);
+    if (!Number.isFinite(ms)) return 'Antigos';
+    if (ms > 8.64e15) ms = Math.floor(ms / 100000);
+    const d = new Date(ms);
+    if (isNaN(d.getTime())) return 'Antigos';
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const yesterday = new Date(today);
@@ -2388,7 +2395,7 @@ function getGroupLabel(timestamp) {
 
     if (d >= today) return 'Hoje';
     if (d >= yesterday) return 'Ontem';
-    
+
     return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
