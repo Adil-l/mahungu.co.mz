@@ -778,40 +778,106 @@ function loadLastEdit() {
     applyBackgroundState();
 }
 
-// ── Carrossel no editor: junta vários slides (capturas) num só post ──
-let carouselDraft = [];          // dataURLs já capturados
-let pendingCarouselSlides = null; // marca o save-modal em modo carrossel
+// ── Carrossel no editor: gestor de SLIDES editáveis ──
+// Cada slide guarda o seu estado completo {html, state, imgSrc}; o editor mostra
+// sempre o slide ativo. Captura-se a imagem de cada slide só ao GUARDAR.
+let carouselSlides = [];          // estados dos slides
+let activeSlideIndex = -1;        // -1 = fora do modo carrossel
+let pendingCarouselStates = null; // marca o save-modal em modo carrossel
 
-function updateCarouselUI() {
-    const countEl = document.getElementById('carousel-count');
-    if (countEl) countEl.textContent = carouselDraft.length;
-    const saveBtn = document.getElementById('btn-save-carousel');
-    const clearBtn = document.getElementById('btn-clear-carousel');
-    if (saveBtn) saveBtn.style.display = carouselDraft.length >= 2 ? '' : 'none';
-    if (clearBtn) clearBtn.style.display = carouselDraft.length >= 1 ? '' : 'none';
+function snapshotEditor() {
+    const editor = document.getElementById('editor');
+    const photo = document.querySelector('.layer-photo .photo-single');
+    return {
+        html: editor ? editor.innerHTML : '',
+        state: { ...core.editorState },
+        imgSrc: photo ? photo.src : ''
+    };
 }
 
-async function addSlideToCarousel() {
-    try {
-        const dataUrl = await core.captureCurrentFlyer();
-        carouselDraft.push(dataUrl);
-        updateCarouselUI();
-        ui.showToast(`Slide ${carouselDraft.length} adicionado. Edita a próxima notícia e adiciona, ou guarda o carrossel.`, 'success');
-    } catch (e) {
-        ui.showToast('Erro ao capturar o slide.', 'error');
+function loadEditorState(s) {
+    const editor = document.getElementById('editor');
+    if (editor) editor.innerHTML = s.html || '';
+    core.editorState = { ...core.editorState, ...freshSplitDefaults(), ...(s.state || {}) };
+    const photo = document.querySelector('.layer-photo .photo-single');
+    if (photo && isValidImageSrc(s.imgSrc)) photo.src = s.imgSrc;
+    applyBackgroundState();
+    invalidateFlyerSnapshot();
+}
+
+function renderCarouselBar() {
+    const bar = document.getElementById('carousel-bar');
+    const enterBtn = document.getElementById('btn-enter-carousel');
+    if (!bar) return;
+    if (activeSlideIndex < 0) {
+        bar.style.display = 'none';
+        bar.innerHTML = '';
+        if (enterBtn) enterBtn.style.display = '';
+        return;
     }
+    if (enterBtn) enterBtn.style.display = 'none';
+    bar.style.display = 'flex';
+    const slides = carouselSlides.map((s, i) =>
+        `<button class="cbar-slide ${i === activeSlideIndex ? 'active' : ''}" onclick="switchSlide(${i})">Slide ${i + 1}${carouselSlides.length > 1 ? `<span class="cbar-x" onclick="event.stopPropagation();removeSlide(${i})" title="Remover">&times;</span>` : ''}</button>`
+    ).join('');
+    bar.innerHTML = slides
+        + `<button class="cbar-add" onclick="addCarouselSlide()" title="Adicionar slide (mesmo layout)">+ Slide</button>`
+        + `<button class="cbar-save btn-chip" onclick="saveCarousel()"><i data-lucide="images"></i> Guardar (${carouselSlides.length})</button>`
+        + `<button class="cbar-exit" onclick="exitCarousel()" title="Sair do modo carrossel">Sair</button>`;
+    if (window.lucide) lucide.createIcons();
 }
-window.addSlideToCarousel = addSlideToCarousel;
 
-function clearCarouselDraft() {
-    carouselDraft = [];
-    updateCarouselUI();
+function enterCarouselMode() {
+    if (activeSlideIndex >= 0) return;
+    carouselSlides = [snapshotEditor()];   // o flyer atual passa a ser o Slide 1
+    activeSlideIndex = 0;
+    renderCarouselBar();
+    ui.showToast('Modo carrossel: este é o Slide 1. Clica num slide para o editar; "+ Slide" cria o próximo.', 'info');
 }
-window.clearCarouselDraft = clearCarouselDraft;
+window.enterCarouselMode = enterCarouselMode;
+
+function switchSlide(i) {
+    if (activeSlideIndex < 0 || i === activeSlideIndex || !carouselSlides[i]) return;
+    carouselSlides[activeSlideIndex] = snapshotEditor(); // guarda edições do slide atual
+    activeSlideIndex = i;
+    loadEditorState(carouselSlides[i]);
+    renderCarouselBar();
+}
+window.switchSlide = switchSlide;
+
+function addCarouselSlide() {
+    if (activeSlideIndex < 0) return;
+    carouselSlides[activeSlideIndex] = snapshotEditor();
+    carouselSlides.push(snapshotEditor()); // novo slide duplica o layout atual
+    activeSlideIndex = carouselSlides.length - 1;
+    loadEditorState(carouselSlides[activeSlideIndex]);
+    renderCarouselBar();
+    ui.showToast(`Slide ${activeSlideIndex + 1} criado (mesmo layout). Edita o texto/foto.`, 'success');
+}
+window.addCarouselSlide = addCarouselSlide;
+
+function removeSlide(i) {
+    if (carouselSlides.length <= 1) return exitCarousel();
+    carouselSlides.splice(i, 1);
+    if (i < activeSlideIndex) activeSlideIndex--;
+    else if (i === activeSlideIndex) activeSlideIndex = Math.min(activeSlideIndex, carouselSlides.length - 1);
+    loadEditorState(carouselSlides[activeSlideIndex]);
+    renderCarouselBar();
+}
+window.removeSlide = removeSlide;
+
+function exitCarousel() {
+    activeSlideIndex = -1;
+    carouselSlides = [];
+    renderCarouselBar();
+}
+window.exitCarousel = exitCarousel;
 
 function saveCarousel() {
-    if (carouselDraft.length < 2) return ui.showToast('Adiciona pelo menos 2 slides ao carrossel.', 'info');
-    pendingCarouselSlides = carouselDraft.slice();
+    if (activeSlideIndex < 0) return;
+    carouselSlides[activeSlideIndex] = snapshotEditor();
+    if (carouselSlides.length < 2) return ui.showToast('Um carrossel precisa de pelo menos 2 slides.', 'info');
+    pendingCarouselStates = carouselSlides.slice();
     openSaveModal();
 }
 window.saveCarousel = saveCarousel;
@@ -869,9 +935,14 @@ async function confirmSaveToHistory() {
             }
         }
 
-        // ── Guardar um CARROSSEL (slides já capturados via "Adicionar slide") ──
-        if (pendingCarouselSlides && pendingCarouselSlides.length >= 2) {
-            const slides = pendingCarouselSlides;
+        // ── Guardar um CARROSSEL: captura cada slide a partir do seu estado ──
+        if (pendingCarouselStates && pendingCarouselStates.length >= 2) {
+            const slides = [];
+            for (const st of pendingCarouselStates) {
+                loadEditorState(st);
+                await new Promise(r => setTimeout(r, 80)); // deixa a imagem/layout assentar
+                slides.push(await core.captureCurrentFlyer());
+            }
             const entry = {
                 id: generateUniqueFlyerId(),
                 title: title,
@@ -885,8 +956,8 @@ async function confirmSaveToHistory() {
                 cta: editorPostMeta?.cta || ''
             };
             await storage.saveFlyer(entry);
-            pendingCarouselSlides = null;
-            clearCarouselDraft();
+            pendingCarouselStates = null;
+            exitCarousel();
             editingFlyerId = entry.id;
             closeSaveModal();
             ui.showToast(`Carrossel com ${slides.length} slides guardado!`, 'success');

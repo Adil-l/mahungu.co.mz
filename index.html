@@ -130,15 +130,10 @@
 
     <div class="control-group" id="carousel-controls" style="margin-top: auto;">
         <div class="control-label">Carrossel (várias notícias num post)</div>
-        <button class="btn-main" onclick="addSlideToCarousel()" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">
-            <i data-lucide="copy-plus"></i> Adicionar slide (<span id="carousel-count">0</span>)
+        <button class="btn-main" id="btn-enter-carousel" onclick="enterCarouselMode()" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">
+            <i data-lucide="images"></i> Criar carrossel
         </button>
-        <button class="btn-full" id="btn-save-carousel" onclick="saveCarousel()" style="display:none; margin-top:6px; color: var(--primary);">
-            <i data-lucide="images" style="width: 14px; height: 14px;"></i> Guardar carrossel
-        </button>
-        <button class="btn-full" id="btn-clear-carousel" onclick="clearCarouselDraft()" style="display:none; margin-top:2px;">
-            <i data-lucide="x" style="width: 14px; height: 14px;"></i> Cancelar
-        </button>
+        <div id="carousel-bar" class="carousel-bar" style="display:none;"></div>
     </div>
 
     <div class="control-group">
