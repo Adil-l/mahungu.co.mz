@@ -318,6 +318,14 @@
                 </div>
             </div>
 
+            <div id="ai-merge-bar" class="ai-merge-bar" style="display:none;">
+                <span><i data-lucide="images"></i> <strong id="ai-merge-count">0</strong> selecionadas para carrossel</span>
+                <div class="ai-merge-actions">
+                    <button class="btn-chip" onclick="clearMergeSelection()">Limpar</button>
+                    <button class="btn-main btn-success" onclick="uniteSelectedAsCarousel()"><i data-lucide="images"></i> Unir em carrossel</button>
+                </div>
+            </div>
+
             <div class="proposals-grid" id="ai-saved-container">
                 <!-- Conteúdo virá depois -->
                 <div style="grid-column: 1/-1; text-align: center; padding: 50px; color: var(--text-muted);">

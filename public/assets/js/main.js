@@ -2966,6 +2966,7 @@ async function renderAISaved() {
 
         html += `
         <article class="proposal-card is-ready">
+            <label class="merge-check" title="Selecionar para unir num carrossel"><input type="checkbox" ${mergeSelection.has(p.id) ? 'checked' : ''} onchange="toggleMergeSelect(${p.id}, this.checked)"></label>
             <button class="proposal-preview" onclick="openProposalModal(${p.id})" title="Rever proposta">
                 ${miniFlyerHTML(p)}
                 <span class="proposal-badge ready">Pronta</span>
@@ -2983,10 +2984,115 @@ async function renderAISaved() {
     });
 
     container.innerHTML = html;
+    updateMergeBar();
     lucide.createIcons();
 }
 
 window.renderAISaved = renderAISaved;
+
+// ── Unir propostas (Salvadas da IA) num carrossel ──
+let mergeSelection = new Set();
+
+function toggleMergeSelect(id, checked) {
+    if (checked) mergeSelection.add(id); else mergeSelection.delete(id);
+    updateMergeBar();
+}
+window.toggleMergeSelect = toggleMergeSelect;
+
+function updateMergeBar() {
+    const bar = document.getElementById('ai-merge-bar');
+    const count = document.getElementById('ai-merge-count');
+    if (count) count.textContent = mergeSelection.size;
+    if (bar) bar.style.display = mergeSelection.size >= 2 ? 'flex' : 'none';
+}
+
+function clearMergeSelection() {
+    mergeSelection.clear();
+    renderAISaved();
+}
+window.clearMergeSelection = clearMergeSelection;
+
+// Carrega uma proposta no editor (escondido) e captura-a como imagem de slide.
+async function captureProposalSlide(proposal) {
+    const editor = document.getElementById('editor');
+    const photoSingle = document.querySelector('.layer-photo .photo-single');
+    if (proposal.flyerState) {
+        if (editor) editor.innerHTML = proposal.flyerState.html || '';
+        core.editorState = { ...core.editorState, ...freshSplitDefaults(), ...(proposal.flyerState.state || {}) };
+        if (photoSingle && isValidImageSrc(proposal.flyerState.imgSrc)) photoSingle.src = proposal.flyerState.imgSrc;
+    } else {
+        if (editor) editor.innerHTML = headlineHtml(proposal.generatedTitle, proposal.generatedSummary);
+        const photoSrc = flyerPhotoUrl(proposal.image);
+        if (photoSingle && photoSrc) photoSingle.src = photoSrc;
+        Object.assign(core.editorState, freshSplitDefaults());
+    }
+    applyBackgroundState();
+    invalidateFlyerSnapshot();
+    if (editor && !proposal.flyerState) fitHeadline(editor);
+    return await core.captureCurrentFlyer();
+}
+
+async function uniteSelectedAsCarousel() {
+    const ids = [...mergeSelection];
+    if (ids.length < 2) return ui.showToast('Seleciona pelo menos 2 posts.', 'info');
+
+    const proposals = [];
+    for (const id of ids) {
+        const p = await storage.getProposalById(id);
+        if (p) proposals.push(p);
+    }
+    if (proposals.length < 2) return ui.showToast('Propostas não encontradas.', 'error');
+
+    ui.showToast('A montar o carrossel… ✨', 'info');
+    try {
+        // 1) captura cada proposta como um slide
+        const slides = [];
+        for (const p of proposals) slides.push(await captureProposalSlide(p));
+
+        // 2) legenda-resumo combinada pela IA (com fallback)
+        let caption = '', hashtags = [], cta = '';
+        try {
+            const r = await ai.generateCarouselCaption(
+                proposals.map(p => ({ title: p.generatedTitle || p.title, summary: p.generatedSummary || '', category: p.category })),
+                proposals[0].category || 'Geral'
+            );
+            caption = r.caption || ''; hashtags = r.hashtags || []; cta = r.cta || '';
+        } catch (e) {
+            caption = 'Resumo: ' + proposals.map(p => p.generatedTitle || p.title).join(' • ');
+        }
+
+        // 3) guarda o flyer-carrossel nos Aprovados
+        const entry = {
+            id: generateUniqueFlyerId(),
+            title: proposals.map(p => p.generatedTitle || p.title).join(' + ').substring(0, 80),
+            category: proposals[0].category || 'IA Gerado',
+            status: 'Aprovado',
+            date: new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }),
+            image: slides[0],
+            slides,
+            caption, hashtags, cta
+        };
+        await storage.saveFlyer(entry);
+
+        // 4) marca as propostas como aprovadas (saem das Salvadas)
+        for (const p of proposals) {
+            p.status = 'approved';
+            await storage.saveProposal(p);
+            shareProposal(p).catch(() => {});
+        }
+
+        mergeSelection.clear();
+        updateDashboardStats();
+        renderAISaved();
+        renderProposals();
+        ui.showToast(`Carrossel com ${slides.length} slides criado nos Aprovados!`, 'success');
+        Promise.all([shareFlyer(entry), storage.syncFlyerToServer(entry)]).catch(() => {});
+    } catch (err) {
+        console.error('Erro ao unir carrossel:', err);
+        ui.showToast('Erro ao montar o carrossel.', 'error');
+    }
+}
+window.uniteSelectedAsCarousel = uniteSelectedAsCarousel;
 
 // Aplica o resultado da IA à proposta e marca como pronta para revisão.
 function applyGenerationToProposal(proposal, result) {

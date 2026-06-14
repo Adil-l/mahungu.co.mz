@@ -352,6 +352,38 @@ export const ai = {
     },
 
     /**
+     * Legenda-RESUMO para um CARROSSEL que junta vários posts/notícias (1 slide cada).
+     * Ex.: "Brasil venceu Croácia" + "Portugal venceu Argentina" ->
+     * "Resumo do Mundial: Portugal vence Argentina e Brasil bate Croácia".
+     */
+    async generateCarouselCaption(items, category = 'Geral') {
+        const lista = items.map((it, i) => `${i + 1}. ${it.title}${it.summary ? ' — ' + it.summary : ''}`).join('\n');
+        const prompt = `
+            Você é o social media manager da Mahungu em Moçambique.
+            ${MAHUNGU_LANGUAGE_RULE}
+            ${this.brandDirectives()}
+            Vou publicar um CARROSSEL no Instagram que junta estas ${items.length} notícias (cada uma é um slide):
+            ${lista}
+
+            Escreva UMA legenda única que faça o RESUMO do conjunto (apanhado coeso, não slide a slide
+            isolado). Começa com um gancho que abranja o tema comum (ex.: "Resumo do Mundial:") e refere
+            os destaques de cada slide de forma fluida.
+            ${MAHUNGU_CAPTION_RULES}
+
+            Responda APENAS em JSON estrito:
+            {
+                "caption": "Legenda-resumo do carrossel (fórmula Mahungu)",
+                "hashtags": ["#Tag1", "#Tag2", "#Tag3", "#Tag4"],
+                "cta": "${MAHUNGU_CTA}"
+            }
+            Não escreva nada fora do JSON.
+        `;
+        const text = await this.ask(prompt);
+        const j = this.parseProposalJSON(text, { title: items[0]?.title || 'Resumo', summary: '', category });
+        return { caption: j.caption, hashtags: j.hashtags, cta: j.cta };
+    },
+
+    /**
      * Gera conteúdo de engajamento (sem notícia): curiosidades, factos
      * engraçados, perguntas à audiência, etc. Devolve o mesmo formato
      * de proposta que generateContent.
