@@ -317,9 +317,9 @@ body.editor-active #tab-editor {
 .flyer.is-story .layer-photo .photo-single,
 .flyer.is-story .photo-split { height: 1920px; }
 .flyer.is-story .photo-half { height: 1920px; }
-.flyer.is-story .layer-meio-fundo { bottom: -160px; height: 1000px; }
-.flyer.is-story .layer-logo { top: 1480px; width: 320px; }
-.flyer.is-story .layer-texto { top: 1545px; height: 360px; }
+.flyer.is-story .layer-meio-fundo { bottom: -160px; height: 700px; }
+.flyer.is-story .layer-logo { top: 1390px; width: 365px; }
+.flyer.is-story .layer-texto { top: 1485px; height: 360px; }
 
 .headline-editor { 
   font-family: 'Paralucent', sans-serif; 
