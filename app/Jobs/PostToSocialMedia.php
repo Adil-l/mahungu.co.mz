@@ -324,24 +324,8 @@ class PostToSocialMedia implements ShouldQueue
         $imageUrl = $disk->url($mediaPath);
         $content = $this->scheduledPost->content ?? '';
 
-        // 1) Cria o container de media (o IG vai buscar a imagem ao URL público)
-        $container = Http::post("https://graph.facebook.com/v19.0/{$igId}/media", [
-            'image_url' => $imageUrl,
-            'caption' => $content,
-            'access_token' => $pageToken,
-        ]);
-        if ($container->failed()) {
-            throw new \Exception('Instagram (container): ' . $container->json('error.message', 'erro ao preparar a imagem (o URL é público?).'));
-        }
-
-        // 2) Publica o container
-        $publish = Http::post("https://graph.facebook.com/v19.0/{$igId}/media_publish", [
-            'creation_id' => $container->json('id'),
-            'access_token' => $pageToken,
-        ]);
-        if ($publish->failed()) {
-            throw new \Exception('Instagram (publish): ' . $publish->json('error.message', 'erro ao publicar.'));
-        }
+        // Cria o container, espera o IG processar a imagem e publica.
+        $this->publishInstagramPhoto($igId, $imageUrl, $content, $pageToken);
 
         Log::info("Publicado no Instagram (conta {$igId}) via token fixo.");
         return true;
@@ -430,28 +414,58 @@ class PostToSocialMedia implements ShouldQueue
         // 3) URL público da imagem (o IG vai buscá-la; não aceita upload de bytes).
         $imageUrl = Storage::disk(config('filesystems.media_disk'))->url($mediaPath);
 
-        // 4) Cria o container de media
-        $container = Http::post("https://graph.facebook.com/v19.0/{$igId}/media", [
-            'image_url' => $imageUrl,
-            'caption' => $content,
-            'access_token' => $pageToken,
-        ]);
-
-        if ($container->failed()) {
-            throw new \Exception('Instagram (container): ' . $container->json('error.message', 'erro ao preparar a imagem.'));
-        }
-
-        // 5) Publica o container
-        $publish = Http::post("https://graph.facebook.com/v19.0/{$igId}/media_publish", [
-            'creation_id' => $container->json('id'),
-            'access_token' => $pageToken,
-        ]);
-
-        if ($publish->failed()) {
-            throw new \Exception('Instagram (publish): ' . $publish->json('error.message', 'erro ao publicar.'));
-        }
+        // 4-5) Cria o container, espera o IG processar a imagem e publica.
+        $this->publishInstagramPhoto($igId, $imageUrl, $content, $pageToken);
 
         Log::info("Publicado no Instagram (conta {$igId}) para o utilizador {$account->user_id}.");
         return true;
+    }
+
+    /**
+     * Cria o container de media do Instagram, ESPERA o processamento assíncrono
+     * (o IG vai buscar a imagem ao image_url) e só depois publica. Sem a espera,
+     * o media_publish devolve "Media ID is not available" porque o container
+     * ainda está em IN_PROGRESS. Se a imagem não for acessível publicamente o
+     * container vai a ERROR — aqui isso é reportado de forma clara.
+     */
+    protected function publishInstagramPhoto(string $igId, string $imageUrl, string $caption, string $token): void
+    {
+        $container = Http::post("https://graph.facebook.com/v19.0/{$igId}/media", [
+            'image_url' => $imageUrl,
+            'caption' => $caption,
+            'access_token' => $token,
+        ]);
+        if ($container->failed()) {
+            throw new \Exception('Instagram (container): ' . $container->json('error.message', 'erro ao preparar a imagem (o URL é público?).'));
+        }
+        $creationId = $container->json('id');
+
+        // Espera o container ficar FINISHED (o IG processa a imagem em background).
+        $status = null;
+        for ($i = 0; $i < 12; $i++) {
+            $statusRes = Http::get("https://graph.facebook.com/v19.0/{$creationId}", [
+                'fields' => 'status_code,status',
+                'access_token' => $token,
+            ]);
+            $status = $statusRes->json('status_code');
+            if ($status === 'FINISHED') {
+                break;
+            }
+            if ($status === 'ERROR') {
+                throw new \Exception('Instagram: o processamento da imagem falhou (ERROR) — normalmente o URL da imagem não está acessível publicamente (usar MEDIA_DISK=s3 com bucket público). ' . $statusRes->json('status', ''));
+            }
+            sleep(2);
+        }
+        if ($status !== 'FINISHED') {
+            throw new \Exception('Instagram: a imagem não ficou pronta a tempo (status: ' . ($status ?? 'desconhecido') . '). Tenta novamente.');
+        }
+
+        $publish = Http::post("https://graph.facebook.com/v19.0/{$igId}/media_publish", [
+            'creation_id' => $creationId,
+            'access_token' => $token,
+        ]);
+        if ($publish->failed()) {
+            throw new \Exception('Instagram (publish): ' . $publish->json('error.message', 'erro ao publicar.'));
+        }
     }
 }
