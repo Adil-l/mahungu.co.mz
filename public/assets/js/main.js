@@ -2881,7 +2881,7 @@ function openAISettings() {
     const intervalInput = document.getElementById('monitoring-interval');
     if (intervalInput) intervalInput.value = storage.getSetting('monitoringInterval', 15);
     const ageInput = document.getElementById('news-age-days');
-    if (ageInput) ageInput.value = String(storage.getSetting('maxNewsAgeDays', 7));
+    if (ageInput) ageInput.value = String(storage.getSetting('maxNewsAgeDays', 3));
     modal.classList.add('active');
     lucide.createIcons();
 }
@@ -2896,7 +2896,7 @@ function saveAISettings() {
     const openaiKey = (document.getElementById('ai-openai-key')?.value || '').trim();
     const openrouterKey = (document.getElementById('ai-openrouter-key')?.value || '').trim();
     const interval = parseInt(document.getElementById('monitoring-interval').value) || 15;
-    const newsAge = parseInt(document.getElementById('news-age-days').value) || 7;
+    const newsAge = parseInt(document.getElementById('news-age-days').value) || 3;
     storage.updateSetting('apiKey', apiKey);
     storage.updateSetting('openaiKey', openaiKey);
     storage.updateSetting('openrouterKey', openrouterKey);
@@ -3053,6 +3053,10 @@ const DEFAULT_SOURCES = [
     { name: "A Verdade", url: "https://verdade.co.mz/feed", category: "Moçambique", active: true },
     { name: "Rádio Moçambique", url: "https://rm.co.mz/feed", category: "Moçambique", active: true },
     { name: "Zitamar News", url: "https://zitamar.com/feed", category: "Moçambique", active: true },
+    { name: "360 Mozambique", url: "https://360mozambique.com/feed/", category: "Moçambique", active: true },
+    { name: "Jornal Domingo", url: "https://jornaldomingo.co.mz/feed", category: "Moçambique", active: true },
+    { name: "AllAfrica Moçambique", url: "https://allafrica.com/tools/headlines/rdf/mozambique/headlines.rdf", category: "Moçambique", active: true },
+    { name: "AllAfrica África Austral", url: "https://allafrica.com/tools/headlines/rdf/southernafrica/headlines.rdf", category: "Moçambique", active: true },
     // África em Português
     { name: "DW África (PT)", url: "https://rss.dw.com/rdf/rss-pt-afr", category: "Moçambique", active: true },
     { name: "RFI Português", url: "https://www.rfi.fr/pt/rss", category: "Moçambique", active: true },
@@ -3079,7 +3083,14 @@ const DEFAULT_SOURCES = [
     { name: "The New York Times", url: "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml", category: "Global", active: true },
     { name: "The Guardian", url: "https://www.theguardian.com/world/rss", category: "Global", active: true },
     { name: "Deutsche Welle", url: "https://rss.dw.com/rdf/rss-en-world", category: "Global", active: true },
-    { name: "France 24", url: "https://www.france24.com/en/rss", category: "Global", active: true }
+    { name: "France 24", url: "https://www.france24.com/en/rss", category: "Global", active: true },
+    // Lusófonas (já em português — menos tradução necessária)
+    { name: "Notícias ao Minuto", url: "https://www.noticiasaominuto.com/rss/ultima-hora", category: "Global", active: true },
+    { name: "Público (PT)", url: "https://feeds.feedburner.com/PublicoRSS", category: "Global", active: true },
+    { name: "Observador (PT)", url: "https://observador.pt/feed/", category: "Global", active: true },
+    { name: "RTP Mundo (PT)", url: "https://www.rtp.pt/noticias/rss/mundo", category: "Global", active: true },
+    { name: "BBC Português", url: "https://feeds.bbci.co.uk/portuguese/rss.xml", category: "Global", active: true },
+    { name: "G1 Mundo (BR)", url: "https://g1.globo.com/rss/g1/mundo/", category: "Global", active: true }
 ];
 
 async function seedDefaultSources() {

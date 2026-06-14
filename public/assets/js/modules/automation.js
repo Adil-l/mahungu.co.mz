@@ -15,11 +15,11 @@ const FETCH_TIMEOUT_MS = 25000;
 // Notícias publicadas há mais de FRESH_DAYS são descartadas, EXCETO se parecerem
 // virais (muitos comentários ou palavras-chave) e ainda dentro de VIRAL_MAX_DAYS.
 const DAY_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_FRESH_DAYS = 7;     // janela "recente" por omissão (configurável na UI)
-const VIRAL_MAX_DAYS = 30;        // até aqui, basta ser viral (critério normal)
-const EVERGREEN_MAX_DAYS = 180;   // até aqui, só se for FORTEMENTE viral (memorável)
-const VIRAL_MIN_COMMENTS = 30;    // comentários que contam como "viral"
-const STRONG_MIN_COMMENTS = 100;  // comentários que contam como "memorável"
+const DEFAULT_FRESH_DAYS = 3;     // janela "recente" por omissão (configurável na UI)
+const VIRAL_MAX_DAYS = 10;        // até aqui, basta ser viral (critério normal)
+const EVERGREEN_MAX_DAYS = 30;    // até aqui, só se for FORTEMENTE viral (memorável)
+const VIRAL_MIN_COMMENTS = 50;    // comentários que contam como "viral"
+const STRONG_MIN_COMMENTS = 150;  // comentários que contam como "memorável"
 const VIRAL_KEYWORDS = /(viral|pol[ée]mica|trending|chocante|esc[âa]ndalo|bomb[áa]stic|sensa[çc][ãa]o|recorde)/i;
 const STRONG_KEYWORDS = /(viral|recorde|hist[óo]ric|in[ée]dit|imperd[íi]vel)/i;
 
