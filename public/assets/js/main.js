@@ -2872,6 +2872,8 @@ function openAISettings() {
     document.getElementById('ai-api-key').value = ai.apiKey || '';
     const openaiInput = document.getElementById('ai-openai-key');
     if (openaiInput) openaiInput.value = ai.openaiKey || '';
+    const openrouterInput = document.getElementById('ai-openrouter-key');
+    if (openrouterInput) openrouterInput.value = ai.openrouterKey || '';
     // Diretrizes de marca guardadas
     document.getElementById('brand-voice').value = storage.getSetting('brandVoice', '');
     document.getElementById('brand-audience').value = storage.getSetting('brandAudience', '');
@@ -2892,10 +2894,12 @@ function closeAISettings(e) {
 function saveAISettings() {
     const apiKey = document.getElementById('ai-api-key').value.trim();
     const openaiKey = (document.getElementById('ai-openai-key')?.value || '').trim();
+    const openrouterKey = (document.getElementById('ai-openrouter-key')?.value || '').trim();
     const interval = parseInt(document.getElementById('monitoring-interval').value) || 15;
     const newsAge = parseInt(document.getElementById('news-age-days').value) || 7;
     storage.updateSetting('apiKey', apiKey);
     storage.updateSetting('openaiKey', openaiKey);
+    storage.updateSetting('openrouterKey', openrouterKey);
     storage.updateSetting('monitoringInterval', interval);
     storage.updateSetting('maxNewsAgeDays', newsAge);
     // Diretrizes de marca (injetadas em todos os prompts da IA)
@@ -2904,6 +2908,7 @@ function saveAISettings() {
     storage.updateSetting('brandHashtags', document.getElementById('brand-hashtags').value.trim());
     ai.apiKey = apiKey;
     ai.openaiKey = openaiKey;
+    ai.openrouterKey = openrouterKey;
     ui.showToast("Configurações salvas!", "success");
     closeAISettings();
 }
@@ -2912,7 +2917,8 @@ async function testAIConnection() {
     // Sem chave também funciona: testa os provedores gratuitos integrados.
     const apiKey = document.getElementById('ai-api-key').value.trim();
     const openaiKey = (document.getElementById('ai-openai-key')?.value || '').trim();
-    const hasKey = !!(apiKey || openaiKey);
+    const openrouterKey = (document.getElementById('ai-openrouter-key')?.value || '').trim();
+    const hasKey = !!(apiKey || openaiKey || openrouterKey);
 
     const btn = document.getElementById('test-ai-btn');
     if (!btn) return;
@@ -2924,10 +2930,12 @@ async function testAIConnection() {
 
     const oldKey = ai.apiKey;
     const oldOpenaiKey = ai.openaiKey;
+    const oldOpenrouterKey = ai.openrouterKey;
     try {
         // Temporariamente usa as chaves para o teste sem salvá-las permanentemente
         ai.apiKey = apiKey;
         ai.openaiKey = openaiKey;
+        ai.openrouterKey = openrouterKey;
 
         await ai.testConnection(); // Lança erro se nenhum provedor responder
 
@@ -2938,6 +2946,7 @@ async function testAIConnection() {
     } finally {
         ai.apiKey = oldKey; // Restaura as chaves antigas
         ai.openaiKey = oldOpenaiKey;
+        ai.openrouterKey = oldOpenrouterKey;
         btn.disabled = false;
         btn.innerHTML = originalHtml;
         lucide.createIcons();

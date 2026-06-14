@@ -74,12 +74,16 @@ function fetchWithTimeout(url, options = {}) {
 }
 
 export const ai = {
-    apiKey: '',      // Google Gemini
-    openaiKey: '',   // OpenAI (provedor principal quando definido)
+    apiKey: '',          // Google Gemini
+    openaiKey: '',       // OpenAI
+    openrouterKey: '',   // OpenRouter (agregador, tem modelos grátis)
+    openrouterModel: '', // modelo OpenRouter (default abaixo se vazio)
 
     init() {
         this.apiKey = window.MAHUNGU_CONFIG?.apiKey || storage.getSetting('apiKey') || '';
         this.openaiKey = window.MAHUNGU_CONFIG?.openaiKey || storage.getSetting('openaiKey') || '';
+        this.openrouterKey = window.MAHUNGU_CONFIG?.openrouterKey || storage.getSetting('openrouterKey') || '';
+        this.openrouterModel = storage.getSetting('openrouterModel', '') || '';
     },
 
     /**
@@ -118,6 +122,28 @@ export const ai = {
         const data = await response.json();
         const text = data?.choices?.[0]?.message?.content;
         if (!text) throw new Error('OpenAI: resposta vazia.');
+        return text;
+    },
+
+    async callOpenRouter(prompt) {
+        if (!this.openrouterKey) throw new Error('Sem OpenRouter API Key.');
+        const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.openrouterKey}`,
+                'HTTP-Referer': 'https://mahungu.co.mz',
+                'X-Title': 'Mahungu Studio'
+            },
+            body: JSON.stringify({
+                model: this.openrouterModel || 'openai/gpt-oss-120b:free',
+                messages: [{ role: 'user', content: prompt }]
+            })
+        });
+        if (!response.ok) throw new Error(`OpenRouter HTTP ${response.status}`);
+        const data = await response.json();
+        const text = data?.choices?.[0]?.message?.content;
+        if (!text) throw new Error('OpenRouter: resposta vazia.');
         return text;
     },
 
@@ -185,6 +211,7 @@ export const ai = {
         const providers = [];
         if (this.openaiKey) providers.push(['OpenAI', (p) => this.callOpenAI(p)]);
         if (this.apiKey) providers.push(['Gemini', (p) => this.callGemini(p)]);
+        if (this.openrouterKey) providers.push(['OpenRouter', (p) => this.callOpenRouter(p)]);
         providers.push(['llm7', (p) => this.callLLM7(p)]);
         providers.push(['Pollinations', (p) => this.callPollinations(p)]);
 
