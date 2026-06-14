@@ -846,67 +846,53 @@
 </div>
 
 <div class="modal-overlay" id="scheduler-modal" onclick="closeSchedulerModal(event)">
-    <div class="modal-container" style="max-width: 500px; height: auto; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
-        <div class="modal-header" style="margin-bottom: 25px;">
-            <div><div class="modal-eyebrow">Agendamento</div><h2 style="color: #fff; font-size: 20px;">Novo Post</h2></div>
+    <div class="modal-container" style="max-width: 520px; height: auto; padding: 36px; flex-direction: column;" onclick="event.stopPropagation()">
+        <div class="modal-header" style="margin-bottom: 24px;">
+            <div><div class="modal-eyebrow">Agendamento</div><h2 style="color: var(--text); font-size: 20px;">Novo Post</h2></div>
             <button class="close-modal" onclick="closeSchedulerModal()"><i data-lucide="x"></i></button>
         </div>
-        
-        <div class="form-group">
-            <label>Selecione o Flyer (Opcional)</label>
-            <select id="schedule-flyer" class="custom-select">
-                <option value="">Sem Flyer (Apenas Texto)</option>
-                <!-- Preenchido via JS -->
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label>Legenda / Conteúdo</label>
-            <textarea id="schedule-content" style="width: 100%; min-height: 100px; background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); border-radius: 8px; color: #fff; padding: 12px; font-family: inherit; resize: vertical;" placeholder="Escreva a legenda, ou escolha um flyer acima para a preencher automaticamente..."></textarea>
-            <p id="schedule-caption-hint" style="display:none; font-size: 11px; color: var(--text-muted); margin-top: 6px;">
-                <i data-lucide="sparkles" style="width:12px;height:12px;display:inline;vertical-align:middle;"></i>
-                Legenda preenchida a partir do flyer — podes editá-la livremente antes de agendar.
-            </p>
-            <button type="button" class="btn-chip" id="btn-generate-hashtags" style="margin-top: 8px;" onclick="generateHashtags()">
-                <i data-lucide="hash"></i>
-                Gerar hashtags
+
+        <div style="display: flex; flex-direction: column; gap: 18px;">
+            <div class="form-group">
+                <label>Flyer (opcional)</label>
+                <select id="schedule-flyer" class="custom-select">
+                    <option value="">Sem flyer (apenas texto)</option>
+                    <!-- Preenchido via JS -->
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Legenda / Conteúdo</label>
+                <textarea id="schedule-content" placeholder="Escreva a legenda, ou escolha um flyer acima para a preencher automaticamente..."></textarea>
+                <p id="schedule-caption-hint" style="display:none; font-size: 11px; color: var(--text-muted); margin-top: 6px;">
+                    <i data-lucide="sparkles" style="width:12px;height:12px;display:inline;vertical-align:middle;"></i>
+                    Legenda preenchida a partir do flyer — podes editá-la livremente antes de agendar.
+                </p>
+                <button type="button" class="btn-chip" id="btn-generate-hashtags" style="margin-top: 10px;" onclick="generateHashtags()">
+                    <i data-lucide="hash"></i> Gerar hashtags
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label>Plataformas</label>
+                <div class="platform-chips">
+                    <label class="platform-chip"><input type="checkbox" name="platforms" value="instagram"><i data-lucide="instagram"></i> Instagram</label>
+                    <label class="platform-chip"><input type="checkbox" name="platforms" value="facebook"><i data-lucide="facebook"></i> Facebook</label>
+                    <label class="platform-chip"><input type="checkbox" name="platforms" value="tiktok"><i data-lucide="music"></i> TikTok</label>
+                    <label class="platform-chip"><input type="checkbox" name="platforms" value="twitter"><i data-lucide="twitter"></i> X (Twitter)</label>
+                    <label class="platform-chip"><input type="checkbox" name="platforms" value="threads"><i data-lucide="at-sign"></i> Threads</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Data e hora</label>
+                <input type="datetime-local" id="schedule-datetime">
+            </div>
+
+            <button class="btn-main btn-success" style="margin-top: 4px;" onclick="saveScheduledPost()">
+                <i data-lucide="calendar"></i> Agendar Agora
             </button>
         </div>
-
-        <div class="form-group">
-            <label>Plataformas</label>
-            <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 5px;">
-                <label style="flex: 1 1 30%; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="checkbox" name="platforms" value="instagram">
-                    <span style="font-size: 13px;">Instagram</span>
-                </label>
-                <label style="flex: 1 1 30%; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="checkbox" name="platforms" value="facebook">
-                    <span style="font-size: 13px;">Facebook</span>
-                </label>
-                <label style="flex: 1 1 30%; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="checkbox" name="platforms" value="tiktok">
-                    <span style="font-size: 13px;">TikTok</span>
-                </label>
-                <label style="flex: 1 1 30%; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="checkbox" name="platforms" value="twitter">
-                    <span style="font-size: 13px;">X (Twitter)</span>
-                </label>
-                <label style="flex: 1 1 30%; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <input type="checkbox" name="platforms" value="threads">
-                    <span style="font-size: 13px;">Threads</span>
-                </label>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label>Data e Hora</label>
-            <input type="datetime-local" id="schedule-datetime">
-        </div>
-
-        <button class="btn-main btn-success" style="margin-top: 10px;" onclick="saveScheduledPost()">
-            <i data-lucide="calendar"></i> Agendar Agora
-        </button>
     </div>
 </div>
 
