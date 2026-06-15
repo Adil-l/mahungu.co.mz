@@ -861,6 +861,15 @@ function toggleStoryFormat() {
 }
 window.toggleStoryFormat = toggleStoryFormat;
 
+// Botão "Salvar Story": garante o formato 9:16 e abre o modal de guardar — o
+// confirmSaveToHistory grava com format:'story' (vai para a aba Stories). Se
+// estavas a editar um flyer feed, cria uma variante story sem apagar o feed.
+function saveAsStory() {
+    if (editorFormat !== 'story') setEditorFormat('story');
+    openSaveModal();
+}
+window.saveAsStory = saveAsStory;
+
 function snapshotEditor() {
     const editor = document.getElementById('editor');
     const photo = document.querySelector('.layer-photo .photo-single');
