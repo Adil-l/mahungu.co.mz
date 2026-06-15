@@ -154,6 +154,7 @@ export const automation = {
                     summary: description.replace(/<[^>]*>?/gm, '').trim().substring(0, 200),
                     sourceUrl: link,
                     sourceName: source.name,
+                    sourceType: 'rss',                        // origem (p/ filtrar nas Propostas)
                     category: source.category || 'Geral',
                     date: publishedAt != null ? new Date(publishedAt).toLocaleDateString('pt-PT') : new Date().toLocaleDateString('pt-PT'),
                     image: image,
@@ -221,6 +222,7 @@ export const automation = {
                 summary: caption.replace(/\s+/g, ' ').trim().substring(0, 200),
                 sourceUrl: link,
                 sourceName: source.name,
+                sourceType: 'instagram',                  // origem (p/ filtrar nas Propostas)
                 category: source.category || 'Geral',
                 date: publishedAt != null ? new Date(publishedAt).toLocaleDateString('pt-PT') : new Date().toLocaleDateString('pt-PT'),
                 image,

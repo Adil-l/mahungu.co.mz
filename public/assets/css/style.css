@@ -1049,11 +1049,15 @@ body.editor-active #tab-editor {
 .dash-metrics { margin-top: 24px; display: flex; flex-direction: column; gap: 16px; }
 .dash-section-title { font-size: 16px; font-weight: 800; color: var(--text); }
 .dash-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
-.dash-kpi { display: flex; align-items: center; gap: 14px; padding: 18px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 14px; }
+.dash-kpi { display: flex; align-items: center; gap: 14px; padding: 18px; background: var(--glass-bg); border: 1px solid var(--glass-border); border-left: 3px solid var(--kpi, var(--glass-border)); border-radius: 14px; transition: transform .15s ease, box-shadow .15s ease; }
+.dash-kpi:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(0,0,0,0.28); }
 .dash-kpi-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .dash-kpi-icon i, .dash-kpi-icon svg { width: 22px; height: 22px; }
+.dash-kpi-body { flex: 1; min-width: 0; }
 .dash-kpi-value { font-size: 26px; font-weight: 800; color: var(--text); line-height: 1.1; }
 .dash-kpi-label { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.dash-kpi-bar { margin-top: 10px; height: 5px; background: var(--glass-border); border-radius: 999px; overflow: hidden; }
+.dash-kpi-bar span { display: block; height: 100%; border-radius: 999px; min-width: 3px; transition: width .5s ease; }
 .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 16px; }
 .dash-panel { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 14px; padding: 18px 20px; }
 .dash-panel-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 16px; }
@@ -2031,6 +2035,19 @@ body.editor-active #tab-editor {
 
 .filter-chip:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
 .filter-chip.active { background: rgba(212, 82, 42, 0.15); border-color: var(--primary); color: #e8763e; }
+
+/* Filtro de ORIGEM das propostas (Instagram / RSS / Todas) */
+.source-filter { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.source-filter-label { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-right: 2px; }
+.src-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 20px;
+    color: var(--text-muted); font-size: 12px; font-weight: 600; padding: 7px 14px; cursor: pointer;
+    transition: all 0.15s;
+}
+.src-chip i, .src-chip svg { width: 14px; height: 14px; }
+.src-chip:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+.src-chip.active { background: rgba(212, 82, 42, 0.15); border-color: var(--primary); color: #e8763e; }
 
 .filter-search {
     display: flex;

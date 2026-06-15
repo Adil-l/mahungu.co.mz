@@ -284,6 +284,11 @@
                 </button>
             </div>
 
+            <div class="filter-search" style="margin-bottom: 20px; max-width: 100%;">
+                <i data-lucide="search"></i>
+                <input type="text" id="sources-search" placeholder="Pesquisar fontes (nome, categoria, link)..." oninput="onSourcesSearch(this.value)">
+            </div>
+
             <div class="management-list" id="sources-container">
                 <!-- Renderizado via JS -->
             </div>
@@ -309,6 +314,13 @@
                         <i data-lucide="sparkles"></i> Gerar Tudo (IA)
                     </button>
                 </div>
+            </div>
+
+            <div class="source-filter" id="proposals-source-filter">
+                <span class="source-filter-label">Origem:</span>
+                <button class="src-chip active" data-src="all" onclick="setProposalsSource('all')"><i data-lucide="layers"></i> Todas</button>
+                <button class="src-chip" data-src="instagram" onclick="setProposalsSource('instagram')"><i data-lucide="instagram"></i> Instagram</button>
+                <button class="src-chip" data-src="rss" onclick="setProposalsSource('rss')"><i data-lucide="rss"></i> RSS</button>
             </div>
 
             <div class="filter-bar">
@@ -920,10 +932,20 @@
 
         <div style="display: flex; flex-direction: column; gap: 18px;">
             <div class="form-group">
-                <label>Flyer (opcional)</label>
+                <label>Formato — escolhe primeiro o que vais publicar</label>
+                <div class="platform-chips" id="schedule-format">
+                    <label class="platform-chip"><input type="radio" name="postformat" value="feed" checked onchange="onScheduleFormatChange()"><i data-lucide="square"></i> Publicação</label>
+                    <label class="platform-chip"><input type="radio" name="postformat" value="story" onchange="onScheduleFormatChange()"><i data-lucide="zap"></i> Story</label>
+                    <label class="platform-chip"><input type="radio" name="postformat" value="carousel" onchange="onScheduleFormatChange()"><i data-lucide="images"></i> Carrossel</label>
+                </div>
+                <p id="schedule-format-hint" style="display:none; font-size:11px; color:var(--text-muted); margin-top:6px;"></p>
+            </div>
+
+            <div class="form-group">
+                <label id="schedule-flyer-label">Publicação a agendar</label>
                 <select id="schedule-flyer" class="custom-select">
                     <option value="">Sem flyer (apenas texto)</option>
-                    <!-- Preenchido via JS -->
+                    <!-- Preenchido via JS conforme o formato -->
                 </select>
             </div>
 
@@ -948,16 +970,6 @@
                     <label class="platform-chip"><input type="checkbox" name="platforms" value="twitter"><i data-lucide="twitter"></i> X (Twitter)</label>
                     <label class="platform-chip"><input type="checkbox" name="platforms" value="threads"><i data-lucide="at-sign"></i> Threads</label>
                 </div>
-            </div>
-
-            <div class="form-group">
-                <label>Formato</label>
-                <div class="platform-chips" id="schedule-format">
-                    <label class="platform-chip"><input type="radio" name="postformat" value="feed" checked onchange="onScheduleFormatChange()"><i data-lucide="square"></i> Publicação</label>
-                    <label class="platform-chip"><input type="radio" name="postformat" value="story" onchange="onScheduleFormatChange()"><i data-lucide="zap"></i> Story</label>
-                    <label class="platform-chip"><input type="radio" name="postformat" value="carousel" onchange="onScheduleFormatChange()"><i data-lucide="images"></i> Carrossel</label>
-                </div>
-                <p id="schedule-format-hint" style="display:none; font-size:11px; color:var(--text-muted); margin-top:6px;"></p>
             </div>
 
             <div class="form-group" id="schedule-carousel-group" style="display:none;">

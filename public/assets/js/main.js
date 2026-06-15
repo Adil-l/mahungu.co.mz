@@ -195,7 +195,22 @@ function fitHeadline(editorEl) {
 }
 
 // ── FILTROS E PESQUISA (Propostas e Histórico) ──
-let proposalsFilter = { category: 'Todas', query: '' };
+let proposalsFilter = { category: 'Todas', query: '', source: 'all' };
+
+// Origem de uma proposta: usa o campo sourceType (novo) e, p/ propostas antigas
+// sem ele, infere pelo URL (permalink do Instagram) — senão assume RSS.
+function proposalOrigin(p) {
+    if (p.sourceType === 'instagram' || p.sourceType === 'rss') return p.sourceType;
+    return /instagram\.com/i.test(p.sourceUrl || '') ? 'instagram' : 'rss';
+}
+
+function setProposalsSource(src) {
+    proposalsFilter.source = src;
+    document.querySelectorAll('#proposals-source-filter .src-chip').forEach(b =>
+        b.classList.toggle('active', b.dataset.src === src));
+    renderProposals();
+}
+window.setProposalsSource = setProposalsSource;
 let aiSavedFilter = { category: 'Todas', query: '' };
 let historyFilter = { category: 'Todas', query: '' };
 let storiesFilter = { category: 'Todas', query: '' };
@@ -524,43 +539,60 @@ window.handleChatAction = async (action) => {
 
 // ── GESTÃO DE FONTES & PROPOSTAS ──
 
+let sourcesQuery = '';
+function onSourcesSearch(value) {
+    sourcesQuery = value;
+    renderSources();
+}
+window.onSourcesSearch = onSourcesSearch;
+
 async function renderSources() {
-    const sources = await storage.getAllSources();
+    const allSources = await storage.getAllSources();
     const container = document.getElementById('sources-container');
     if (!container) return;
 
-    if (sources.length === 0) {
+    if (allSources.length === 0) {
         container.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--text-muted);">Nenhuma fonte cadastrada.</div>';
         return;
     }
 
-    // Barra de filtro / ações em massa por categoria.
+    // Pesquisa por nome, categoria ou link (a lista mostrada; os chips de
+    // categoria/contadores em baixo continuam a refletir o total).
+    const q = sourcesQuery.toLowerCase().trim();
+    const sources = q
+        ? allSources.filter(s => [s.name, s.category, s.url].some(f => String(f || '').toLowerCase().includes(q)))
+        : allSources;
+
+    // Barra de filtro / ações em massa por categoria — usa o TOTAL (allSources),
+    // para os contadores não mudarem enquanto se pesquisa.
     const pref = ['Moçambique', 'Desporto', 'Política', 'Tecnologia', 'Entretenimento', 'Global'];
-    const cats = [...new Set(sources.map(s => s.category || 'Geral'))]
+    const cats = [...new Set(allSources.map(s => s.category || 'Geral'))]
         .sort((a, b) => {
             const ia = pref.indexOf(a), ib = pref.indexOf(b);
             return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
         })
         .map(name => {
-            const inCat = sources.filter(s => (s.category || 'Geral') === name);
+            const inCat = allSources.filter(s => (s.category || 'Geral') === name);
             const activeCount = inCat.filter(s => s.active).length;
             return { name, total: inCat.length, activeCount, allActive: activeCount === inCat.length };
         });
-    const activeTotal = sources.filter(s => s.active).length;
+    const activeTotal = allSources.filter(s => s.active).length;
 
     const filterBar = `
         <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid var(--glass-border);">
             <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
                 <button class="btn-chip" onclick="setAllSourcesActive(true)" title="Ativar todas as fontes"><i data-lucide="check-check"></i> Ativar todas</button>
                 <button class="btn-chip" onclick="setAllSourcesActive(false)" title="Desativar todas as fontes"><i data-lucide="power-off"></i> Desativar todas</button>
-                <span style="margin-left:auto; font-size:12px; color:var(--text-muted);">${activeTotal}/${sources.length} ativas</span>
+                <span style="margin-left:auto; font-size:12px; color:var(--text-muted);">${activeTotal}/${allSources.length} ativas</span>
             </div>
             <div class="filter-chips">
                 ${cats.map(c => `<button class="filter-chip ${c.allActive ? 'active' : ''}" onclick="toggleCategorySources('${c.name.replace(/'/g, "\\'")}')" title="Ligar/desligar todas as fontes de ${escapeHtml(c.name)}">${escapeHtml(c.name)} <span style="opacity:.65;">${c.activeCount}/${c.total}</span></button>`).join('')}
             </div>
         </div>`;
 
-    const list = sources.map(s => `
+    const list = sources.length === 0
+        ? `<div style="text-align:center; padding:30px; color:var(--text-muted);">Nenhuma fonte corresponde a "${escapeHtml(sourcesQuery)}".</div>`
+        : sources.map(s => `
         <div class="management-item">
             <div class="m-thumb" style="display: flex; align-items: center; justify-content: center; background: ${s.active ? 'rgba(40, 167, 69, 0.1)' : 'rgba(255, 68, 68, 0.1)'}; color: ${s.active ? '#28a745' : '#ff4444'};">
                 <i data-lucide="${s.type === 'instagram' ? 'instagram' : 'rss'}"></i>
@@ -1214,27 +1246,11 @@ function onScheduleFlyerChange() {
     if (caption && !textarea.value.trim()) textarea.value = caption;
     if (hint) hint.style.display = caption ? 'block' : 'none';
 
-    // Flyer-carrossel: o slide 1 é a imagem; os restantes vão como slides extra.
+    // O formato já está escolhido nos botões (e filtra esta lista). Aqui só
+    // carregamos os slides extra quando o item escolhido é um carrossel.
     if (flyer && Array.isArray(flyer.slides) && flyer.slides.length > 1) {
         schedulerCarouselSlides = flyer.slides.slice(1);
-        const carRadio = document.querySelector('input[name="postformat"][value="carousel"]');
-        if (carRadio) carRadio.checked = true;
-        onScheduleFormatChange();
         renderCarouselPreview();
-    }
-    // Flyer-story (9:16): seleciona automaticamente o formato Story para que a
-    // arte vertical saia como STORIES no Instagram (e não como post de feed).
-    else if (flyer && flyer.format === 'story') {
-        const storyRadio = document.querySelector('input[name="postformat"][value="story"]');
-        if (storyRadio) storyRadio.checked = true;
-        onScheduleFormatChange();
-    }
-    // Flyer normal (feed): repõe o formato "feed" (evita ficar preso em "story"
-    // de uma escolha anterior — garante que o que se posta corresponde ao item).
-    else if (flyer) {
-        const feedRadio = document.querySelector('input[name="postformat"][value="feed"]');
-        if (feedRadio) feedRadio.checked = true;
-        onScheduleFormatChange();
     }
 }
 
@@ -1247,12 +1263,44 @@ function onScheduleFormatChange() {
     const hint = document.getElementById('schedule-format-hint');
     if (group) group.style.display = (format === 'carousel') ? 'block' : 'none';
     if (hint) {
-        if (format === 'story') { hint.style.display = 'block'; hint.textContent = 'O flyer sai como Story do Instagram (visível 24h).'; }
+        if (format === 'story') { hint.style.display = 'block'; hint.textContent = 'A arte 9:16 sai como Story (Instagram/Facebook, visível 24h).'; }
         else if (format === 'carousel') { hint.style.display = 'block'; hint.textContent = 'Slide 1 = flyer; adiciona as imagens seguintes. Aplica-se ao Instagram.'; }
         else { hint.style.display = 'none'; }
     }
+    populateScheduleFlyers(format);
 }
 window.onScheduleFormatChange = onScheduleFormatChange;
+
+// Preenche o seletor de item apenas com os flyers do formato escolhido. Assim
+// os botões de Formato (Publicação | Story | Carrossel) funcionam como separador
+// e nunca se mistura um Story 9:16 com um post de feed do mesmo título.
+function populateScheduleFlyers(format) {
+    const select = document.getElementById('schedule-flyer');
+    const label = document.getElementById('schedule-flyer-label');
+    if (!select) return;
+    const all = schedulerFlyers || [];
+    const isCarousel = f => Array.isArray(f.slides) && f.slides.length > 1;
+    let list, labelText, emptyText;
+    if (format === 'story') {
+        list = all.filter(f => f.format === 'story');
+        labelText = 'Story a agendar (9:16)';
+        emptyText = 'Sem story (apenas texto)';
+    } else if (format === 'carousel') {
+        list = all.filter(f => f.format !== 'story' && isCarousel(f));
+        labelText = 'Carrossel a agendar';
+        emptyText = 'Sem carrossel (apenas texto)';
+    } else {
+        list = all.filter(f => f.format !== 'story' && !isCarousel(f));
+        labelText = 'Publicação a agendar';
+        emptyText = 'Sem flyer (apenas texto)';
+    }
+    if (label) label.textContent = labelText;
+    const prev = select.value;
+    select.innerHTML = `<option value="">${emptyText}</option>` +
+        list.map(f => `<option value="${f.id}">${escapeHtml(f.title)}</option>`).join('');
+    if (prev && [...select.options].some(o => o.value === prev)) select.value = prev;
+    onScheduleFlyerChange();
+}
 
 function renderCarouselPreview() {
     const box = document.getElementById('schedule-carousel-preview');
@@ -1294,27 +1342,17 @@ async function openSchedulerModal() {
     const modal = document.getElementById('scheduler-modal');
     modal.classList.add('active');
 
-    // Reset do formato e dos slides do carrossel.
+    // Carrega os flyers ANTES de popular o seletor (o formato decide o que mostra).
+    schedulerFlyers = await storage.getAllFlyers();
+
+    // Reset do formato (Publicação) e dos slides do carrossel. O onScheduleFormatChange
+    // a seguir popula o seletor só com os itens do formato escolhido.
     schedulerCarouselSlides = [];
     const feedRadio = document.querySelector('input[name="postformat"][value="feed"]');
     if (feedRadio) feedRadio.checked = true;
     renderCarouselPreview();
     onScheduleFormatChange();
-
-    // Fill flyers select — separa Flyers (feed/carrossel) de Stories (9:16) em
-    // grupos distintos, senão as duas versões do mesmo título ficam idênticas
-    // na lista e é impossível saber qual se vai postar.
-    const select = document.getElementById('schedule-flyer');
-    schedulerFlyers = await storage.getAllFlyers();
-
-    const optHtml = f => `<option value="${f.id}">${escapeHtml(f.title)}</option>`;
-    const posts = schedulerFlyers.filter(f => f.format !== 'story');
-    const stories = schedulerFlyers.filter(f => f.format === 'story');
-    let optionsHtml = '<option value="">Sem Flyer (Apenas Texto)</option>';
-    if (posts.length) optionsHtml += `<optgroup label="🖼️ Flyers (feed / carrossel)">${posts.map(optHtml).join('')}</optgroup>`;
-    if (stories.length) optionsHtml += `<optgroup label="📱 Stories (9:16)">${stories.map(optHtml).join('')}</optgroup>`;
-    select.innerHTML = optionsHtml;
-    select.onchange = onScheduleFlyerChange;
+    document.getElementById('schedule-flyer').onchange = onScheduleFlyerChange;
 
     // Limpa legenda anterior e esconde a dica
     document.getElementById('schedule-content').value = '';
@@ -2109,6 +2147,9 @@ window.renderStories = renderStories;
 // que a arte vertical sai como STORIES no Instagram — publicação igual à dos posts.
 async function scheduleStory(id) {
     await openSchedulerModal();
+    // Marca o formato Story (filtra o seletor para os stories) e seleciona este.
+    const storyRadio = document.querySelector('input[name="postformat"][value="story"]');
+    if (storyRadio) { storyRadio.checked = true; onScheduleFormatChange(); }
     const select = document.getElementById('schedule-flyer');
     if (select) {
         select.value = String(id);
@@ -2587,10 +2628,17 @@ async function updateChart(view, el) {
 // KPIs, um donut SVG e barras horizontais. Corre sempre que a dashboard
 // está visível (ao abrir a aba ou após qualquer ação que atualize stats).
 // ═══════════════════════════════════════════════════════════════════
-function dashKpi({ icon, value, label, color }) {
-    return `<div class="dash-kpi">
+function dashKpi({ icon, value, label, color, progress }) {
+    const bar = (typeof progress === 'number')
+        ? `<div class="dash-kpi-bar"><span style="width:${Math.max(0, Math.min(100, Math.round(progress)))}%;background:${color};"></span></div>`
+        : '';
+    return `<div class="dash-kpi" style="--kpi:${color};">
         <div class="dash-kpi-icon" style="color:${color};background:${color}1f;"><i data-lucide="${icon}"></i></div>
-        <div><div class="dash-kpi-value">${value}</div><div class="dash-kpi-label">${label}</div></div>
+        <div class="dash-kpi-body">
+            <div class="dash-kpi-value">${value}</div>
+            <div class="dash-kpi-label">${label}</div>
+            ${bar}
+        </div>
     </div>`;
 }
 
@@ -2727,11 +2775,13 @@ async function renderDashboardMetrics() {
             trendLbls.push(_mNames[m]);
         }
 
+        const totalSched = scheduled.length || 0;
+        const pct = (n) => totalSched ? (n / totalSched) * 100 : 0;
         const kpis = [
-            dashKpi({ icon: 'send', value: sc.posted, label: 'Posts publicados', color: '#28a745' }),
-            dashKpi({ icon: 'clock', value: sc.pending + sc.processing, label: 'Agendados', color: '#ff9800' }),
-            dashKpi({ icon: 'alert-triangle', value: sc.failed + sc.partially_posted, label: 'Com falha', color: '#ff4444' }),
-            dashKpi({ icon: 'target', value: successRate + '%', label: 'Taxa de sucesso', color: '#7000ff' }),
+            dashKpi({ icon: 'send', value: sc.posted, label: 'Posts publicados', color: '#28a745', progress: pct(sc.posted) }),
+            dashKpi({ icon: 'clock', value: sc.pending + sc.processing, label: 'Agendados', color: '#ff9800', progress: pct(sc.pending + sc.processing) }),
+            dashKpi({ icon: 'alert-triangle', value: sc.failed + sc.partially_posted, label: 'Com falha', color: '#ff4444', progress: pct(sc.failed + sc.partially_posted) }),
+            dashKpi({ icon: 'target', value: successRate + '%', label: 'Taxa de sucesso', color: '#7000ff', progress: successRate }),
             dashKpi({ icon: 'image', value: flyersAprovados, label: 'Flyers aprovados', color: '#D4522A' }),
             dashKpi({ icon: 'smartphone', value: storiesCount, label: 'Stories guardados', color: '#E1306C' }),
             dashKpi({ icon: 'rss', value: sources.filter(s => s.active).length, label: 'Fontes ativas', color: '#00b8d4' }),
@@ -3185,8 +3235,12 @@ async function renderProposals() {
     const categories = [...new Set(visible.map(p => p.category || 'Geral'))].sort();
     renderFilterChips('proposals-filter-chips', categories, proposalsFilter.category, 'setProposalsCategory');
 
-    const filtered = applyContentFilter(visible, proposalsFilter,
+    let filtered = applyContentFilter(visible, proposalsFilter,
         p => [p.generatedTitle, p.title, p.summary, p.sourceName]);
+    // Filtro por origem (Instagram / RSS / todas) — botões em #proposals-source-filter.
+    if (proposalsFilter.source !== 'all') {
+        filtered = filtered.filter(p => proposalOrigin(p) === proposalsFilter.source);
+    }
 
     if (filtered.length === 0) {
         container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">Nenhuma proposta corresponde ao filtro/pesquisa.</div>';
