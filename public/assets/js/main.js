@@ -1050,15 +1050,21 @@ async function confirmSaveToHistory() {
         // (o IndexedDB faz upsert por id) e preserva a data de criação original.
         const isUpdate = editingFlyerId != null;
         const existing = isUpdate ? await storage.getFlyerById(editingFlyerId) : null;
+        // Mudou de formato em relação ao item carregado (ex.: feed → story)? Então é
+        // uma VARIANTE: cria-se um id PRÓPRIO para não destruir o original. Assim o
+        // feed continua nos "Posts Aprovados" e o Story passa a viver na aba Stories.
+        const existingFormat = existing?.format || 'feed';
+        const isVariant = !!existing && existingFormat !== editorFormat;
+        const reuseId = isUpdate && !isVariant;
         const entry = {
-            id: editingFlyerId || generateUniqueFlyerId(),
+            id: reuseId ? editingFlyerId : generateUniqueFlyerId(),
             title: title,
             category: category,
-            status: existing?.status || 'Aprovado',
+            status: reuseId ? (existing?.status || 'Aprovado') : 'Aprovado',
             // 'feed' (1080×1350) ou 'story' (9:16). Os stories aparecem na aba
             // "Stories"; "Posts Aprovados" só mostra os de feed.
             format: editorFormat,
-            date: existing?.date || new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }),
+            date: (reuseId && existing?.date) ? existing.date : new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }),
             image: dataUrl,
             // Legenda associada (se o flyer veio de uma proposta carregada no editor)
             caption: editorPostMeta?.caption || '',
@@ -1076,8 +1082,9 @@ async function confirmSaveToHistory() {
         closeSaveModal();
         const isStorySave = editorFormat === 'story';
         ui.showToast(
-            isUpdate ? (isStorySave ? "Story atualizado!" : "Flyer atualizado!")
-                     : (isStorySave ? "Story guardado!" : "Flyer salvo!"),
+            isVariant ? (isStorySave ? "Story criado — o flyer feed foi preservado nos Aprovados." : "Flyer criado a partir do Story (o Story foi preservado).")
+            : isUpdate ? (isStorySave ? "Story atualizado!" : "Flyer atualizado!")
+            : (isStorySave ? "Story guardado!" : "Flyer salvo!"),
             "success"
         );
         // Reflete a alteração nas listas visíveis sem duplicar.
@@ -2057,6 +2064,7 @@ async function renderHistory() {
                 </button>
                 <div class="history-actions-overlay">
                     <button class="btn-mini" onclick="editFlyer(${item.id})" title="Editar"><i data-lucide="edit-3"></i></button>
+                    ${(Array.isArray(item.slides) && item.slides.length > 1) ? '' : `<button class="btn-mini" onclick="transformFlyerToStory(${item.id})" title="Transformar em Story (9:16) — mantém o feed"><i data-lucide="smartphone"></i></button>`}
                     <button class="btn-mini" onclick="deleteHistoryItem(${item.id}, event)" title="Excluir"><i data-lucide="trash-2"></i></button>
                     <button class="btn-mini" onclick="downloadDataUrl('${item.image}', '${fileName}.png')" title="Baixar"><i data-lucide="download"></i></button>
                 </div>
@@ -3012,6 +3020,18 @@ async function transformToStory(proposalId) {
     ui.showToast('Proposta em formato Story (9:16). Ajusta e "Salvar" guarda-a em Stories.', 'success');
 }
 window.transformToStory = transformToStory;
+
+// Transforma um POST APROVADO (feed) em Story 9:16. Carrega-o no editor e muda
+// para o formato story; ao guardar, cria-se um Story com id próprio (variante),
+// preservando o flyer feed original nos "Posts Aprovados".
+async function transformFlyerToStory(id) {
+    await editFlyer(id);          // abre o flyer no editor (entra como feed)
+    setEditorFormat('story');     // muda para 9:16
+    const editor = document.getElementById('editor');
+    if (editor) fitHeadline(editor);
+    ui.showToast('Em formato Story (9:16). "Salvar" cria o Story sem apagar o feed.', 'success');
+}
+window.transformFlyerToStory = transformFlyerToStory;
 
 async function approveAndSaveProposal(id) {
     const proposal = await storage.getProposalById(id);
