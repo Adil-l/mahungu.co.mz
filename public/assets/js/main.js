@@ -1597,6 +1597,15 @@ async function generateHashtags() {
 }
 window.generateHashtags = generateHashtags;
 
+// Limpa a legenda do modal de Novo Post (e esconde a dica de preenchimento).
+function clearScheduleCaption() {
+    const ta = document.getElementById('schedule-content');
+    if (ta) { ta.value = ''; ta.focus(); }
+    const hint = document.getElementById('schedule-caption-hint');
+    if (hint) hint.style.display = 'none';
+}
+window.clearScheduleCaption = clearScheduleCaption;
+
 
 async function downloadFlyer() {
     const btn = document.querySelector('#editor-tools .btn-success');
