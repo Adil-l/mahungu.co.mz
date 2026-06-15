@@ -764,6 +764,8 @@ body.editor-active #tab-editor {
 .status-badge.publicado { background: rgba(13, 202, 240, 0.12); color: #0ddcf0; }
 .status-badge.rejeitado { background: rgba(255, 68, 68, 0.1); color: #ff4444; }
 .status-badge.story { background: rgba(225, 48, 108, 0.14); color: #ff5c97; font-weight: 700; }
+.status-badge.reel { background: rgba(124, 77, 255, 0.16); color: #b39bff; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+.status-badge.reel i, .status-badge.reel svg { width: 11px; height: 11px; }
 
 /* Sobre a miniatura, usar pílula escura sólida para legibilidade sobre a foto
    (mantém a cor do texto definida acima por estado). */

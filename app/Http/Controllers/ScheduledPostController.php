@@ -34,7 +34,7 @@ class ScheduledPostController extends Controller
             'scheduled_at' => 'required|date|after:now',
             'media_path' => 'nullable|string',
             'media_data_url' => 'nullable|string', // imagem do flyer (data URL base64)
-            'media_type' => 'nullable|in:feed,story,carousel',
+            'media_type' => 'nullable|in:feed,story,carousel,reel',
             'carousel_data_urls' => 'nullable|array', // slides extra (data URLs base64) p/ carrossel
             'carousel_data_urls.*' => 'string',
             'metadata' => 'nullable|array',
