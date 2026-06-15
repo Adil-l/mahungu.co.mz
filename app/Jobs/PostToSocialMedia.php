@@ -238,26 +238,43 @@ class PostToSocialMedia implements ShouldQueue
      * do OAuth por utilizador, inclui Páginas de negócio atribuídas ao sistema).
      * FACEBOOK_PAGE_ID é opcional: escolhe a Página certa quando há várias.
      */
-    protected function postToFacebookPage(): bool
+    /**
+     * Resolve a Página da marca a partir do token fixo. PRIORIZA o FACEBOOK_PAGE_ID:
+     * usa-o diretamente (não depende de /me/accounts, que vem VAZIO com tokens de
+     * Utilizador de Sistema). Só na sua ausência tenta descobrir via /me/accounts
+     * (funciona com tokens de Utilizador normais). Devolve [pageId, pageToken].
+     */
+    protected function resolveSystemPage(?string $token): array
     {
-        $token = config('services.facebook.page_token');
         $pageId = config('services.facebook.page_id');
-        $pageToken = $token;
-
+        if ($pageId) {
+            // O token de Sistema já publica; ainda assim tenta obter o token da
+            // Página (mais correto), com fallback para o próprio token de sistema.
+            $pageToken = Http::get("https://graph.facebook.com/v19.0/{$pageId}", [
+                'fields' => 'access_token',
+                'access_token' => $token,
+            ])->json('access_token') ?: $token;
+            return [$pageId, $pageToken];
+        }
         $pages = Http::get('https://graph.facebook.com/v19.0/me/accounts', [
             'access_token' => $token,
         ])->json('data', []);
-
         if (!empty($pages)) {
-            $page = $pageId
-                ? (collect($pages)->firstWhere('id', $pageId) ?? $pages[0])
-                : $pages[0];
-            $pageId = $page['id'];
-            $pageToken = $page['access_token'] ?? $token;
-        } elseif (!$pageId) {
+            return [$pages[0]['id'], $pages[0]['access_token'] ?? $token];
+        }
+        return [null, $token];
+    }
+
+    protected function postToFacebookPage(): bool
+    {
+        $token = config('services.facebook.page_token');
+        [$pageId, $pageToken] = $this->resolveSystemPage($token);
+
+        if (!$pageId) {
             throw new \Exception(
-                'O token fixo do Facebook não vê nenhuma Página. Confirma que a Página '
-                . 'está atribuída ao Utilizador de Sistema, ou define FACEBOOK_PAGE_ID no .env.'
+                'O token fixo do Facebook não vê nenhuma Página. Define FACEBOOK_PAGE_ID no .env '
+                . '(e limpa a cache de config: "php artisan config:clear", ou re-deploy), ou atribui a '
+                . 'Página ao Utilizador de Sistema com a permissão business_management.'
             );
         }
 
@@ -305,23 +322,10 @@ class PostToSocialMedia implements ShouldQueue
     protected function postToInstagramViaToken(): bool
     {
         $token = config('services.facebook.page_token');
-        $pageId = config('services.facebook.page_id');
-        $pageToken = $token;
-
-        $pages = Http::get('https://graph.facebook.com/v19.0/me/accounts', [
-            'access_token' => $token,
-        ])->json('data', []);
-
-        if (!empty($pages)) {
-            $page = $pageId
-                ? (collect($pages)->firstWhere('id', $pageId) ?? $pages[0])
-                : $pages[0];
-            $pageId = $page['id'];
-            $pageToken = $page['access_token'] ?? $token;
-        }
+        [$pageId, $pageToken] = $this->resolveSystemPage($token);
 
         if (!$pageId) {
-            throw new \Exception('Instagram: não foi possível resolver a Página a partir do token fixo.');
+            throw new \Exception('Instagram: não foi possível resolver a Página a partir do token fixo. Define FACEBOOK_PAGE_ID no .env (e limpa a cache: "php artisan config:clear" ou re-deploy) com o id da Página à qual a conta IG Business está ligada, ou garante que o token tem business_management e a Página atribuída.');
         }
 
         // Conta IG Business ligada à Página

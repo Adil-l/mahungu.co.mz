@@ -10,6 +10,7 @@ class DiagnosticarFacebook extends Command
 {
     protected $signature = 'mahungu:fb-diag {--user= : ID do utilizador cuja conta Facebook ligada será testada}
                                             {--token= : Testar diretamente este access_token (ignora a conta ligada)}
+                                            {--page= : Diagnosticar esta Página por ID diretamente (útil quando me/accounts vem vazio, ex.: token de Utilizador de Sistema)}
                                             {--post-test : Publica um post de teste na Página e mostra a resposta crua do Facebook}';
 
     protected $description = 'Diagnostica o porquê de o Facebook não publicar: mostra permissões concedidas e Páginas visíveis para o token.';
@@ -87,26 +88,43 @@ class DiagnosticarFacebook extends Command
             'access_token' => $token,
         ])->json('data', []);
 
+        // Página a diagnosticar: --page > FACEBOOK_PAGE_ID > 1.ª de me/accounts.
+        $explicitPageId = $this->option('page') ?: config('services.facebook.page_id');
+
         $this->newLine();
         if (empty($pages)) {
-            $this->error('me/accounts veio VAZIO — é exatamente isto que causa "Nenhuma Página associada".');
-            $this->line('Causa: a conta não administra nenhuma Página, OU não marcaste a Página no ecrã de login do Facebook,');
-            $this->line('OU a conta não é Tester/Admin da app (modo Desenvolvimento). Nada disto se corrige no código.');
-            return self::FAILURE;
+            $this->warn('me/accounts veio VAZIO — é o que causa "não foi possível resolver a Página a partir do token fixo".');
+            $this->line('Típico de token de Utilizador de Sistema: a Página pertence a um Business e/ou falta a permissão business_management,');
+            $this->line('ou a Página não está atribuída ao Utilizador de Sistema. SOLUÇÃO: define FACEBOOK_PAGE_ID com o id da tua Página');
+            $this->line('(o código passa a usá-lo diretamente, sem depender de me/accounts).');
+            if (!$explicitPageId) {
+                $this->newLine();
+                $this->error('Sem --page e sem FACEBOOK_PAGE_ID definido — não há Página para testar. Corre de novo com --page=<ID da Página>.');
+                return self::FAILURE;
+            }
+            $this->info("A testar a Página por ID direto: {$explicitPageId} (o mesmo que FACEBOOK_PAGE_ID faria).");
+        } else {
+            $this->info('Páginas visíveis (' . count($pages) . '):');
+            foreach ($pages as $page) {
+                $tasks = implode('/', $page['tasks'] ?? []);
+                $podePublicar = in_array('CREATE_CONTENT', $page['tasks'] ?? [], true) ? 'PODE publicar' : 'SEM permissão de publicar';
+                $this->line("  • {$page['name']} (id {$page['id']}) — {$podePublicar} [tasks: {$tasks}]");
+            }
         }
 
-        $this->info('Páginas visíveis (' . count($pages) . '):');
-        foreach ($pages as $page) {
-            $tasks = implode('/', $page['tasks'] ?? []);
-            $podePublicar = in_array('CREATE_CONTENT', $page['tasks'] ?? [], true) ? 'PODE publicar' : 'SEM permissão de publicar';
-            $this->line("  • {$page['name']} (id {$page['id']}) — {$podePublicar} [tasks: {$tasks}]");
+        // 4) Inspeciona a Página (explícita, ou a 1.ª de me/accounts): token da
+        //    Página, estado de publicação e últimas publicações.
+        if (!empty($pages)) {
+            $page = $explicitPageId
+                ? (collect($pages)->firstWhere('id', $explicitPageId) ?? $pages[0])
+                : $pages[0];
+            $pageId = $page['id'];
+            $pageToken = $page['access_token'] ?? $token;
+        } else {
+            // Sem me/accounts: usa a página explícita com o próprio token de sistema.
+            $pageId = $explicitPageId;
+            $pageToken = $token;
         }
-
-        // 4) Inspeciona a 1.ª Página: token da Página, estado de publicação e
-        //    últimas publicações — para confirmar se os posts aparecem mesmo.
-        $page = $pages[0];
-        $pageId = $page['id'];
-        $pageToken = $page['access_token'] ?? $token;
 
         $info = Http::get("https://graph.facebook.com/v19.0/{$pageId}", [
             'fields' => 'name,is_published,link',
