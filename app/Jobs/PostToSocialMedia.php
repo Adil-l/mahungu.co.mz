@@ -248,10 +248,15 @@ class PostToSocialMedia implements ShouldQueue
     {
         $pageId = config('services.facebook.page_id');
         if ($pageId) {
-            // O token fixo (FACEBOOK_PAGE_TOKEN) já tem as atribuições para publicar
-            // como a Página — usa-se DIRETAMENTE com o FACEBOOK_PAGE_ID, sem tentar
-            // resolver/obter outro token.
-            return [$pageId, $token];
+            // Para publicar COMO a Página é preciso o PAGE access token. Mesmo um
+            // token de Sistema com TODAS as permissões, usado direto em /feed ou
+            // /photos, dá "(#200) publish_actions deprecated". Aqui troca-se o token
+            // fixo pelo token da própria Página (fallback: o próprio token fixo).
+            $pageToken = Http::get("https://graph.facebook.com/v19.0/{$pageId}", [
+                'fields' => 'access_token',
+                'access_token' => $token,
+            ])->json('access_token') ?: $token;
+            return [$pageId, $pageToken];
         }
         // Sem FACEBOOK_PAGE_ID: descobre a Página via /me/accounts (token normal).
         $pages = Http::get('https://graph.facebook.com/v19.0/me/accounts', [
@@ -281,12 +286,17 @@ class PostToSocialMedia implements ShouldQueue
 
         $hasMedia = $mediaPath && Storage::disk(config('filesystems.media_disk'))->exists($mediaPath);
 
-        // Story da Página (token de sistema): usa o fluxo próprio /photo_stories
-        // em vez do /photos do feed — senão o "story" sai como post normal.
+        // Story da Página: tenta o fluxo próprio /photo_stories. Se a API não
+        // estiver disponível para esta Página/app (ex.: "(#200) publish_actions"),
+        // NÃO falha o post — cai para baixo e publica a arte 9:16 como foto no feed.
         if ($hasMedia && $this->scheduledPost->media_type === 'story') {
-            $this->postIds['facebook'] = $this->postFacebookPhotoStory($pageId, $pageToken, $mediaPath);
-            Log::info("Publicado Story no Facebook (Página {$pageId}) via token fixo.");
-            return true;
+            try {
+                $this->postIds['facebook'] = $this->postFacebookPhotoStory($pageId, $pageToken, $mediaPath);
+                Log::info("Publicado Story no Facebook (Página {$pageId}) via token fixo.");
+                return true;
+            } catch (\Exception $e) {
+                Log::warning("FB Story (/photo_stories) indisponível ({$e->getMessage()}) — fallback: publica a arte no feed.");
+            }
         }
 
         if ($hasMedia) {
@@ -540,14 +550,20 @@ class PostToSocialMedia implements ShouldQueue
     {
         $status = null;
         $detalhe = '';
-        // ~60s (20×3s): stories/imagens grandes e a busca do URL pelo IG demoram.
-        for ($i = 0; $i < 20; $i++) {
+        // POUCOS pedidos (o rate limit da app — (#4) — esgota-se com polls a mais):
+        // ~8 leituras com espera CRESCENTE antes de cada uma (≈70s no total), em vez
+        // de 20 pedidos seguidos. Espera-se antes do 1.º poll (dá tempo ao IG).
+        foreach ([3, 5, 7, 9, 11, 12, 12, 12] as $espera) {
+            sleep($espera);
             $statusRes = Http::get("https://graph.facebook.com/v19.0/{$creationId}", [
                 'fields' => 'status_code,status',
                 'access_token' => $token,
             ]);
-            // Se a própria leitura do estado falhar (token/permissão), guarda o
-            // motivo — senão o status_code fica null e o erro diria só "desconhecido".
+            // Rate limit da app (#4 / #17 / #32): não adianta martelar — para já.
+            if (in_array((int) $statusRes->json('error.code'), [4, 17, 32], true)) {
+                throw new \Exception('Instagram: limite de pedidos da app atingido na Graph API ((#' . $statusRes->json('error.code') . ') ' . $statusRes->json('error.message', '') . '). NÃO é o S3 — é o rate limit da app. Espera ~1h e/ou reduz o volume de publicações; tirar a app do modo de Desenvolvimento aumenta muito o limite.');
+            }
+            // Se a leitura falhar por outro motivo, guarda-o (senão ficaria "desconhecido").
             if ($err = $statusRes->json('error.message')) {
                 $detalhe = $err;
             }
@@ -561,7 +577,6 @@ class PostToSocialMedia implements ShouldQueue
             if ($status === 'ERROR') {
                 throw new \Exception('Instagram: o processamento falhou (ERROR) — quase sempre o URL da imagem não está acessível publicamente ao Instagram (o bucket/objeto S3 tem de ser público). ' . $detalhe);
             }
-            sleep(3);
         }
         Log::warning("IG container timeout: creationId={$creationId}, status=" . ($status ?? 'null') . ", detalhe={$detalhe}");
         throw new \Exception('Instagram: o conteúdo não ficou pronto a tempo (status: ' . ($status ?? 'desconhecido') . '). Causa habitual: a imagem no S3 não está acessível publicamente ao Instagram (abre o image_url numa janela anónima para confirmar), ou o ficheiro é grande. ' . $detalhe);
