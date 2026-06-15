@@ -17,6 +17,11 @@ class Kernel extends ConsoleKernel
         // execução morrer a meio o cadeado fica preso 24h e BLOQUEIA todas as
         // publicações seguintes ("Has Mutex" no schedule:list).
         $schedule->command('mahungu:process-scheduled-posts')->everyMinute()->withoutOverlapping(10);
+        // Salvaguarda: repõe a "pending" os posts presos em "processing" há mais de
+        // 10 min (job perdido — processo morto a meio da espera do IG, deploy, etc.).
+        // Sem isto ficavam presos para sempre no "tempo de espera". O cutoff de
+        // 10 min garante que não mexe num post que está mesmo a publicar.
+        $schedule->command('mahungu:requeue-stuck')->everyFiveMinutes()->withoutOverlapping();
         // Métricas reais dos posts já publicados (likes/alcance) — de hora a hora.
         $schedule->command('mahungu:fetch-metrics')->hourly()->withoutOverlapping(30);
     }
