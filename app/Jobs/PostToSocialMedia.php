@@ -248,19 +248,12 @@ class PostToSocialMedia implements ShouldQueue
     {
         $pageId = config('services.facebook.page_id');
         if ($pageId) {
-            // Obtém o TOKEN DA PÁGINA (Page Access Token) — é o correto para
-            // publicar numa Página. Publicar com o token de Sistema/Utilizador
-            // direto dá "(#200) publish_actions ... deprecated".
-            $pageToken = Http::get("https://graph.facebook.com/v19.0/{$pageId}", [
-                'fields' => 'access_token',
-                'access_token' => $token,
-            ])->json('access_token') ?: $token;
-            if ($pageToken === $token) {
-                Log::warning("FB/IG: não consegui obter o Page Access Token da Página {$pageId} (a usar o token de Sistema). " .
-                    "Se a publicação falhar com (#200)/publish_actions, o Utilizador de Sistema precisa de papel de publicação NA Página no Business Manager (e o token, business_management + pages_manage_posts).");
-            }
-            return [$pageId, $pageToken];
+            // O token fixo (FACEBOOK_PAGE_TOKEN) já tem as atribuições para publicar
+            // como a Página — usa-se DIRETAMENTE com o FACEBOOK_PAGE_ID, sem tentar
+            // resolver/obter outro token.
+            return [$pageId, $token];
         }
+        // Sem FACEBOOK_PAGE_ID: descobre a Página via /me/accounts (token normal).
         $pages = Http::get('https://graph.facebook.com/v19.0/me/accounts', [
             'access_token' => $token,
         ])->json('data', []);
