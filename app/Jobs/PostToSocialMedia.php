@@ -248,12 +248,17 @@ class PostToSocialMedia implements ShouldQueue
     {
         $pageId = config('services.facebook.page_id');
         if ($pageId) {
-            // O token de Sistema já publica; ainda assim tenta obter o token da
-            // Página (mais correto), com fallback para o próprio token de sistema.
+            // Obtém o TOKEN DA PÁGINA (Page Access Token) — é o correto para
+            // publicar numa Página. Publicar com o token de Sistema/Utilizador
+            // direto dá "(#200) publish_actions ... deprecated".
             $pageToken = Http::get("https://graph.facebook.com/v19.0/{$pageId}", [
                 'fields' => 'access_token',
                 'access_token' => $token,
             ])->json('access_token') ?: $token;
+            if ($pageToken === $token) {
+                Log::warning("FB/IG: não consegui obter o Page Access Token da Página {$pageId} (a usar o token de Sistema). " .
+                    "Se a publicação falhar com (#200)/publish_actions, o Utilizador de Sistema precisa de papel de publicação NA Página no Business Manager (e o token, business_management + pages_manage_posts).");
+            }
             return [$pageId, $pageToken];
         }
         $pages = Http::get('https://graph.facebook.com/v19.0/me/accounts', [
@@ -541,21 +546,32 @@ class PostToSocialMedia implements ShouldQueue
     protected function waitForContainer(string $creationId, string $token): void
     {
         $status = null;
-        for ($i = 0; $i < 12; $i++) {
+        $detalhe = '';
+        // ~60s (20×3s): stories/imagens grandes e a busca do URL pelo IG demoram.
+        for ($i = 0; $i < 20; $i++) {
             $statusRes = Http::get("https://graph.facebook.com/v19.0/{$creationId}", [
                 'fields' => 'status_code,status',
                 'access_token' => $token,
             ]);
+            // Se a própria leitura do estado falhar (token/permissão), guarda o
+            // motivo — senão o status_code fica null e o erro diria só "desconhecido".
+            if ($err = $statusRes->json('error.message')) {
+                $detalhe = $err;
+            }
             $status = $statusRes->json('status_code');
+            if ($s = $statusRes->json('status')) {
+                $detalhe = $s;
+            }
             if ($status === 'FINISHED') {
                 return;
             }
             if ($status === 'ERROR') {
-                throw new \Exception('Instagram: o processamento falhou (ERROR) — normalmente o URL da imagem não está acessível publicamente (usar MEDIA_DISK=s3 com bucket público). ' . $statusRes->json('status', ''));
+                throw new \Exception('Instagram: o processamento falhou (ERROR) — quase sempre o URL da imagem não está acessível publicamente ao Instagram (o bucket/objeto S3 tem de ser público). ' . $detalhe);
             }
-            sleep(2);
+            sleep(3);
         }
-        throw new \Exception('Instagram: o conteúdo não ficou pronto a tempo (status: ' . ($status ?? 'desconhecido') . '). Tenta novamente.');
+        Log::warning("IG container timeout: creationId={$creationId}, status=" . ($status ?? 'null') . ", detalhe={$detalhe}");
+        throw new \Exception('Instagram: o conteúdo não ficou pronto a tempo (status: ' . ($status ?? 'desconhecido') . '). Causa habitual: a imagem no S3 não está acessível publicamente ao Instagram (abre o image_url numa janela anónima para confirmar), ou o ficheiro é grande. ' . $detalhe);
     }
 
     /**
