@@ -992,6 +992,12 @@ async function confirmSaveToHistory() {
     lucide.createIcons();
 
     try {
+        // "Salvar Story" a partir de uma proposta: NÃO atualiza a proposta (ramo
+        // abaixo) — cria-se um Story e CONSOME-se a proposta (sai das Salvadas da
+        // IA, vai só para Stories, nunca para Posts Aprovados).
+        const consumeProposalId = (editorFormat === 'story' && editingProposalId != null) ? editingProposalId : null;
+        if (consumeProposalId) editingProposalId = null;
+
         // ── Edição de uma PROPOSTA (Salvada da IA) ──
         // Atualiza a proposta e mantém-na em "Salvadas" (não cria flyer aprovado).
         if (editingProposalId != null) {
@@ -1096,6 +1102,18 @@ async function confirmSaveToHistory() {
             : (isStorySave ? "Story guardado!" : "Flyer salvo!"),
             "success"
         );
+        // "Salvar Story" a partir de uma proposta: consome-a (aprovada) → sai das
+        // "Salvadas da IA" e fica só como Story (nunca vai para Posts Aprovados).
+        if (consumeProposalId && isStorySave) {
+            const prop = await storage.getProposalById(consumeProposalId);
+            if (prop) {
+                prop.status = 'approved';
+                await storage.saveProposal(prop);
+                shareProposal(prop).catch(e => console.error('Sync proposta (story):', e));
+            }
+            updateProposalsBadge();
+            updateAISavedBadge();
+        }
         // Reflete a alteração nas listas visíveis sem duplicar.
         if (!document.getElementById('tab-history').classList.contains('hidden')) renderHistory();
         if (!document.getElementById('tab-stories').classList.contains('hidden')) renderStories();
@@ -3028,9 +3046,9 @@ async function editProposalInEditor(id) {
 // carregamento no editor e ativa o formato story. O "Salvar" cria um NOVO
 // story (não mexe na proposta), que vai para a aba "Stories".
 async function transformToStory(proposalId) {
-    await editProposalInEditor(proposalId); // carrega no editor (em feed) e mostra a aba
-    // O próximo "Salvar" cria um story novo, sem tocar na proposta original.
-    editingProposalId = null;
+    await editProposalInEditor(proposalId); // carrega no editor (define editingProposalId)
+    // Mantém editingProposalId: ao guardar em modo story, o confirmSaveToHistory
+    // cria o Story e CONSOME a proposta (sai das Salvadas da IA). Só limpa o flyer.
     editingFlyerId = null;
     setEditorFormat('story');
     const editor = document.getElementById('editor');
