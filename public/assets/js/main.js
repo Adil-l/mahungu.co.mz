@@ -865,6 +865,20 @@ function setEditorFormat(format) {
             : 'Formato vertical 9:16. Ao guardar, vai para a aba <strong>Stories</strong>.';
     }
     document.getElementById('btn-toggle-story')?.classList.toggle('active', editorFormat === 'story');
+    // Reel usa vídeo: o botão "Trocar Foto" passa a "Trocar Vídeo"; o <video>
+    // só aparece no modo reel (e quando há um vídeo carregado).
+    const trocarLabel = document.getElementById('trocar-foto-label');
+    if (trocarLabel) trocarLabel.textContent = editorFormat === 'reel' ? 'Trocar Vídeo' : 'Trocar Foto';
+    const video = document.querySelector('.layer-photo .photo-video');
+    const photo = document.querySelector('.layer-photo .photo-single');
+    if (editorFormat === 'reel' && video && video.getAttribute('src')) {
+        video.style.display = 'block';
+        if (photo) photo.style.display = 'none';
+        video.play().catch(() => {});
+    } else {
+        if (video) video.style.display = 'none';
+        if (photo) photo.style.display = '';
+    }
     core.setScale();
     invalidateFlyerSnapshot();
 }
@@ -901,6 +915,11 @@ window.openReelsEditor = openReelsEditor;
 // (grava com format:'reel', indo para a aba Reels).
 function saveAsReel() {
     if (editorFormat !== 'reel') setEditorFormat('reel');
+    const video = document.querySelector('.layer-photo .photo-video');
+    if (!video || !video.getAttribute('src')) {
+        ui.showToast('Carrega um vídeo primeiro ("Trocar Vídeo") — um Reel é um vídeo.', 'info');
+        return;
+    }
     openSaveModal();
 }
 window.saveAsReel = saveAsReel;
@@ -1095,7 +1114,18 @@ async function confirmSaveToHistory() {
             return;
         }
 
-        const dataUrl = await core.captureCurrentFlyer();
+        // Reel COM vídeo: grava um vídeo (frames + arte) em vez de captura estática.
+        const videoEl = document.querySelector('.layer-photo .photo-video');
+        const isReelVideo = editorFormat === 'reel' && videoEl && videoEl.getAttribute('src') && videoEl.style.display !== 'none';
+        let dataUrl, reelVideo = null;
+        if (isReelVideo) {
+            ui.showToast('A gravar o vídeo do Reel… aguarda (dura o tempo do vídeo).', 'info');
+            const out = await core.captureReelVideo();
+            reelVideo = out.videoDataUrl;
+            dataUrl = out.poster; // miniatura (1º/último frame composto)
+        } else {
+            dataUrl = await core.captureCurrentFlyer();
+        }
         // Se há um flyer carregado via "Editar", reutiliza o id para ATUALIZAR
         // (o IndexedDB faz upsert por id) e preserva a data de criação original.
         const isUpdate = editingFlyerId != null;
@@ -1116,6 +1146,8 @@ async function confirmSaveToHistory() {
             format: editorFormat,
             date: (reuseId && existing?.date) ? existing.date : new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }),
             image: dataUrl,
+            // Reel: vídeo gravado (WebM data URL). Os outros formatos não o têm.
+            ...(reelVideo ? { video: reelVideo } : {}),
             // Legenda associada (se o flyer veio de uma proposta carregada no editor)
             caption: editorPostMeta?.caption || '',
             hashtags: editorPostMeta?.hashtags || [],
@@ -1156,7 +1188,9 @@ async function confirmSaveToHistory() {
         if (!document.getElementById('tab-reels').classList.contains('hidden')) renderReels();
         if (!document.getElementById('tab-ai-saved').classList.contains('hidden')) renderAISaved();
         // Sincroniza com o servidor em PARALELO e em segundo plano (não bloqueia a UI).
-        Promise.all([shareFlyer(entry), storage.syncFlyerToServer(entry)])
+        // O vídeo do Reel (WebM base64, vários MB) NÃO vai no sync — fica local.
+        const syncEntry = reelVideo ? { ...entry, video: undefined } : entry;
+        Promise.all([shareFlyer(syncEntry), storage.syncFlyerToServer(syncEntry)])
             .catch(e => console.error('Sync em segundo plano falhou:', e));
     } catch (err) {
         ui.showToast("Erro ao salvar.", "error");
@@ -1747,7 +1781,35 @@ document.addEventListener('mouseup', () => {
     }, 10);
 });
 
+// No Editor de Reels, "Trocar Foto" carrega um VÍDEO (o fundo do Reel).
+let reelVideoObjectUrl = null;
+function trocarVideo() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'video/*';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (reelVideoObjectUrl) URL.revokeObjectURL(reelVideoObjectUrl);
+        reelVideoObjectUrl = URL.createObjectURL(file);
+        const video = document.querySelector('.layer-photo .photo-video');
+        const img = document.querySelector('.layer-photo .photo-single');
+        if (video) {
+            video.src = reelVideoObjectUrl;
+            video.style.display = 'block';
+            video.load();
+            video.play().catch(() => {});
+        }
+        if (img) img.style.display = 'none';
+        invalidateFlyerSnapshot();
+        ui.showToast('Vídeo carregado. "Salvar Reel" grava o vídeo com a arte por cima.', 'success');
+    };
+    input.click();
+}
+window.trocarVideo = trocarVideo;
+
 function trocarFoto() {
+    if (editorFormat === 'reel') return trocarVideo();
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -2269,19 +2331,20 @@ async function renderReels() {
         const cat = item.category || 'Geral';
         const safeTitle = escapeHtml(item.title || 'Sem título');
         const fileName = ('Mahungu_Reel_' + (item.title || 'reel')).replace(/[^a-z0-9_-]+/gi, '_');
+        const temVideo = !!item.video;
         html += `
             <article class="history-item" data-category="${escapeHtml(cat)}">
-                <button class="history-thumb" onclick="viewHistoryItem(${item.id})">
+                <button class="history-thumb" onclick="${temVideo ? `playReel(${item.id})` : `viewHistoryItem(${item.id})`}">
                     <img src="${item.image}" class="ready" alt="${safeTitle}">
                     <span class="status-badge reel"><i data-lucide="film" size="11"></i> Reel</span>
-                    <span class="thumb-view"><i data-lucide="eye" size="18"></i></span>
+                    <span class="thumb-view"><i data-lucide="${temVideo ? 'play' : 'eye'}" size="18"></i></span>
                     ${hasCaption(item) ? '<span class="thumb-caption-flag" title="Tem legenda"><i data-lucide="message-square-text" size="14"></i></span>' : ''}
                 </button>
                 <div class="history-actions-overlay">
                     <button class="btn-mini" onclick="scheduleReel(${item.id})" title="Agendar/Publicar como Reel"><i data-lucide="send"></i></button>
                     <button class="btn-mini" onclick="editFlyer(${item.id})" title="Editar"><i data-lucide="edit-3"></i></button>
                     <button class="btn-mini" onclick="deleteHistoryItem(${item.id}, event)" title="Excluir"><i data-lucide="trash-2"></i></button>
-                    <button class="btn-mini" onclick="downloadDataUrl('${item.image}', '${fileName}.png')" title="Baixar"><i data-lucide="download"></i></button>
+                    <button class="btn-mini" onclick="${temVideo ? `downloadReelVideo(${item.id})` : `downloadDataUrl('${item.image}', '${fileName}.png')`}" title="Baixar ${temVideo ? 'vídeo' : 'imagem'}"><i data-lucide="download"></i></button>
                 </div>
                 <div class="history-info">
                     <h3 class="history-title" title="${safeTitle}">${safeTitle}</h3>
@@ -2307,6 +2370,45 @@ async function scheduleReel(id) {
     ui.showToast('Agenda o Reel: confirma plataforma e hora.', 'info');
 }
 window.scheduleReel = scheduleReel;
+
+// Reproduz o vídeo de um Reel num overlay.
+async function playReel(id) {
+    const f = await storage.getFlyerById(id);
+    if (!f || !f.video) return viewHistoryItem(id);
+    let ov = document.getElementById('reel-player-overlay');
+    if (!ov) {
+        ov = document.createElement('div');
+        ov.id = 'reel-player-overlay';
+        ov.className = 'modal-overlay';
+        ov.onclick = (e) => { if (e.target === ov) closeReelPlayer(); };
+        ov.innerHTML = `<div class="reel-player"><button class="close-modal" onclick="closeReelPlayer()"><i data-lucide="x"></i></button><video controls autoplay loop playsinline></video></div>`;
+        document.body.appendChild(ov);
+    }
+    ov.querySelector('video').src = f.video;
+    ov.classList.add('active');
+    lucide.createIcons();
+}
+window.playReel = playReel;
+
+function closeReelPlayer() {
+    const ov = document.getElementById('reel-player-overlay');
+    if (!ov) return;
+    const v = ov.querySelector('video');
+    if (v) { v.pause(); v.removeAttribute('src'); v.load(); }
+    ov.classList.remove('active');
+}
+window.closeReelPlayer = closeReelPlayer;
+
+async function downloadReelVideo(id) {
+    const f = await storage.getFlyerById(id);
+    if (f && f.video) {
+        const name = ('Mahungu_Reel_' + (f.title || 'reel')).replace(/[^a-z0-9_-]+/gi, '_');
+        downloadDataUrl(f.video, name + '.webm');
+    } else {
+        ui.showToast('Este reel não tem vídeo.', 'info');
+    }
+}
+window.downloadReelVideo = downloadReelVideo;
 
 // Abre o agendador já com este story 9:16 selecionado. O formato "Story" é
 // auto-marcado por onScheduleFlyerChange (flyer.format === 'story'), garantindo
@@ -4305,7 +4407,16 @@ async function syncSharedData(rerender = true) {
         if (Array.isArray(flyers)) {
             const serverIds = new Set(flyers.map(f => String(f.id)));
             for (const f of flyers) {
-                if (f && f.id != null) await storage.saveFlyer(f);
+                if (f && f.id != null) {
+                    // Reels: o vídeo NÃO vai no sync (é grande, fica local). Preserva
+                    // o vídeo local para não o perder quando o servidor devolve o
+                    // flyer sem vídeo.
+                    if (!f.video) {
+                        const local = await storage.getFlyerById(f.id);
+                        if (local && local.video) f.video = local.video;
+                    }
+                    await storage.saveFlyer(f);
+                }
             }
             const locais = await storage.getAllFlyers();
             for (const lf of locais) {

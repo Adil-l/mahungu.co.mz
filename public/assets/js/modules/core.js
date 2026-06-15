@@ -179,6 +179,110 @@ export const core = {
         }
     },
 
+    /**
+     * Grava um REEL (vídeo 9:16) compondo, em tempo real, os frames do vídeo de
+     * fundo + as sobreposições do flyer (texto/logo/barras/onda) "queimadas".
+     * Usa um canvas 1080x1920 + MediaRecorder. Devolve { videoDataUrl, poster }.
+     * O resultado é WebM (o que o browser grava); o IG aceita MP4 — converter no
+     * servidor (ffmpeg) é um passo posterior.
+     */
+    async captureReelVideo() {
+        const flyer = document.querySelector('.flyer');
+        const video = flyer && flyer.querySelector('.photo-video');
+        if (!video || !video.getAttribute('src')) {
+            throw new Error('Carrega um vídeo primeiro ("Trocar Vídeo").');
+        }
+        const W = 1080, H = 1920;
+
+        // Garante que o vídeo tem dimensões/metadata.
+        if (!video.videoWidth) {
+            await new Promise((res) => {
+                if (video.readyState >= 1) return res();
+                video.onloadedmetadata = res;
+                setTimeout(res, 4000);
+            });
+        }
+
+        // 1) Sobreposições (texto/logo/barras/onda) como PNG transparente: esconde
+        //    o vídeo/foto e o fundo do flyer, captura, repõe.
+        const photo = flyer.querySelector('.photo-single');
+        const prevVideoVis = video.style.visibility;
+        const prevPhotoDisp = photo ? photo.style.display : '';
+        const prevFlyerBg = flyer.style.background;
+        video.style.visibility = 'hidden';
+        if (photo) photo.style.display = 'none';
+        flyer.style.background = 'transparent';
+        if (document.fonts && document.fonts.ready) await document.fonts.ready;
+        const overlayCanvas = await html2canvas(flyer, {
+            backgroundColor: null, width: W, height: H, windowWidth: W, windowHeight: H,
+            scale: 1, useCORS: true, logging: false,
+        });
+        video.style.visibility = prevVideoVis;
+        if (photo) photo.style.display = prevPhotoDisp;
+        flyer.style.background = prevFlyerBg;
+        const overlay = new Image();
+        overlay.src = overlayCanvas.toDataURL('image/png');
+        try { await overlay.decode(); } catch (e) {}
+
+        // 2) Canvas de composição + MediaRecorder.
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        const stream = canvas.captureStream(30);
+        const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+            ? 'video/webm;codecs=vp9'
+            : (MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' : 'video/webm');
+        const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6000000 });
+        const chunks = [];
+        recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+
+        // 3) Reproduz do início e desenha cada frame (vídeo cover + overlay).
+        video.muted = true;
+        try { video.currentTime = 0; } catch (e) {}
+        await video.play().catch(() => {});
+        const cover = (m) => {
+            const mw = m.videoWidth, mh = m.videoHeight;
+            if (!mw || !mh) return;
+            const s = Math.max(W / mw, H / mh);
+            const w = mw * s, h = mh * s;
+            ctx.drawImage(m, (W - w) / 2, (H - h) / 2, w, h);
+        };
+        let raf;
+        const draw = () => {
+            ctx.fillStyle = '#040830';
+            ctx.fillRect(0, 0, W, H);
+            cover(video);
+            ctx.drawImage(overlay, 0, 0, W, H);
+            raf = requestAnimationFrame(draw);
+        };
+        draw();
+        recorder.start();
+
+        // 4) Para no fim do vídeo (máx. 30s).
+        const durMs = Math.min((isFinite(video.duration) && video.duration ? video.duration : 15) * 1000, 30000);
+        return await new Promise((resolve, reject) => {
+            let done = false;
+            const finish = () => {
+                if (done) return; done = true;
+                cancelAnimationFrame(raf);
+                try { recorder.stop(); } catch (e) {}
+                try { video.pause(); } catch (e) {}
+            };
+            video.onended = finish;
+            const timer = setTimeout(finish, durMs);
+            recorder.onstop = () => {
+                clearTimeout(timer);
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const poster = canvas.toDataURL('image/jpeg', 0.7);
+                const reader = new FileReader();
+                reader.onloadend = () => resolve({ videoDataUrl: reader.result, poster });
+                reader.onerror = () => reject(new Error('Falha a ler o vídeo gravado.'));
+                reader.readAsDataURL(blob);
+            };
+            recorder.onerror = (e) => { finish(); reject((e && e.error) || new Error('Falha a gravar o vídeo.')); };
+        });
+    },
+
     waitForImages(root) {
         const images = Array.from(root.querySelectorAll('img'));
         return Promise.all(images.map(img => {
