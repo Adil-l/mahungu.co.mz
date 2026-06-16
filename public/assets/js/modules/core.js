@@ -224,15 +224,34 @@ export const core = {
         overlay.src = overlayCanvas.toDataURL('image/png');
         try { await overlay.decode(); } catch (e) {}
 
-        // 2) Canvas de composição + MediaRecorder.
+        // 2) Canvas de composição + MediaRecorder. PREFERE MP4/H.264 (o que o
+        //    Instagram aceita p/ Reels); senão WebM (fallback de browsers sem mp4).
         const canvas = document.createElement('canvas');
         canvas.width = W; canvas.height = H;
         const ctx = canvas.getContext('2d');
-        const stream = canvas.captureStream(30);
-        const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-            ? 'video/webm;codecs=vp9'
-            : (MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' : 'video/webm');
-        const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6000000 });
+        const canvasStream = canvas.captureStream(30);
+
+        // Tenta juntar o ÁUDIO do vídeo original (se o browser deixar capturá-lo).
+        let recordStream = canvasStream;
+        try {
+            const vs = typeof video.captureStream === 'function' ? video.captureStream()
+                : (typeof video.mozCaptureStream === 'function' ? video.mozCaptureStream() : null);
+            const at = vs ? vs.getAudioTracks() : [];
+            if (at.length) recordStream = new MediaStream([...canvasStream.getVideoTracks(), at[0]]);
+        } catch (e) {}
+
+        const candidatos = [
+            'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
+            'video/mp4;codecs=avc1.42E01E',
+            'video/mp4',
+            'video/webm;codecs=vp9',
+            'video/webm',
+        ];
+        const mime = candidatos.find((t) => { try { return MediaRecorder.isTypeSupported(t); } catch (e) { return false; } }) || 'video/webm';
+        const isMp4 = mime.indexOf('video/mp4') === 0;
+        const blobType = isMp4 ? 'video/mp4' : 'video/webm';
+        const ext = isMp4 ? 'mp4' : 'webm';
+        const recorder = new MediaRecorder(recordStream, { mimeType: mime, videoBitsPerSecond: 6000000 });
         const chunks = [];
         recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
 
@@ -272,10 +291,10 @@ export const core = {
             const timer = setTimeout(finish, durMs);
             recorder.onstop = () => {
                 clearTimeout(timer);
-                const blob = new Blob(chunks, { type: 'video/webm' });
+                const blob = new Blob(chunks, { type: blobType });
                 const poster = canvas.toDataURL('image/jpeg', 0.7);
                 const reader = new FileReader();
-                reader.onloadend = () => resolve({ videoDataUrl: reader.result, poster });
+                reader.onloadend = () => resolve({ videoDataUrl: reader.result, poster, ext, mime: blobType });
                 reader.onerror = () => reject(new Error('Falha a ler o vídeo gravado.'));
                 reader.readAsDataURL(blob);
             };

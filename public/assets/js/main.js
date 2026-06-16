@@ -1525,6 +1525,9 @@ async function saveScheduledPost() {
             metadata: metadata,
             // Envia a imagem do flyer para o servidor poder publicar à hora marcada.
             media_data_url: flyer ? flyer.image : null,
+            // Reel: envia também o VÍDEO (mp4) — é o que se publica como Reel; a
+            // imagem fica como poster/miniatura.
+            media_video_url: (format === 'reel' && flyer && flyer.video) ? flyer.video : undefined,
             media_type: format,
             carousel_data_urls: format === 'carousel' ? schedulerCarouselSlides : undefined
         });

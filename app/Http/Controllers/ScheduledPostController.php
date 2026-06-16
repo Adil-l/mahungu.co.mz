@@ -34,15 +34,23 @@ class ScheduledPostController extends Controller
             'scheduled_at' => 'required|date|after:now',
             'media_path' => 'nullable|string',
             'media_data_url' => 'nullable|string', // imagem do flyer (data URL base64)
+            'media_video_url' => 'nullable|string', // Reel: vídeo (data URL base64 mp4/webm)
             'media_type' => 'nullable|in:feed,story,carousel,reel',
             'carousel_data_urls' => 'nullable|array', // slides extra (data URLs base64) p/ carrossel
             'carousel_data_urls.*' => 'string',
             'metadata' => 'nullable|array',
         ]);
 
-        // Guarda a imagem do flyer no servidor para a publicação automática.
+        // Guarda o media no servidor para a publicação automática. Para um Reel o
+        // "media" principal é o VÍDEO (mp4); para os outros é a imagem do flyer.
         $mediaPath = $validated['media_path'] ?? null;
-        if (!empty($validated['media_data_url'])) {
+        $posterPath = null;
+        if (($validated['media_type'] ?? null) === 'reel' && !empty($validated['media_video_url'])) {
+            $mediaPath = $this->storeDataUrl($validated['media_video_url']) ?? $mediaPath;
+            if (!empty($validated['media_data_url'])) {
+                $posterPath = $this->storeDataUrl($validated['media_data_url']); // miniatura
+            }
+        } elseif (!empty($validated['media_data_url'])) {
             $mediaPath = $this->storeDataUrl($validated['media_data_url']) ?? $mediaPath;
         }
 
@@ -55,6 +63,11 @@ class ScheduledPostController extends Controller
             }
         }
 
+        $metadata = $validated['metadata'] ?? [];
+        if ($posterPath) {
+            $metadata['poster_path'] = $posterPath; // miniatura do Reel
+        }
+
         $post = ScheduledPost::create([
             'user_id' => Auth::id(),
             'flyer_id' => $validated['flyer_id'] ?? null,
@@ -64,7 +77,7 @@ class ScheduledPostController extends Controller
             'media_path' => $mediaPath,
             'media_type' => $validated['media_type'] ?? 'feed',
             'carousel_paths' => $carouselPaths ?: null,
-            'metadata' => $validated['metadata'] ?? null,
+            'metadata' => $metadata ?: null,
             'status' => 'pending',
         ]);
 
@@ -80,10 +93,12 @@ class ScheduledPostController extends Controller
      */
     private function storeDataUrl(string $dataUrl): ?string
     {
-        if (!preg_match('/^data:image\/(\w+);base64,/', $dataUrl, $m)) {
+        // Aceita imagem (flyer/poster) ou vídeo (Reel: mp4/webm).
+        if (!preg_match('#^data:(?:image|video)/([\w.+-]+);base64,#', $dataUrl, $m)) {
             return null;
         }
-        $ext = strtolower($m[1]) === 'jpeg' ? 'jpg' : strtolower($m[1]);
+        $sub = strtolower($m[1]);
+        $ext = $sub === 'jpeg' ? 'jpg' : $sub;
         $bytes = base64_decode(substr($dataUrl, strpos($dataUrl, ',') + 1), true);
         if ($bytes === false) {
             return null;
