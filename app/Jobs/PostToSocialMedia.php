@@ -286,22 +286,6 @@ class PostToSocialMedia implements ShouldQueue
 
         $hasMedia = $mediaPath && Storage::disk(config('filesystems.media_disk'))->exists($mediaPath);
 
-        // Reel: o media_path é um VÍDEO (mp4) — publica-se como vídeo no feed da
-        // Página (não como foto, que falharia).
-        if ($hasMedia && $this->scheduledPost->media_type === 'reel') {
-            $res = Http::attach('source', Storage::disk(config('filesystems.media_disk'))->get($mediaPath), 'reel.mp4')
-                ->post("https://graph.facebook.com/v19.0/{$pageId}/videos", [
-                    'description' => $content,
-                    'access_token' => $pageToken,
-                ]);
-            if ($res->failed()) {
-                throw new \Exception('Facebook (Reel/vídeo): ' . $res->json('error.message', 'erro ao publicar o vídeo.'));
-            }
-            $this->postIds['facebook'] = $res->json('id');
-            Log::info("Publicado Reel (vídeo) no Facebook (Página {$pageId}).");
-            return true;
-        }
-
         // Story da Página: tenta o fluxo próprio /photo_stories. Se a API não
         // estiver disponível para esta Página/app (ex.: "(#200) publish_actions"),
         // NÃO falha o post — cai para baixo e publica a arte 9:16 como foto no feed.
@@ -375,13 +359,6 @@ class PostToSocialMedia implements ShouldQueue
             $urls = array_map(fn ($p) => $disk->url($p), array_merge([$mediaPath], $this->scheduledPost->carousel_paths));
             $this->postIds['instagram'] = $this->publishInstagramCarousel($igId, $urls, $content, $pageToken);
             Log::info("Publicado no Instagram (conta {$igId}) via token fixo [CAROUSEL].");
-            return true;
-        }
-
-        // Reel: o media_path é o VÍDEO (mp4) — publica como REELS.
-        if ($this->scheduledPost->media_type === 'reel') {
-            $this->postIds['instagram'] = $this->publishInstagramReel($igId, $disk->url($mediaPath), $content, $pageToken);
-            Log::info("Publicado no Instagram (conta {$igId}) via token fixo [REELS].");
             return true;
         }
 
@@ -519,19 +496,12 @@ class PostToSocialMedia implements ShouldQueue
             throw new \Exception('Esta Página não tem uma conta Instagram Business ligada.');
         }
 
-        // 3) URL público do media (o IG vai buscá-lo; não aceita upload de bytes).
-        $mediaUrl = Storage::disk(config('filesystems.media_disk'))->url($mediaPath);
-
-        // Reel: o media_path é o vídeo (mp4) → publica como REELS.
-        if ($this->scheduledPost->media_type === 'reel') {
-            $this->postIds['instagram'] = $this->publishInstagramReel($igId, $mediaUrl, $content, $pageToken);
-            Log::info("Publicado no Instagram (conta {$igId}) para o utilizador {$account->user_id} [REELS].");
-            return true;
-        }
+        // 3) URL público da imagem (o IG vai buscá-la; não aceita upload de bytes).
+        $imageUrl = Storage::disk(config('filesystems.media_disk'))->url($mediaPath);
 
         // 4-5) Cria o container, espera o IG processar a imagem e publica.
         $igMediaType = ($this->scheduledPost->media_type === 'story') ? 'STORIES' : 'IMAGE';
-        $this->postIds['instagram'] = $this->publishInstagramPhoto($igId, $mediaUrl, $content, $pageToken, $igMediaType);
+        $this->postIds['instagram'] = $this->publishInstagramPhoto($igId, $imageUrl, $content, $pageToken, $igMediaType);
 
         Log::info("Publicado no Instagram (conta {$igId}) para o utilizador {$account->user_id} [{$igMediaType}].");
         return true;
@@ -572,51 +542,18 @@ class PostToSocialMedia implements ShouldQueue
     }
 
     /**
-     * Publica um REEL no Instagram: cria o container com media_type=REELS e o
-     * video_url (mp4 público do bucket), espera o processamento (vídeos demoram
-     * mais a transcodificar) e publica. Requer S3/URL público acessível ao IG.
-     */
-    protected function publishInstagramReel(string $igId, string $videoUrl, string $caption, string $token): ?string
-    {
-        $container = Http::post("https://graph.facebook.com/v19.0/{$igId}/media", [
-            'media_type' => 'REELS',
-            'video_url' => $videoUrl,
-            'caption' => $caption,
-            'access_token' => $token,
-        ]);
-        if ($container->failed()) {
-            throw new \Exception('Instagram (Reel/container): ' . $container->json('error.message', 'erro ao preparar o vídeo (o URL é público? é mp4 H.264?).'));
-        }
-        $creationId = $container->json('id');
-
-        // Vídeos demoram bem mais a ficar prontos do que imagens → mais esperas.
-        $this->waitForContainer($creationId, $token, [5, 8, 10, 12, 15, 15, 15, 15, 15, 15]);
-
-        $publish = Http::post("https://graph.facebook.com/v19.0/{$igId}/media_publish", [
-            'creation_id' => $creationId,
-            'access_token' => $token,
-        ]);
-        if ($publish->failed()) {
-            throw new \Exception('Instagram (Reel/publish): ' . $publish->json('error.message', 'erro ao publicar o Reel.'));
-        }
-
-        return $publish->json('id');
-    }
-
-    /**
      * Espera um container de media do Instagram ficar FINISHED (processamento
      * assíncrono). Lança exceção clara se falhar (ERROR = URL não público) ou
      * se exceder o tempo. Usado por fotos, stories e carrossel.
      */
-    protected function waitForContainer(string $creationId, string $token, array $esperas = [3, 5, 7, 9, 11, 12, 12, 12]): void
+    protected function waitForContainer(string $creationId, string $token): void
     {
         $status = null;
         $detalhe = '';
         // POUCOS pedidos (o rate limit da app — (#4) — esgota-se com polls a mais):
-        // leituras com espera CRESCENTE antes de cada uma. Espera-se antes do 1.º
-        // poll (dá tempo ao IG). Reels (vídeo) demoram mais a transcodificar →
-        // passa-se uma lista de esperas maior.
-        foreach ($esperas as $espera) {
+        // ~8 leituras com espera CRESCENTE antes de cada uma (≈70s no total), em vez
+        // de 20 pedidos seguidos. Espera-se antes do 1.º poll (dá tempo ao IG).
+        foreach ([3, 5, 7, 9, 11, 12, 12, 12] as $espera) {
             sleep($espera);
             $statusRes = Http::get("https://graph.facebook.com/v19.0/{$creationId}", [
                 'fields' => 'status_code,status',

@@ -37,10 +37,6 @@
             <i data-lucide="pen-tool"></i>
             <span class="nav-label">Painel de Edição</span>
         </a>
-        <a href="javascript:void(0)" class="nav-item" id="nav-reels-editor" onclick="openReelsEditor()" title="Editor de Reels">
-            <i data-lucide="clapperboard"></i>
-            <span class="nav-label">Editor de Reels</span>
-        </a>
         <a href="javascript:void(0)" class="nav-item" data-tab="news-sources" title="Fontes de Notícias">
             <i data-lucide="rss"></i>
             <span class="nav-label">Fontes de Notícias</span>
@@ -60,10 +56,6 @@
         <a href="javascript:void(0)" class="nav-item" data-tab="stories" title="Stories">
             <i data-lucide="smartphone"></i>
             <span class="nav-label">Stories</span>
-        </a>
-        <a href="javascript:void(0)" class="nav-item" data-tab="reels" title="Reels Salvos">
-            <i data-lucide="film"></i>
-            <span class="nav-label">Reels Salvos</span>
         </a>
         <a href="javascript:void(0)" class="nav-item" data-tab="scheduler" title="Agendamento">
             <i data-lucide="calendar"></i>
@@ -169,10 +161,6 @@
             <i data-lucide="smartphone"></i>
             Salvar Story (9:16)
         </button>
-        <button class="btn-main" onclick="saveAsReel()" style="background: rgba(124,77,255,0.14); border: 1px solid rgba(124,77,255,0.45); color: #b39bff; margin-bottom: 10px;">
-            <i data-lucide="clapperboard"></i>
-            Salvar Reel (9:16)
-        </button>
         <button class="btn-main btn-success" onclick="downloadFlyer()">
             <i data-lucide="download"></i>
             Exportar Flyer
@@ -252,7 +240,6 @@
             <div class="flyer">
                 <div class="layer-photo">
                     <img class="photo-single" src="/assets/img/photos/foto-base.png" alt="">
-                    <video class="photo-video" muted loop playsinline style="display:none;"></video>
                     <div class="photo-split">
                         <div class="photo-half" data-half="left" onclick="selectHalf('left')"><img alt=""></div>
                         <div class="photo-half" data-half="right" onclick="selectHalf('right')"><img alt=""></div>
@@ -421,26 +408,6 @@
                 </div>
             </div>
             <div class="stories-grid" id="stories-container">
-                <!-- Renderizado via JS -->
-            </div>
-        </div>
-    </section>
-
-    <!-- REELS SALVOS (formato 9:16) -->
-    <section id="tab-reels" class="tab-content hidden">
-        <div class="content-wrapper">
-            <div class="sidebar-header" style="margin-bottom: 8px;">
-                <h1 style="color: #fff; font-size: 24px;">Reels Salvos</h1>
-            </div>
-            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 24px;">Conteúdos no formato vertical 9:16 (mesmo layout dos Stories). Cria-os no <strong>Editor de Reels</strong>.</p>
-            <div class="filter-bar">
-                <div class="filter-chips" id="reels-filter-chips"></div>
-                <div class="filter-search">
-                    <i data-lucide="search"></i>
-                    <input type="text" id="reels-search" placeholder="Pesquisar reels..." oninput="onReelsSearch(this.value)">
-                </div>
-            </div>
-            <div class="stories-grid" id="reels-container">
                 <!-- Renderizado via JS -->
             </div>
         </div>
@@ -973,7 +940,6 @@
                 <div class="platform-chips" id="schedule-format">
                     <label class="platform-chip"><input type="radio" name="postformat" value="feed" checked onchange="onScheduleFormatChange()"><i data-lucide="square"></i> Publicação</label>
                     <label class="platform-chip"><input type="radio" name="postformat" value="story" onchange="onScheduleFormatChange()"><i data-lucide="zap"></i> Story</label>
-                    <label class="platform-chip"><input type="radio" name="postformat" value="reel" onchange="onScheduleFormatChange()"><i data-lucide="clapperboard"></i> Reel</label>
                     <label class="platform-chip"><input type="radio" name="postformat" value="carousel" onchange="onScheduleFormatChange()"><i data-lucide="images"></i> Carrossel</label>
                 </div>
                 <p id="schedule-format-hint" style="display:none; font-size:11px; color:var(--text-muted); margin-top:6px;"></p>
