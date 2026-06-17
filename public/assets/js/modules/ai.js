@@ -73,6 +73,9 @@ ANCORAGEM (OBRIGATÓRIO — anti-invenção):
 - Baseia-te EXCLUSIVAMENTE nos factos presentes na FONTE acima.
 - NUNCA inventes nomes, números, datas, valores, locais ou citações que não estejam na FONTE.
 - Inclui números/nomes APENAS se aparecerem na FONTE; se não houver, escreve sem eles.
+- Não SUBSTITUAS um facto por outro parecido nem mudes o significado dos verbos/ações.
+  Exemplos de distorção PROIBIDA: trocar "começar/estrear" por "marcar golo";
+  "ser convocado" por "jogar"; "anunciar" por "confirmar". Preserva a AÇÃO EXATA da fonte.
 - Não deduzas "o que acontece a seguir" se a FONTE não o disser.
 - Melhor uma legenda genérica e verdadeira do que específica e falsa.
 `;
