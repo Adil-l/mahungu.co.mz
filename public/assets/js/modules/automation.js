@@ -152,6 +152,7 @@ export const automation = {
                     id: id,
                     title: title,
                     summary: description.replace(/<[^>]*>?/gm, '').trim().substring(0, 200),
+                    sourceText: description.replace(/<[^>]*>?/gm, ' ').replace(/[ \t]+/g, ' ').trim().substring(0, 2000), // texto completo p/ ancorar a IA (anti-invenção)
                     sourceUrl: link,
                     sourceName: source.name,
                     sourceType: 'rss',                        // origem (p/ filtrar nas Propostas)
@@ -220,6 +221,7 @@ export const automation = {
                 id,
                 title,
                 summary: caption.replace(/\s+/g, ' ').trim().substring(0, 200),
+                sourceText: caption.trim().substring(0, 2000), // legenda completa (original) p/ ancorar a IA / adaptação leve
                 sourceUrl: link,
                 sourceName: source.name,
                 sourceType: 'instagram',                  // origem (p/ filtrar nas Propostas)

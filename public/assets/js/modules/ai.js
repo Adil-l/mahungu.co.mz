@@ -66,6 +66,35 @@ em inglês ou noutra língua, TRADUZ e escreve sempre em português. NUNCA respo
 em inglês nem misturES línguas.
 `;
 
+// Guarda-costas anti-invenção: injetado em todos os prompts de geração para
+// impedir que o modelo "encha" a legenda com factos que não estão na fonte.
+const MAHUNGU_ANTI_FABRICATION = `
+ANCORAGEM (OBRIGATÓRIO — anti-invenção):
+- Baseia-te EXCLUSIVAMENTE nos factos presentes na FONTE acima.
+- NUNCA inventes nomes, números, datas, valores, locais ou citações que não estejam na FONTE.
+- Inclui números/nomes APENAS se aparecerem na FONTE; se não houver, escreve sem eles.
+- Não deduzas "o que acontece a seguir" se a FONTE não o disser.
+- Melhor uma legenda genérica e verdadeira do que específica e falsa.
+`;
+
+// Esquema de saída comum aos prompts de geração de proposta.
+const MAHUNGU_JSON_OUTPUT = `
+Responda APENAS em formato JSON estrito, exatamente com estes campos:
+{
+    "flyerTitle": "Gancho com verbo forte (máx 55 caracteres)",
+    "flyerSummary": "Consequência, número ou impacto (máx 70 caracteres)",
+    "caption": "Legenda no formato Mahungu",
+    "hashtags": ["#Tag1", "#Tag2", "#Tag3"],
+    "cta": "${MAHUNGU_CTA}",
+    "template": "classic"
+}
+O campo "template" deve ser um de: "classic", "modern", "neon", "split".
+Use "split" (fundo duplo, duas imagens lado a lado) APENAS quando a notícia
+compara/confronta dois sujeitos: duas pessoas, duas equipas, antes/depois ou
+rivalidade. Caso contrário, use "classic".
+Não escreva nada fora do JSON.
+`;
+
 function fetchWithTimeout(url, options = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -287,7 +316,24 @@ export const ai = {
     },
 
     async generateContent(newsItem) {
-        const prompt = `
+        // Usa o texto-fonte completo (sourceText) para ancorar a IA; cai para o
+        // resumo curto se a proposta for antiga e não tiver sourceText.
+        const sourceText = String(newsItem.sourceText || newsItem.summary || '').trim();
+        // Fonte curta (típico em posts do Instagram): não há matéria para 5 parágrafos
+        // sem inventar. Faz-se uma ADAPTAÇÃO LEVE que mantém ~80% do original.
+        const SHORT_SOURCE_CHARS = 280;
+        const isShort = sourceText.length > 0 && sourceText.length < SHORT_SOURCE_CHARS;
+        const prompt = isShort
+            ? this.lightCaptionPrompt(newsItem, sourceText)
+            : this.fullCaptionPrompt(newsItem, sourceText);
+
+        const text = await this.ask(prompt);
+        return this.parseProposalJSON(text, newsItem);
+    },
+
+    // Prompt normal: fonte com matéria suficiente para a legenda completa Mahungu.
+    fullCaptionPrompt(newsItem, sourceText) {
+        return `
             Você é o editor-chefe da Mahungu, plataforma moçambicana que transforma notícias
             em conteúdo rápido, claro e envolvente para redes sociais — gerando atenção,
             partilhas e comentários, sem perder credibilidade.
@@ -296,30 +342,45 @@ export const ai = {
 
             NOTÍCIA:
             Título: ${newsItem.title}
-            Resumo: ${newsItem.summary}
             Categoria: ${newsItem.category}
+
+            FONTE (texto original — usa SÓ estes factos):
+            ${sourceText || '(sem texto adicional; usa apenas o título acima)'}
+
             ${MAHUNGU_HEADLINE_RULES}
             ${MAHUNGU_CAPTION_RULES}
+            ${MAHUNGU_ANTI_FABRICATION}
 
             Gere a proposta seguindo o Manual Editorial da Mahungu acima.
-            Responda APENAS em formato JSON estrito, exatamente com estes campos:
-            {
-                "flyerTitle": "Gancho com verbo forte (máx 55 caracteres)",
-                "flyerSummary": "Consequência, número ou impacto (máx 70 caracteres)",
-                "caption": "Legenda completa com os 5 parágrafos da fórmula Mahungu",
-                "hashtags": ["#Tag1", "#Tag2", "#Tag3"],
-                "cta": "${MAHUNGU_CTA}",
-                "template": "classic"
-            }
-            O campo "template" deve ser um de: "classic", "modern", "neon", "split".
-            Use "split" (fundo duplo, duas imagens lado a lado) APENAS quando a notícia
-            compara/confronta dois sujeitos: duas pessoas, duas equipas, dois lados,
-            antes/depois ou rivalidade. Caso contrário, use "classic".
-            Não escreva nada fora do JSON.
+            ${MAHUNGU_JSON_OUTPUT}
         `;
+    },
 
-        const text = await this.ask(prompt);
-        return this.parseProposalJSON(text, newsItem);
+    // Prompt de adaptação leve: fonte CURTA → manter ~80% do original, sem inventar.
+    lightCaptionPrompt(newsItem, sourceText) {
+        return `
+            Você é o editor-chefe da Mahungu, plataforma moçambicana de notícias.
+            ${MAHUNGU_LANGUAGE_RULE}
+            ${this.brandDirectives()}
+
+            A FONTE abaixo é CURTA. NÃO a transformes numa legenda longa de 5 parágrafos —
+            isso obrigaria a INVENTAR. Faz uma ADAPTAÇÃO LEVE:
+            - Mantém ~80% do texto ORIGINAL da fonte (as mesmas palavras sempre que possível).
+            - Só podes: (a) abrir com UM marcador Mahungu (alterna): ${MAHUNGU_CAPTION_OPENINGS};
+              (b) afinar ligeiramente o tom/pontuação; (c) traduzir para português de Moçambique
+              se vier noutra língua; (d) terminar com uma pergunta curta de debate e depois "${MAHUNGU_CTA}".
+            - NÃO acrescentes factos, números, nomes, datas nem contexto que não estejam na FONTE.
+
+            FONTE (texto original):
+            ${sourceText}
+
+            Categoria: ${newsItem.category}
+            ${MAHUNGU_HEADLINE_RULES}
+            ${MAHUNGU_ANTI_FABRICATION}
+
+            Para "flyerTitle"/"flyerSummary", usa apenas o que está na FONTE (sem inventar números).
+            ${MAHUNGU_JSON_OUTPUT}
+        `;
     },
 
     /**
