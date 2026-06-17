@@ -9,17 +9,22 @@ const FEED_PROXIES = [
 
 const FETCH_TIMEOUT_MS = 25000;
 
-// ── Filtro de recência ──
-// Notícias publicadas há mais de FRESH_DAYS são descartadas, EXCETO se parecerem
-// virais (muitos comentários ou palavras-chave) e ainda dentro de VIRAL_MAX_DAYS.
+// ── Filtro de idade ──
+// Notícias mais antigas que maxNewsAgeDays (definição na UI; por omissão 3 dias)
+// são descartadas. Dentro dessa janela, decide o FILTRO DE IMPACTO (abaixo).
 const DAY_MS = 24 * 60 * 60 * 1000;
-const DEFAULT_FRESH_DAYS = 3;     // janela "recente" por omissão (configurável na UI)
-const VIRAL_MAX_DAYS = 10;        // até aqui, basta ser viral (critério normal)
-const EVERGREEN_MAX_DAYS = 30;    // até aqui, só se for FORTEMENTE viral (memorável)
-const VIRAL_MIN_COMMENTS = 50;    // comentários que contam como "viral"
-const STRONG_MIN_COMMENTS = 150;  // comentários que contam como "memorável"
-const VIRAL_KEYWORDS = /(viral|pol[ée]mica|trending|chocante|esc[âa]ndalo|bomb[áa]stic|sensa[çc][ãa]o|recorde)/i;
-const STRONG_KEYWORDS = /(viral|recorde|hist[óo]ric|in[ée]dit|imperd[íi]vel)/i;
+const DEFAULT_FRESH_DAYS = 3;     // janela máxima de idade por omissão (configurável na UI)
+
+// ── Filtro de impacto (engajamento + tópico) ──
+// Aplica-se a TODOS os itens, mesmo os recentes — só passa o que tem tração real
+// E é de impacto geral. Números fixos, fáceis de afinar aqui no topo.
+const IG_MIN_LIKES = 100;       // curtidas mínimas p/ contar como tração
+const IG_MIN_COMMENTS = 10;     // ou comentários mínimos
+const IG_STRONG_LIKES = 5000;   // viral óbvio → dispensa o critério de tópico
+// Léxico alargado de "impacto geral" (política, economia, segurança, saúde, grandes nomes/desporto…).
+const IMPACT_KEYWORDS = /(govern|ministr|president|eleic|elei[çc]|partido|frelimo|renamo|parlament|\blei\b|decret|greve|manifesta|protest|combust[íi]vel|gasolina|gas[óo]leo|metical|pre[çc]o|sal[áa]rio|imposto|economia|infla[çc]|d[óo]lar|emprego|despedimento|corrup|esc[âa]ndal|pol[ée]mic|recorde|hist[óo]ric|in[ée]dit|morte|morr|faleceu|acidente|ataque|viol[êe]nc|terror|cabo delgado|sa[úu]de|hospital|surto|c[óo]lera|covid|vacina|futebol|mamba|mundial|\bcopa|sele[çc][ãa]o|campe[ãa]o|\bfinal\b|estrei|champions|fifa|\bgolo|transfer|contrat|pol[íi]cia|tribunal|deten[çc]|pris[ãa]o|viral|chocante|bomb[áa]stic|sensa[çc])/i;
+// Categorias inerentemente de impacto geral.
+const IMPACT_CATEGORIES = new Set(['Política', 'Economia', 'Desporto', 'Nacional', 'Internacional', 'Saúde', 'Segurança']);
 
 export const automation = {
     intervalId: null,
@@ -108,6 +113,7 @@ export const automation = {
 
         let newItemsCount = 0;
         let skippedOld = 0;
+        let skippedLowImpact = 0;
 
         for (const item of items) {
             const title = (item.querySelector('title')?.textContent || '').trim();
@@ -123,25 +129,21 @@ export const automation = {
 
             if (!title || !link) continue;
 
-            // ── Filtro de recência (em camadas) ──
+            // ── Filtro de idade ──
             const publishedAt = this.parsePubDate(pubDate);
-            if (publishedAt != null) {
-                const ageDays = (Date.now() - publishedAt) / DAY_MS;
-                if (ageDays > freshDays) {
-                    const comments = this.extractCommentsCount(item);
-                    let keep;
-                    if (ageDays <= VIRAL_MAX_DAYS) {
-                        keep = this.looksViral(title, source.category, comments);          // viral
-                    } else if (ageDays <= EVERGREEN_MAX_DAYS) {
-                        keep = this.looksStronglyViral(title, source.category, comments);   // memorável
-                    } else {
-                        keep = false;                                                      // demasiado antiga
-                    }
-                    if (!keep) {
-                        skippedOld++;
-                        continue;
-                    }
-                }
+            if (publishedAt != null && (Date.now() - publishedAt) / DAY_MS > freshDays) {
+                skippedOld++;
+                continue;
+            }
+
+            // ── Filtro de impacto (RSS não tem likes → decide pelo tópico/categoria) ──
+            if (!this.passesImpact('rss', {
+                comments: this.extractCommentsCount(item),
+                text: `${title} ${description}`,
+                category: source.category,
+            })) {
+                skippedLowImpact++;
+                continue;
             }
 
             const id = this.generateId(link);
@@ -167,8 +169,10 @@ export const automation = {
             }
         }
 
-        if (newItemsCount > 0 || skippedOld > 0) {
-            console.log(`✅ [${source.name}] ${newItemsCount} novas` + (skippedOld ? ` (${skippedOld} antigas ignoradas)` : '') + '.');
+        if (newItemsCount > 0 || skippedOld > 0 || skippedLowImpact > 0) {
+            console.log(`✅ [${source.name}] ${newItemsCount} novas`
+                + (skippedOld ? ` (${skippedOld} antigas)` : '')
+                + (skippedLowImpact ? ` (${skippedLowImpact} baixo impacto)` : '') + '.');
         }
         return newItemsCount;
     },
@@ -191,25 +195,24 @@ export const automation = {
         const media = Array.isArray(data.media) ? data.media : [];
         const freshDays = Math.max(1, Number(storage.getSetting('maxNewsAgeDays', DEFAULT_FRESH_DAYS)) || DEFAULT_FRESH_DAYS);
         let newItemsCount = 0;
+        let skippedLowImpact = 0;
 
         for (const m of media) {
             const link = m.permalink;
             const caption = (m.caption || '').trim();
             if (!link || !caption) continue;
 
-            // Mesmo filtro de recência/viralidade do RSS (usa comentários do post).
+            // ── Filtro de idade ──
             const publishedAt = m.timestamp ? this.parsePubDate(m.timestamp) : null;
-            if (publishedAt != null) {
-                const ageDays = (Date.now() - publishedAt) / DAY_MS;
-                if (ageDays > freshDays) {
-                    const comments = Number(m.comments_count) || 0;
-                    let keep;
-                    if (ageDays <= VIRAL_MAX_DAYS) keep = this.looksViral(caption, source.category, comments);
-                    else if (ageDays <= EVERGREEN_MAX_DAYS) keep = this.looksStronglyViral(caption, source.category, comments);
-                    else keep = false;
-                    if (!keep) continue;
-                }
-            }
+            if (publishedAt != null && (Date.now() - publishedAt) / DAY_MS > freshDays) { skippedLowImpact++; continue; }
+
+            // ── Filtro de impacto (engajamento real do Instagram + tópico) ──
+            if (!this.passesImpact('instagram', {
+                likes: Number(m.like_count) || 0,
+                comments: Number(m.comments_count) || 0,
+                text: caption,
+                category: source.category,
+            })) { skippedLowImpact++; continue; }
 
             const id = this.generateId(link);
             if (await storage.getProposalById(id)) continue;
@@ -235,7 +238,9 @@ export const automation = {
             newItemsCount++;
         }
 
-        if (newItemsCount > 0) console.log(`✅ [IG @${username}] ${newItemsCount} novas.`);
+        if (newItemsCount > 0 || skippedLowImpact > 0) {
+            console.log(`✅ [IG @${username}] ${newItemsCount} novas` + (skippedLowImpact ? ` (${skippedLowImpact} ignoradas: idade/baixo impacto)` : '') + '.');
+        }
         return newItemsCount;
     },
 
@@ -253,16 +258,20 @@ export const automation = {
         return Number.isNaN(n) ? 0 : n;
     },
 
-    // Heurística "viral" para notícias antigas: muitos comentários ou palavras-chave.
-    looksViral(title, category, comments) {
-        if (comments >= VIRAL_MIN_COMMENTS) return true;
-        return VIRAL_KEYWORDS.test(title || '') || VIRAL_KEYWORDS.test(category || '');
-    },
+    // Filtro de impacto: combina engajamento (curtidas/comentários) e tópico de
+    // impacto geral. Para Instagram exige os DOIS (com atalho p/ viral óbvio);
+    // para RSS (sem engajamento fiável) decide pelo tópico/categoria.
+    passesImpact(platform, { likes = 0, comments = 0, text = '', category = '' } = {}) {
+        const topicOK = IMPACT_KEYWORDS.test(text || '') || IMPACT_CATEGORIES.has(category);
 
-    // Heurística mais exigente para notícias muito antigas (memoráveis/evergreen).
-    looksStronglyViral(title, category, comments) {
-        if (comments >= STRONG_MIN_COMMENTS) return true;
-        return STRONG_KEYWORDS.test(title || '') || STRONG_KEYWORDS.test(category || '');
+        if (platform === 'instagram') {
+            if (likes >= IG_STRONG_LIKES) return true;                 // viral óbvio dispensa o tópico
+            const engagementOK = likes >= IG_MIN_LIKES || comments >= IG_MIN_COMMENTS;
+            return engagementOK && topicOK;                            // os dois combinados
+        }
+
+        // RSS e outras fontes sem engajamento fiável → decide o tópico de impacto.
+        return topicOK;
     },
 
     // Extrai o link de um item RSS ou Atom (<link href> ou <link>texto</link>).
