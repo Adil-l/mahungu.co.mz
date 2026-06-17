@@ -23,8 +23,12 @@ const IG_MIN_COMMENTS = 10;     // ou comentários mínimos
 const IG_STRONG_LIKES = 5000;   // viral óbvio → dispensa o critério de tópico
 // Léxico alargado de "impacto geral" (política, economia, segurança, saúde, grandes nomes/desporto…).
 const IMPACT_KEYWORDS = /(govern|ministr|president|eleic|elei[çc]|partido|frelimo|renamo|parlament|\blei\b|decret|greve|manifesta|protest|combust[íi]vel|gasolina|gas[óo]leo|metical|pre[çc]o|sal[áa]rio|imposto|economia|infla[çc]|d[óo]lar|emprego|despedimento|corrup|esc[âa]ndal|pol[ée]mic|recorde|hist[óo]ric|in[ée]dit|morte|morr|faleceu|acidente|ataque|viol[êe]nc|terror|cabo delgado|sa[úu]de|hospital|surto|c[óo]lera|covid|vacina|futebol|mamba|mundial|\bcopa|sele[çc][ãa]o|campe[ãa]o|\bfinal\b|estrei|champions|fifa|\bgolo|transfer|contrat|pol[íi]cia|tribunal|deten[çc]|pris[ãa]o|viral|chocante|bomb[áa]stic|sensa[çc])/i;
-// Categorias inerentemente de impacto geral.
-const IMPACT_CATEGORIES = new Set(['Política', 'Economia', 'Desporto', 'Nacional', 'Internacional', 'Saúde', 'Segurança']);
+// Categorias inerentemente de impacto geral (inclui as usadas pelo catálogo
+// padrão: "Moçambique" e "Global", além das do cadastro).
+const IMPACT_CATEGORIES = new Set([
+    'Moçambique', 'Nacional', 'Política', 'Economia', 'Sociedade',
+    'Desporto', 'Internacional', 'Global', 'Saúde', 'Segurança',
+]);
 
 export const automation = {
     intervalId: null,
