@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -23,6 +24,14 @@ class MetricsService
             return ['error' => 'FACEBOOK_PAGE_TOKEN não configurado.'];
         }
 
+        // Cacheia a resolução (Página + token da Página + conta IG) por 12h. Sem isto,
+        // CADA scan de fontes IG e CADA leitura de métricas gasta 2 chamadas Graph —
+        // grande contribuinte para o rate limit (#4) da app.
+        $cacheKey = 'meta:targets:' . md5($token . '|' . (string) config('services.facebook.page_id'));
+        if ($cached = Cache::get($cacheKey)) {
+            return $cached;
+        }
+
         $pageId = config('services.facebook.page_id');
         $pageToken = $token;
 
@@ -42,7 +51,9 @@ class MetricsService
             'access_token' => $pageToken,
         ])->json('instagram_business_account.id');
 
-        return ['pageId' => $pageId, 'pageToken' => $pageToken, 'igId' => $igId];
+        $targets = ['pageId' => $pageId, 'pageToken' => $pageToken, 'igId' => $igId];
+        Cache::put($cacheKey, $targets, now()->addHours(12));
+        return $targets;
     }
 
     /** Resumo de métricas de CONTA (Instagram + Página do Facebook). */

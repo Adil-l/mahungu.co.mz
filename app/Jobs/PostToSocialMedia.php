@@ -9,6 +9,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -252,10 +253,15 @@ class PostToSocialMedia implements ShouldQueue
             // token de Sistema com TODAS as permissões, usado direto em /feed ou
             // /photos, dá "(#200) publish_actions deprecated". Aqui troca-se o token
             // fixo pelo token da própria Página (fallback: o próprio token fixo).
-            $pageToken = Http::get("https://graph.facebook.com/v19.0/{$pageId}", [
-                'fields' => 'access_token',
-                'access_token' => $token,
-            ])->json('access_token') ?: $token;
+            // Cacheado 12h → poupa 1 chamada Graph por publicação (alivia o #4).
+            $pageToken = Cache::remember(
+                'fb:pagetoken:' . md5((string) $token . '|' . $pageId),
+                now()->addHours(12),
+                fn () => Http::get("https://graph.facebook.com/v19.0/{$pageId}", [
+                    'fields' => 'access_token',
+                    'access_token' => $token,
+                ])->json('access_token') ?: $token
+            );
             return [$pageId, $pageToken];
         }
         // Sem FACEBOOK_PAGE_ID: descobre a Página via /me/accounts (token normal).
@@ -336,11 +342,15 @@ class PostToSocialMedia implements ShouldQueue
             throw new \Exception('Instagram: não foi possível resolver a Página a partir do token fixo. Define FACEBOOK_PAGE_ID no .env (e limpa a cache: "php artisan config:clear" ou re-deploy) com o id da Página à qual a conta IG Business está ligada, ou garante que o token tem business_management e a Página atribuída.');
         }
 
-        // Conta IG Business ligada à Página
-        $igId = Http::get("https://graph.facebook.com/v19.0/{$pageId}", [
-            'fields' => 'instagram_business_account',
-            'access_token' => $pageToken,
-        ])->json('instagram_business_account.id');
+        // Conta IG Business ligada à Página (cacheada 12h → menos 1 chamada por publicação).
+        $igId = Cache::remember(
+            'fb:igid:' . md5((string) $pageToken . '|' . $pageId),
+            now()->addHours(12),
+            fn () => Http::get("https://graph.facebook.com/v19.0/{$pageId}", [
+                'fields' => 'instagram_business_account',
+                'access_token' => $pageToken,
+            ])->json('instagram_business_account.id')
+        );
 
         if (!$igId) {
             throw new \Exception('A Página não tem uma conta Instagram Business ligada.');
