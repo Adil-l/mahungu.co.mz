@@ -4241,7 +4241,8 @@ async function initApp() {
         // Sincronização entre utilizadores: puxa Salvados/Aprovados de todos e
         // depois repete periodicamente (quase em tempo real).
         syncSharedData();
-        setInterval(() => syncSharedData(), 45000);
+        // 3 min (era 45s). Com o ETag/304 no servidor, polls sem alterações custam ~0.
+        setInterval(() => syncSharedData(), 180000);
 
         console.log('Mahungu Studio: Dashboard atualizada com dados reais.');
     } catch (error) {

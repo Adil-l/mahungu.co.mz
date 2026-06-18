@@ -296,11 +296,20 @@ class StorageService {
     // (para o chamador NÃO reconciliar/apagar contra uma lista vazia errada).
     async pullShared(kind) {
         try {
+            this._syncEtags = this._syncEtags || {};
+            const prevEtag = this._syncEtags[kind];
             const res = await fetch(`/api/sync/${kind}`, {
-                headers: { 'Accept': 'application/json' },
+                headers: {
+                    'Accept': 'application/json',
+                    ...(prevEtag ? { 'If-None-Match': prevEtag } : {})
+                },
                 credentials: 'same-origin'
             });
+            // 304 = nada mudou no servidor → não re-descarrega nem reprocessa (poupa bandwidth).
+            if (res.status === 304) return null;
             if (!res.ok) return null;
+            const etag = res.headers.get('ETag');
+            if (etag) this._syncEtags[kind] = etag;
             const data = await res.json();
             return Array.isArray(data) ? data : null;
         } catch (e) { return null; }

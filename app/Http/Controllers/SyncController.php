@@ -11,9 +11,20 @@ class SyncController extends Controller
     private const KINDS = ['proposal', 'flyer'];
 
     /** Lista todos os itens partilhados de um tipo (proposal|flyer). */
-    public function index(string $kind)
+    public function index(Request $request, string $kind)
     {
         abort_unless(in_array($kind, self::KINDS, true), 404);
+
+        // Assinatura barata (count + max updated_at) — SEM ler os payloads (imagens).
+        // Permite responder 304 quando nada mudou, evitando re-descarregar dezenas de
+        // GB de imagens base64 a cada poll do frontend (principal custo de bandwidth).
+        $sig = SharedItem::where('kind', $kind)
+            ->selectRaw('count(*) as c, max(updated_at) as m')->first();
+        $etag = '"' . md5($kind . ':' . ($sig->c ?? 0) . ':' . ($sig->m ?? '')) . '"';
+
+        if (trim($request->header('If-None-Match', '')) === $etag) {
+            return response('', 304, ['ETag' => $etag]);
+        }
 
         // Os payloads já são JSON válido (guardados via json_encode). Streamamos
         // a concatenação direta SEM os descodificar/recodificar todos para
@@ -38,6 +49,7 @@ class SyncController extends Controller
         }, 200, [
             'Content-Type' => 'application/json',
             'X-Accel-Buffering' => 'no',
+            'ETag' => $etag,
         ]);
     }
 
