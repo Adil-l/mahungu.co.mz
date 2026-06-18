@@ -11,39 +11,59 @@ class FeedProxyController extends Controller
     /**
      * Proxy de feeds RSS (server-side → sem CORS, fiável).
      * GET /feed-proxy?url=<feed_url>  → devolve o XML do feed.
-     * Devolve Response (XML em sucesso) ou JsonResponse (erros 400/502).
+     *
+     * Endurecido contra SSRF: só http/https, o host TEM de resolver para um IP
+     * PÚBLICO (bloqueia privados/reservados, incl. 169.254.169.254 = metadados da
+     * cloud) e cada REDIRECT é revalidado (não se confia no Location do servidor).
      */
     public function __invoke(Request $request): Response|JsonResponse
     {
         $target = trim((string) $request->query('url', ''));
-        $parts = parse_url($target);
-
-        // Validação básica anti-SSRF: só http/https e hosts públicos.
-        $host = $parts['host'] ?? '';
-        $scheme = strtolower($parts['scheme'] ?? '');
-        $isPrivate = $host === 'localhost'
-            || preg_match('/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/', $host)
-            || preg_match('/^172\.(1[6-9]|2[0-9]|3[0-1])\./', $host);
-
-        if (! $target || ! in_array($scheme, ['http', 'https'], true) || ! $host || $isPrivate) {
-            return response()->json(['error' => 'URL inválida.'], 400)
-                ->header('Access-Control-Allow-Origin', '*');
+        if (! $target || ! $this->isSafeUrl($target)) {
+            return $this->reject('URL inválida ou não permitida.');
         }
 
-        $ch = curl_init($target);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,   // segue 301/302 (feeds .co.mz)
-            CURLOPT_MAXREDIRS => 5,
-            CURLOPT_TIMEOUT => 20,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; MahunguBot/1.0; +https://mahungu.co.mz)',
-            CURLOPT_HTTPHEADER => ['Accept: application/rss+xml, application/xml, text/xml, */*'],
-        ]);
-        $body = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err = curl_error($ch);
+        $url = $target;
+        $body = false;
+        $status = 0;
+        $err = '';
+
+        // Segue até 5 redirects, MAS revalidando cada salto (anti-SSRF via Location).
+        for ($hop = 0; $hop < 6; $hop++) {
+            $location = null;
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => false,  // tratamos os redirects à mão (revalidados)
+                CURLOPT_TIMEOUT => 20,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_SSL_VERIFYHOST => 2,
+                CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+                CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; MahunguBot/1.0; +https://mahungu.co.mz)',
+                CURLOPT_HTTPHEADER => ['Accept: application/rss+xml, application/xml, text/xml, */*'],
+                CURLOPT_HEADERFUNCTION => function ($ch, $header) use (&$location) {
+                    if (stripos($header, 'location:') === 0) {
+                        $location = trim(substr($header, 9));
+                    }
+                    return strlen($header);
+                },
+            ]);
+            $body = curl_exec($ch);
+            $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err = curl_error($ch);
+            curl_close($ch);
+
+            if (in_array($status, [301, 302, 303, 307, 308], true) && $location) {
+                $next = $this->resolveRedirect($url, $location);
+                if (! $next || ! $this->isSafeUrl($next)) {
+                    return $this->reject('Redirecionamento bloqueado por segurança.');
+                }
+                $url = $next;
+                continue;
+            }
+            break;
+        }
 
         if ($body === false || $status >= 400 || $status === 0) {
             return response()->json([
@@ -58,5 +78,68 @@ class FeedProxyController extends Controller
             'Cache-Control' => 'public, max-age=300',
             'Access-Control-Allow-Origin' => '*',
         ]);
+    }
+
+    /** Só http/https e que resolva exclusivamente para IP(s) público(s). */
+    private function isSafeUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+        $scheme = strtolower($parts['scheme'] ?? '');
+        $host = $parts['host'] ?? '';
+        if (! in_array($scheme, ['http', 'https'], true) || $host === '') {
+            return false;
+        }
+
+        // Recolhe todos os IPs (IPv4 + IPv6) a que o host resolve.
+        $ips = [];
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            $ips[] = $host;
+        } else {
+            foreach (@gethostbynamel($host) ?: [] as $ip) {
+                $ips[] = $ip;
+            }
+            foreach (@dns_get_record($host, DNS_AAAA) ?: [] as $r) {
+                if (! empty($r['ipv6'])) {
+                    $ips[] = $r['ipv6'];
+                }
+            }
+        }
+        if (empty($ips)) {
+            return false; // não resolve → recusa (evita truques de DNS)
+        }
+
+        // Recusa se QUALQUER IP for privado/reservado (10/8, 127/8, 169.254/16
+        // metadados, 192.168, ::1, fc00::/7, etc.).
+        foreach ($ips as $ip) {
+            if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** Converte um Location (absoluto ou relativo) num URL absoluto. */
+    private function resolveRedirect(string $base, string $location): ?string
+    {
+        if (preg_match('#^https?://#i', $location)) {
+            return $location;
+        }
+        $b = parse_url($base);
+        if (empty($b['scheme']) || empty($b['host'])) {
+            return null;
+        }
+        $origin = $b['scheme'] . '://' . $b['host'] . (isset($b['port']) ? ':' . $b['port'] : '');
+        if (str_starts_with($location, '/')) {
+            return $origin . $location;
+        }
+        $path = isset($b['path']) ? preg_replace('#/[^/]*$#', '/', $b['path']) : '/';
+
+        return $origin . $path . $location;
+    }
+
+    private function reject(string $msg): JsonResponse
+    {
+        return response()->json(['error' => $msg], 400)->header('Access-Control-Allow-Origin', '*');
     }
 }

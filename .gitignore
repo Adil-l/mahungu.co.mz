@@ -33,3 +33,8 @@
 .idea
 .vscode
 *.swp
+
+# Ferramentas / notas locais (podem conter segredos — nunca versionar)
+.playwright-mcp/
+*.doc
+*.docx

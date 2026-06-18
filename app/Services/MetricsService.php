@@ -173,9 +173,12 @@ class MetricsService
      */
     public function businessDiscovery(string $username, int $limit = 12): array
     {
+        // Sanitiza para caracteres válidos de username IG (letras, números, ponto,
+        // underscore, máx 30) — evita injeção na expressão business_discovery.username(...).
         $username = ltrim(trim($username), '@');
+        $username = substr(preg_replace('/[^A-Za-z0-9._]/', '', $username), 0, 30);
         if ($username === '') {
-            return ['ok' => false, 'error' => 'Indica o nome de utilizador do Instagram.'];
+            return ['ok' => false, 'error' => 'Indica o nome de utilizador do Instagram válido.'];
         }
 
         $t = $this->resolveTargets();
