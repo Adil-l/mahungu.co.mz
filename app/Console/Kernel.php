@@ -16,7 +16,9 @@ class Kernel extends ConsoleKernel
         // withoutOverlapping(10): o cadeado expira em 10 min. Sem o limite, se uma
         // execução morrer a meio o cadeado fica preso 24h e BLOQUEIA todas as
         // publicações seguintes ("Has Mutex" no schedule:list).
-        $schedule->command('mahungu:process-scheduled-posts')->everyMinute()->withoutOverlapping(10);
+        // De 2 em 2 min (era todo o minuto): menos "despertares" da BD serverless;
+        // os posts saem com ≤2 min de atraso (irrelevante para redes sociais).
+        $schedule->command('mahungu:process-scheduled-posts')->everyTwoMinutes()->withoutOverlapping(10);
         // Salvaguarda: repõe a "pending" os posts presos em "processing" há mais de
         // 10 min (job perdido — processo morto a meio da espera do IG, deploy, etc.).
         // Sem isto ficavam presos para sempre no "tempo de espera". O cutoff de
