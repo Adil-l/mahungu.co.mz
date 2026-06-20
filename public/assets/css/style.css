@@ -2362,3 +2362,11 @@ body.theme-light .admin-table tbody tr:hover { background: rgba(20,22,40,0.03); 
 @media (max-width: 460px) {
     .dash-kpis, .proposals-grid { grid-template-columns: 1fr; }
 }
+
+/* Botão "Gerar tudo com IA" no editor — acento roxo da IA. */
+.btn-ai-generate {
+    background: linear-gradient(135deg, #7000ff 0%, #9b3dff 100%);
+    border: 1px solid #7000ff;
+    color: #fff;
+}
+.btn-ai-generate:hover { box-shadow: 0 0 18px rgba(112, 0, 255, 0.35); filter: brightness(1.08); }

@@ -3175,6 +3175,56 @@ async function editProposalInEditor(id) {
     ui.showToast("Proposta carregada no editor!", "success");
 }
 
+// Gera um PACOTE de conteúdo (título + legenda + hashtags + CTA) na voz da
+// Mahungu a partir de um tema, e preenche o editor de uma vez. O título/resumo
+// vão para a headline do flyer; a legenda/hashtags/cta ficam em editorPostMeta
+// (acompanham o flyer ao guardar e aparecem ao agendar). POST /api/ai/content-package.
+async function generateContentPackage() {
+    const topic = await ui.prompt(
+        'Gerar tudo com IA',
+        'Sobre que notícia/tema é o flyer? Cola a manchete ou descreve em 1 frase.',
+        '',
+        { placeholder: 'ex: Selecção de Moçambique vence Zâmbia por 2-1', confirmText: 'Gerar' }
+    );
+    if (!topic || !topic.trim()) return;
+
+    ui.showToast('A gerar conteúdo com IA…', 'info');
+    try {
+        const res = await fetch('/api/ai/content-package', {
+            method: 'POST',
+            headers: apiHeaders(),
+            credentials: 'same-origin',
+            body: JSON.stringify({ topic: topic.trim() })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            return ui.showToast(data.error || 'Não foi possível gerar (a IA tem chave/créditos no servidor?).', 'error');
+        }
+        // Se a IA não devolveu JSON limpo, o backend manda {raw, warning}.
+        if (!data.title && data.raw) {
+            return ui.showToast('A IA respondeu sem o formato esperado. Tenta de novo ou reformula o tema.', 'error');
+        }
+
+        const editor = document.getElementById('editor');
+        if (editor) {
+            editor.innerHTML = headlineHtml(data.title || '', data.summary || '');
+            fitHeadline(editor);
+        }
+        // Legenda/hashtags/CTA acompanham o flyer (usados ao agendar).
+        editorPostMeta = {
+            caption: data.caption || '',
+            hashtags: Array.isArray(data.hashtags) ? data.hashtags : [],
+            cta: data.cta || ''
+        };
+        invalidateFlyerSnapshot();
+        autoSave();
+        ui.showToast('Pronto! Título no flyer; legenda e hashtags prontas para o agendamento ✨', 'success');
+    } catch (e) {
+        ui.showToast('Erro ao gerar conteúdo com IA.', 'error');
+    }
+}
+window.generateContentPackage = generateContentPackage;
+
 // Transforma uma proposta (Salvada da IA) num Story 9:16: reutiliza o mesmo
 // carregamento no editor e ativa o formato story. O "Salvar" cria um NOVO
 // story (não mexe na proposta), que vai para a aba "Stories".
