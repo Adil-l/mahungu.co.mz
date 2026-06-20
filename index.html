@@ -490,6 +490,13 @@
                     <h1>Perfil</h1>
                 </div>
 
+                <!-- Separadores: Perfil | Configurações (alterna sem abrir modal) -->
+                <div class="admin-tabs" style="margin-bottom: 24px;">
+                    <button class="admin-tab-btn active" data-profile-tab="perfil" onclick="switchProfileTab('perfil')"><i data-lucide="user"></i> Perfil</button>
+                    <button class="admin-tab-btn" data-profile-tab="config" onclick="switchProfileTab('config')"><i data-lucide="settings"></i> Configurações</button>
+                </div>
+
+                <div id="profile-panel-perfil" class="profile-panel">
                 <div class="profile-container">
                     <div class="profile-avatar-panel">
                         <button class="avatar-upload" type="button" onclick="updateProfileAvatar()" id="profile-avatar-container" aria-label="Atualizar foto de perfil">
@@ -538,10 +545,6 @@
                                 <i data-lucide="lock-keyhole"></i>
                                 Alterar Senha
                             </button>
-                            <button class="btn-main" style="background: rgba(112, 0, 255, 0.1); color: #b98aff; border: 1px solid rgba(112, 0, 255, 0.3);" type="button" onclick="openAISettings()">
-                                <i data-lucide="settings"></i>
-                                Configurações IA
-                            </button>
                             <button class="btn-main" style="background: rgba(255, 152, 0, 0.1); color: #ffb347; border: 1px solid rgba(255, 152, 0, 0.3);" type="button" onclick="openBackupModal()">
                                 <i data-lucide="database"></i>
                                 Backup & Recuperação
@@ -549,6 +552,90 @@
                         </div>
                     </div>
                 </div>
+                </div><!-- /profile-panel-perfil -->
+
+                <!-- Painel: Configurações (antigo modal de IA, agora inline) -->
+                <div id="profile-panel-config" class="profile-panel hidden">
+                    <div class="profile-form-panel" style="max-width: 820px;">
+
+                        <div class="form-group">
+                            <label>Provedores de IA — liga/desliga os que queres usar</label>
+                            <p style="font-size: 11px; color: var(--text-muted); margin: 2px 0 10px;">Desliga os que não queres. Para usar <strong>só um</strong>, desliga os restantes. O Claude é o pago (servidor); as "IA Gratuitas" não precisam de chave.</p>
+                            <div class="ai-providers">
+                                <label class="ai-prov"><input type="checkbox" id="prov-claude"><span class="ai-prov-name">Claude</span><span class="ai-prov-tag tag-paid">paga · servidor</span></label>
+                                <label class="ai-prov"><input type="checkbox" id="prov-gemini"><span class="ai-prov-name">Google Gemini</span><span class="ai-prov-tag">precisa de chave</span></label>
+                                <label class="ai-prov"><input type="checkbox" id="prov-openai"><span class="ai-prov-name">OpenAI</span><span class="ai-prov-tag">precisa de chave</span></label>
+                                <label class="ai-prov"><input type="checkbox" id="prov-openrouter"><span class="ai-prov-name">OpenRouter</span><span class="ai-prov-tag">grátis/pago · chave</span></label>
+                                <label class="ai-prov"><input type="checkbox" id="prov-free"><span class="ai-prov-name">IA Gratuitas</span><span class="ai-prov-tag tag-free">llm7 + Pollinations · sem chave</span></label>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Quem faz o quê — permissões por tarefa</label>
+                            <p style="font-size: 11px; color: var(--text-muted); margin: 2px 0 10px;">Qualquer IA pode fazer qualquer função. Escolhe quem faz cada tarefa (ex.: Gemini a legenda, Claude o título). "Automático" usa a melhor disponível pela ordem dos provedores ligados.</p>
+                            <div class="ai-tasks" id="ai-tasks-grid"><!-- selects preenchidos via JS --></div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>OpenAI API Key (recomendado)</label>
+                            <input type="password" id="ai-openai-key" placeholder="sk-... — provedor principal, sem limites das APIs gratuitas" style="width: 100%;">
+                            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">Com uma chave OpenAI, o modelo gpt-4o-mini passa a ser o provedor principal (mais fiável). <a href="https://platform.openai.com/api-keys" target="_blank" style="color: var(--primary); text-decoration: none;">Obtenha a sua chave aqui.</a></p>
+                        </div>
+
+                        <div class="form-group">
+                            <label>OpenRouter API Key (opcional)</label>
+                            <input type="password" id="ai-openrouter-key" placeholder="sk-or-... — usa modelos grátis (gpt-oss-120b)" style="width: 100%;">
+                            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">Agregador com modelos grátis. <a href="https://openrouter.ai/keys" target="_blank" style="color: var(--primary); text-decoration: none;">Obtenha a sua chave aqui.</a></p>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Google API Key (opcional)</label>
+                            <input type="password" id="ai-api-key" placeholder="Opcional — sem chave, usa IA gratuita integrada" style="width: 100%;">
+                            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">A IA gratuita já está ativa. Para usar o Gemini, <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--primary); text-decoration: none;">obtenha uma chave gratuita aqui.</a></p>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Intervalo de Monitoramento (minutos)</label>
+                            <input type="number" id="monitoring-interval" min="1" max="180" value="15" style="width: 100%;">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Mostrar notícias dos últimos</label>
+                            <select id="news-age-days" class="custom-select" style="width: 100%;">
+                                <option value="2">2 dias</option>
+                                <option value="3" selected>3 dias (recomendado)</option>
+                                <option value="7">7 dias (1 semana)</option>
+                                <option value="14">14 dias (2 semanas)</option>
+                                <option value="30">30 dias (1 mês)</option>
+                            </select>
+                            <p style="color: var(--text-muted); font-size: 11px; margin-top: 6px;">Notícias mais antigas só entram se forem virais (muitos comentários ou palavras-chave como "polémica", "viral").</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Voz da marca (opcional)</label>
+                            <input type="text" id="brand-voice" placeholder="Ex: jovem, descontraída, com gírias de Maputo" style="width: 100%;">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Público-alvo (opcional)</label>
+                            <input type="text" id="brand-audience" placeholder="Ex: jovens moçambicanos 18-35 anos" style="width: 100%;">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Hashtags padrão (opcional)</label>
+                            <input type="text" id="brand-hashtags" placeholder="Ex: #Mahungu #Moçambique" style="width: 100%;">
+                        </div>
+
+                        <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                            <button class="btn-main" id="test-ai-btn" style="flex: 1; min-width: 160px; background: rgba(255,255,255,0.1);" onclick="testAIConnection()">
+                                <i data-lucide="plug-zap"></i> Testar Conexão
+                            </button>
+                            <button class="btn-main" style="flex: 2; min-width: 200px; background: #7000ff;" onclick="saveAISettings()">
+                                <i data-lucide="save"></i> Salvar Configurações
+                            </button>
+                        </div>
+                    </div>
+                </div><!-- /profile-panel-config -->
             </div>
         </div>
     </section>
@@ -806,100 +893,7 @@
 </div>
 
 <!-- MODAL DE CONFIGURAÇÕES DE IA -->
-<div class="modal-overlay" id="ai-settings-modal" onclick="closeAISettings(event)">
-    <div class="modal-container modal-form" style="max-width: 450px; height: auto; min-height: 0; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
-        <div class="modal-header" style="margin-bottom: 25px;">
-            <div>
-                <div class="modal-eyebrow">Configurações</div>
-                <h2 style="color: #fff; font-size: 20px;">Inteligência Artificial</h2>
-            </div>
-            <button class="close-modal" onclick="closeAISettings()"><i data-lucide="x"></i></button>
-        </div>
-        
-        <div class="form-group">
-            <label>Provedores de IA — liga/desliga os que queres usar</label>
-            <p style="font-size: 11px; color: var(--text-muted); margin: 2px 0 10px;">Desliga os que não queres. Para usar <strong>só um</strong>, desliga os restantes. O Claude é o pago (servidor); as "IA Gratuitas" não precisam de chave.</p>
-            <div class="ai-providers">
-                <label class="ai-prov"><input type="checkbox" id="prov-claude"><span class="ai-prov-name">Claude</span><span class="ai-prov-tag tag-paid">paga · servidor</span></label>
-                <label class="ai-prov"><input type="checkbox" id="prov-gemini"><span class="ai-prov-name">Google Gemini</span><span class="ai-prov-tag">precisa de chave</span></label>
-                <label class="ai-prov"><input type="checkbox" id="prov-openai"><span class="ai-prov-name">OpenAI</span><span class="ai-prov-tag">precisa de chave</span></label>
-                <label class="ai-prov"><input type="checkbox" id="prov-openrouter"><span class="ai-prov-name">OpenRouter</span><span class="ai-prov-tag">grátis/pago · chave</span></label>
-                <label class="ai-prov"><input type="checkbox" id="prov-free"><span class="ai-prov-name">IA Gratuitas</span><span class="ai-prov-tag tag-free">llm7 + Pollinations · sem chave</span></label>
-            </div>
-        </div>
-
-        <div class="form-group">
-            <label>OpenAI API Key (recomendado)</label>
-            <div style="position: relative; display: flex; gap: 10px; align-items: center;">
-                <input type="password" id="ai-openai-key" placeholder="sk-... — provedor principal, sem limites das APIs gratuitas" style="flex: 1;">
-            </div>
-            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
-                Com uma chave OpenAI, o modelo gpt-4o-mini passa a ser o provedor principal (mais fiável). <a href="https://platform.openai.com/api-keys" target="_blank" style="color: var(--primary); text-decoration: none;">Obtenha a sua chave aqui.</a>
-            </p>
-        </div>
-
-        <div class="form-group">
-            <label>OpenRouter API Key (opcional)</label>
-            <div style="position: relative; display: flex; gap: 10px; align-items: center;">
-                <input type="password" id="ai-openrouter-key" placeholder="sk-or-... — usa modelos grátis (gpt-oss-120b)" style="flex: 1;">
-            </div>
-            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
-                Agregador com modelos grátis. <a href="https://openrouter.ai/keys" target="_blank" style="color: var(--primary); text-decoration: none;">Obtenha a sua chave aqui.</a>
-            </p>
-        </div>
-
-        <div class="form-group">
-            <label>Google API Key (opcional)</label>
-            <div style="position: relative; display: flex; gap: 10px; align-items: center;">
-                <input type="password" id="ai-api-key" placeholder="Opcional — sem chave, usa IA gratuita integrada" style="flex: 1;">
-            </div>
-            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
-                A IA gratuita já está ativa. Para usar o Gemini, <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--primary); text-decoration: none;">obtenha uma chave gratuita aqui.</a>
-            </p>
-        </div>
-
-        <div class="form-group">
-            <label>Intervalo de Monitoramento (minutos)</label>
-            <input type="number" id="monitoring-interval" min="1" max="180" value="15" style="width: 100%;">
-        </div>
-
-        <div class="form-group">
-            <label>Mostrar notícias dos últimos</label>
-            <select id="news-age-days" class="custom-select" style="width: 100%;">
-                <option value="2">2 dias</option>
-                <option value="3" selected>3 dias (recomendado)</option>
-                <option value="7">7 dias (1 semana)</option>
-                <option value="14">14 dias (2 semanas)</option>
-                <option value="30">30 dias (1 mês)</option>
-            </select>
-            <p style="color: var(--text-muted); font-size: 11px; margin-top: 6px;">Notícias mais antigas só entram se forem virais (muitos comentários ou palavras-chave como "polémica", "viral").</p>
-        </div>
-
-        <div class="form-group">
-            <label>Voz da marca (opcional)</label>
-            <input type="text" id="brand-voice" placeholder="Ex: jovem, descontraída, com gírias de Maputo" style="width: 100%;">
-        </div>
-
-        <div class="form-group">
-            <label>Público-alvo (opcional)</label>
-            <input type="text" id="brand-audience" placeholder="Ex: jovens moçambicanos 18-35 anos" style="width: 100%;">
-        </div>
-
-        <div class="form-group">
-            <label>Hashtags padrão (opcional)</label>
-            <input type="text" id="brand-hashtags" placeholder="Ex: #Mahungu #Moçambique" style="width: 100%;">
-        </div>
-
-        <div style="display: flex; gap: 10px; margin-top: 20px;">
-            <button class="btn-main" id="test-ai-btn" style="flex: 1; background: rgba(255,255,255,0.1);" onclick="testAIConnection()">
-                <i data-lucide="plug-zap"></i> Testar Conexão
-            </button>
-            <button class="btn-main" style="flex: 2; background: #7000ff;" onclick="saveAISettings()">
-                <i data-lucide="save"></i> Salvar Configurações
-            </button>
-        </div>
-    </div>
-</div>
+<!-- (As Definições de IA passaram para o separador "Configurações" na aba Perfil.) -->
 
 <div class="modal-overlay" id="social-accounts-modal" onclick="closeSocialAccountsModal(event)">
     <div class="modal-container modal-form" style="max-width: 500px; height: auto; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">

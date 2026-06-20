@@ -1541,17 +1541,22 @@ async function humanizeCaption() {
     if (!text) return ui.showToast('Escreve ou gera uma legenda primeiro.', 'info');
     ui.showToast('A humanizar…', 'info');
     try {
-        const res = await fetch('/api/ai/humanize', {
-            method: 'POST',
-            headers: apiHeaders(),
-            credentials: 'same-origin',
-            body: JSON.stringify({ text })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            return ui.showToast(data.error || 'Não foi possível humanizar (a IA está configurada no servidor?).', 'error');
+        if (aiClaudeEnabled() && aiTaskProvider('humanizar') === 'auto') {
+            const res = await fetch('/api/ai/humanize', {
+                method: 'POST',
+                headers: apiHeaders(),
+                credentials: 'same-origin',
+                body: JSON.stringify({ text })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                return ui.showToast(data.error || 'Não foi possível humanizar (a IA está configurada no servidor?).', 'error');
+            }
+            ta.value = data.text || text;
+        } else {
+            // IA atribuída à tarefa 'humanizar' (ou Claude desligado).
+            ta.value = (await ai.humanizeText(text)) || text;
         }
-        ta.value = data.text || text;
         ui.showToast('Legenda humanizada ✨', 'success');
     } catch (e) {
         ui.showToast('Erro ao humanizar.', 'error');
@@ -3362,7 +3367,11 @@ async function generateContentPackage(topicArg) {
     ui.showToast(isStory ? 'A gerar título do Story…' : 'A gerar conteúdo com IA…', 'info');
     try {
         let data;
-        if (aiClaudeEnabled()) {
+        // Caminho rápido (1 chamada ao Claude no servidor) só quando o Claude
+        // está ligado E nenhuma tarefa do pacote (título/legenda/hashtags) tem
+        // um provedor específico atribuído. Caso contrário, usa a cadeia cliente
+        // respeitando "quem faz o quê" (cada campo pode vir de uma IA diferente).
+        if (aiClaudeEnabled() && !aiPackageIsCustom()) {
             const res = await fetch('/api/ai/content-package', {
                 method: 'POST',
                 headers: apiHeaders(),
@@ -3378,8 +3387,7 @@ async function generateContentPackage(topicArg) {
                 return ui.showToast('A IA respondeu sem o formato esperado. Tenta de novo ou reformula o tema.', 'error');
             }
         } else {
-            // Claude desligado → cadeia cliente (Gemini/grátis/…). Carrossel usa o
-            // pacote 'feed' (só se aproveita título/resumo no slide ativo).
+            // Cadeia cliente por tarefa (Claude desligado OU permissões personalizadas).
             data = await ai.generatePackage(topic.trim(), isStory ? 'story' : 'feed');
         }
         if (!data || !data.title) {
@@ -3436,7 +3444,7 @@ async function regenerateCaption() {
     ui.showToast('A gerar nova legenda…', 'info');
     try {
         let data;
-        if (aiClaudeEnabled()) {
+        if (aiClaudeEnabled() && aiTaskProvider('legenda') === 'auto') {
             const res = await fetch('/api/ai/caption', {
                 method: 'POST', headers: apiHeaders(), credentials: 'same-origin',
                 body: JSON.stringify({ topic: base })
@@ -3444,7 +3452,7 @@ async function regenerateCaption() {
             data = await res.json().catch(() => ({}));
             if (!res.ok) return ui.showToast(data.error || 'Não foi possível gerar a legenda.', 'error');
         } else {
-            data = await ai.generateCaption(base); // cadeia cliente (Claude desligado)
+            data = await ai.generateCaption(base); // IA atribuída à tarefa 'legenda'
         }
         if (!data || !data.caption) return ui.showToast('A IA não devolveu legenda. Tenta de novo.', 'error');
         const tags = (Array.isArray(data.hashtags) && data.hashtags.length)
@@ -3485,7 +3493,7 @@ async function generateCarousel(topicArg, slidesArg, includeFirst) {
     ui.showToast(`A gerar ${n} slides numa só chamada…`, 'info');
     try {
         let data;
-        if (aiClaudeEnabled()) {
+        if (aiClaudeEnabled() && aiTaskProvider('carrossel') === 'auto') {
             const res = await fetch('/api/ai/carousel', {
                 method: 'POST', headers: apiHeaders(), credentials: 'same-origin',
                 body: JSON.stringify({ topic: baseTitle, slides: n })
@@ -3493,7 +3501,7 @@ async function generateCarousel(topicArg, slidesArg, includeFirst) {
             data = await res.json().catch(() => ({}));
             if (!res.ok) return ui.showToast(data.error || 'Não foi possível gerar o carrossel.', 'error');
         } else {
-            data = await ai.generateCarouselSlides(baseTitle, n); // cadeia cliente (Claude desligado)
+            data = await ai.generateCarouselSlides(baseTitle, n); // IA atribuída à tarefa 'carrossel'
         }
         const gen = Array.isArray(data.slides) ? data.slides : null;
         if (!gen || gen.length < 2) return ui.showToast('A IA não devolveu slides. Tenta de novo ou reformula o tema.', 'error');
@@ -4480,14 +4488,52 @@ window.generateEngagementContent = generateEngagementContent;
 // ║ FUNÇÕES DE CONFIGURAÇÕES IA                                      ║
 // ╚═══════════════════════════════════════════════════════════════════╝
 
-function openAISettings() {
-    const modal = document.getElementById('ai-settings-modal');
+// ── Tarefas de IA atribuíveis a um provedor (permissões por tarefa) ──
+const AI_TASKS = [
+    { id: 'titulo', label: 'Título' },
+    { id: 'legenda', label: 'Legenda' },
+    { id: 'hashtags', label: 'Hashtags' },
+    { id: 'carrossel', label: 'Carrossel' },
+    { id: 'humanizar', label: 'Humanizar' },
+];
+const AI_TASK_PROVIDERS = [
+    ['auto', 'Automático'],
+    ['claude', 'Claude'],
+    ['gemini', 'Google Gemini'],
+    ['openai', 'OpenAI'],
+    ['openrouter', 'OpenRouter'],
+    ['free', 'IA Gratuitas'],
+];
+
+// Provedor atribuído a uma tarefa ('auto' por omissão).
+function aiTaskProvider(taskId) {
+    const map = storage.getSetting('aiTasks', null);
+    const v = (map && typeof map === 'object') ? map[taskId] : null;
+    return v || 'auto';
+}
+// "Gerar tudo" é personalizado se título/legenda/hashtags não forem todos 'auto'.
+function aiPackageIsCustom() {
+    return ['titulo', 'legenda', 'hashtags'].some(t => aiTaskProvider(t) !== 'auto');
+}
+
+function renderAiTaskSelects() {
+    const grid = document.getElementById('ai-tasks-grid');
+    if (!grid) return;
+    grid.innerHTML = AI_TASKS.map(t => {
+        const cur = aiTaskProvider(t.id);
+        const opts = AI_TASK_PROVIDERS.map(([v, label]) =>
+            `<option value="${v}" ${v === cur ? 'selected' : ''}>${label}</option>`).join('');
+        return `<div class="ai-task"><span class="ai-task-name">${t.label}</span><select id="task-${t.id}" class="custom-select">${opts}</select></div>`;
+    }).join('');
+}
+
+// Preenche os campos do separador Configurações a partir das definições guardadas.
+function populateAISettings() {
     document.getElementById('ai-api-key').value = ai.apiKey || '';
     const openaiInput = document.getElementById('ai-openai-key');
     if (openaiInput) openaiInput.value = ai.openaiKey || '';
     const openrouterInput = document.getElementById('ai-openrouter-key');
     if (openrouterInput) openrouterInput.value = ai.openrouterKey || '';
-    // Diretrizes de marca guardadas
     document.getElementById('brand-voice').value = storage.getSetting('brandVoice', '');
     document.getElementById('brand-audience').value = storage.getSetting('brandAudience', '');
     document.getElementById('brand-hashtags').value = storage.getSetting('brandHashtags', '');
@@ -4496,7 +4542,7 @@ function openAISettings() {
     const ageInput = document.getElementById('news-age-days');
     if (ageInput) ageInput.value = String(storage.getSetting('maxNewsAgeDays', 3));
 
-    // Provedores de IA ligados/desligados (sem definição = todos ligados).
+    // Provedores ligados/desligados (sem definição = todos ligados).
     const prov = storage.getSetting('aiProviders', null);
     const isOn = id => !prov || typeof prov !== 'object' || prov[id] !== false;
     ['claude', 'gemini', 'openai', 'openrouter', 'free'].forEach(id => {
@@ -4504,14 +4550,30 @@ function openAISettings() {
         if (cb) cb.checked = isOn(id);
     });
 
-    modal.classList.add('active');
-    lucide.createIcons();
+    renderAiTaskSelects(); // permissões por tarefa
+    if (window.lucide) lucide.createIcons();
 }
 
-function closeAISettings(e) {
-    if (e && e.target !== e.currentTarget && e.type !== 'click') return;
-    document.getElementById('ai-settings-modal').classList.remove('active');
+// Alterna os separadores da aba Perfil (Perfil | Configurações) sem abrir modal.
+function switchProfileTab(section) {
+    document.querySelectorAll('#tab-profile .admin-tab-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.profileTab === section));
+    const perfil = document.getElementById('profile-panel-perfil');
+    const config = document.getElementById('profile-panel-config');
+    if (perfil) perfil.classList.toggle('hidden', section !== 'perfil');
+    if (config) config.classList.toggle('hidden', section !== 'config');
+    if (section === 'config') populateAISettings();
 }
+window.switchProfileTab = switchProfileTab;
+
+// Compatibilidade: "abrir definições" = ir ao Perfil → separador Configurações.
+function openAISettings() {
+    const nav = document.querySelector('.main-nav .nav-item[data-tab="profile"]');
+    showTab('profile', nav);
+    switchProfileTab('config');
+}
+
+function closeAISettings() { switchProfileTab('perfil'); }
 
 function saveAISettings() {
     const apiKey = document.getElementById('ai-api-key').value.trim();
@@ -4529,6 +4591,11 @@ function saveAISettings() {
     }
     storage.updateSetting('aiProviders', aiProviders);
 
+    // Permissões por tarefa (quem faz o quê).
+    const aiTasks = {};
+    AI_TASKS.forEach(t => { aiTasks[t.id] = document.getElementById('task-' + t.id)?.value || 'auto'; });
+    storage.updateSetting('aiTasks', aiTasks);
+
     storage.updateSetting('apiKey', apiKey);
     storage.updateSetting('openaiKey', openaiKey);
     storage.updateSetting('openrouterKey', openrouterKey);
@@ -4542,7 +4609,6 @@ function saveAISettings() {
     ai.openaiKey = openaiKey;
     ai.openrouterKey = openrouterKey;
     ui.showToast("Configurações salvas!", "success");
-    closeAISettings();
 }
 
 async function testAIConnection() {

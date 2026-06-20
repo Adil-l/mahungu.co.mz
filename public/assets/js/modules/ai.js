@@ -453,7 +453,7 @@ export const ai = {
             Não escreva nada fora do JSON.
         `;
 
-        const text = await this.ask(prompt);
+        const text = await this.runForTask('legenda', prompt); // IA atribuída à tarefa 'legenda'
         const j = this.parseProposalJSON(text, { title, summary: '', category });
         return { caption: j.caption, hashtags: j.hashtags, cta: j.cta };
     },
@@ -490,24 +490,119 @@ export const ai = {
         return { caption: j.caption, hashtags: j.hashtags, cta: j.cta };
     },
 
-    // ── FALLBACK quando o Claude (servidor) está DESLIGADO nas Definições ──
-    // Reproduzem, pela cadeia cliente (Gemini/grátis/…), o que os endpoints
-    // /api/ai/content-package e /api/ai/carousel fazem no servidor.
+    // ── PERMISSÕES POR TAREFA — qualquer IA faz qualquer função ──
+    // O utilizador atribui um provedor a cada tarefa nas Definições
+    // (settings.aiTasks). 'auto' = cadeia normal ask(). Reproduzem, pela cadeia
+    // cliente, o que os endpoints /api/ai/* fazem — mas em QUALQUER provedor.
 
-    /**
-     * Pacote a partir de um tema (equivalente a /api/ai/content-package).
-     * Story devolve só {title, summary} (sem legenda — poupa); feed/carrossel
-     * devolvem também caption/hashtags/cta. Usa generateContent (cadeia cliente).
-     */
-    async generatePackage(topic, format = 'feed') {
-        const r = await this.generateContent({ title: topic, summary: '', category: 'Geral', sourceText: topic });
-        if (format === 'story') return { title: r.flyerTitle, summary: r.flyerSummary };
-        return { title: r.flyerTitle, summary: r.flyerSummary, caption: r.caption, hashtags: r.hashtags, cta: r.cta };
+    // Provedor atribuído a uma tarefa ('auto' por omissão).
+    taskProvider(taskId) {
+        const map = storage.getSetting('aiTasks', null);
+        const v = (map && typeof map === 'object') ? map[taskId] : null;
+        return v || 'auto';
+    },
+
+    // Executa o prompt na IA ATRIBUÍDA à tarefa. 'auto' usa a cadeia ask().
+    // Provedor específico: chama-o direto; se falhar, cai para a cadeia ask().
+    async runForTask(taskId, prompt) {
+        const p = this.taskProvider(taskId);
+        if (p === 'auto') return this.ask(prompt);
+        const direct = {
+            claude: () => this.callClaude(prompt),
+            gemini: () => this.callGemini(prompt),
+            openai: () => this.callOpenAI(prompt),
+            openrouter: () => this.callOpenRouter(prompt),
+            free: async () => { try { return await this.callLLM7(prompt); } catch (e) { return this.callPollinations(prompt); } },
+        }[p];
+        if (!direct) return this.ask(prompt);
+        try {
+            return await direct();
+        } catch (err) {
+            console.warn(`Tarefa "${taskId}": provedor "${p}" falhou (${err.message}); a usar a cadeia automática.`);
+            return this.ask(prompt);
+        }
+    },
+
+    // Extrai o primeiro objeto JSON de uma resposta (tolerante a code fences).
+    extractJsonObject(text) {
+        let raw = String(text || '').replace(/```json/gi, '').replace(/```/g, '').trim();
+        const s = raw.indexOf('{'); const e = raw.lastIndexOf('}');
+        if (s !== -1 && e > s) raw = raw.slice(s, e + 1);
+        try { return JSON.parse(raw); } catch (err) { return {}; }
+    },
+
+    normalizeHashtags(h) {
+        if (typeof h === 'string') h = h.split(/[\s,]+/).filter(Boolean);
+        if (!Array.isArray(h)) return [];
+        return h.map(x => String(x).trim()).filter(Boolean);
+    },
+
+    // Só TÍTULO + RESUMO (tarefa 'titulo'). Story → mais forte/autossuficiente.
+    async genTitulo(topic, format = 'feed') {
+        const prompt = `
+            ${MAHUNGU_LANGUAGE_RULE}
+            ${this.brandDirectives()}
+            Notícia/tema: "${topic}"
+            ${MAHUNGU_HEADLINE_RULES}
+            ${format === 'story' ? 'É para um STORY (vai SEM legenda): o título e o resumo têm de contar tudo sozinhos — fortes e autossuficientes.' : ''}
+            ${MAHUNGU_ANTI_FABRICATION}
+            Responde APENAS em JSON estrito: {"title":"gancho ≤55 caracteres","summary":"consequência/número ≤70 caracteres"}
+        `;
+        const j = this.extractJsonObject(await this.runForTask('titulo', prompt));
+        return { title: String(j.title || j.flyerTitle || '').trim(), summary: String(j.summary || j.flyerSummary || '').trim() };
+    },
+
+    // Só LEGENDA + CTA (tarefa 'legenda'), sem hashtags.
+    async genLegendaOnly(topic, ctx = {}) {
+        const prompt = `
+            ${MAHUNGU_LANGUAGE_RULE}
+            ${this.brandDirectives()}
+            Notícia: "${topic}"${ctx.title ? ` (título do flyer: "${ctx.title}")` : ''}
+            Escreve SÓ a legenda do post (sem hashtags; não repitas o título como 1ª linha).
+            ${MAHUNGU_CAPTION_RULES}
+            Responde APENAS em JSON estrito: {"caption":"legenda completa","cta":"${MAHUNGU_CTA}"}
+        `;
+        const j = this.extractJsonObject(await this.runForTask('legenda', prompt));
+        return { caption: j.caption || j.legenda || '', cta: j.cta || MAHUNGU_CTA };
+    },
+
+    // Só HASHTAGS (tarefa 'hashtags').
+    async genHashtagsOnly(topic, ctx = {}) {
+        const prompt = `
+            ${MAHUNGU_LANGUAGE_RULE}
+            ${this.brandDirectives()}
+            Notícia: "${topic}"${ctx.title ? ` (título: "${ctx.title}")` : ''}
+            Gera 5 a 8 hashtags relevantes em português de Moçambique para este post.
+            Responde APENAS em JSON estrito: {"hashtags":["#Tag1","#Tag2","#Tag3"]}
+        `;
+        const j = this.extractJsonObject(await this.runForTask('hashtags', prompt));
+        let hashtags = this.normalizeHashtags(j.hashtags || j.tags);
+        if (!hashtags.length) hashtags = ['#Mahungu'];
+        return { hashtags };
     },
 
     /**
-     * Carrossel de N slides (equivalente a /api/ai/carousel) pela cadeia cliente.
-     * Devolve { slides:[{title,summary}], caption, hashtags, cta }.
+     * Pacote a partir de um tema (equivalente a /api/ai/content-package), mas
+     * cada CAMPO pode vir de uma IA diferente (permissões por tarefa). Story
+     * devolve só {title, summary}. Legenda e hashtags juntam-se numa chamada se
+     * partilharem o mesmo provedor (poupa); senão vão separadas.
+     */
+    async generatePackage(topic, format = 'feed') {
+        const t = await this.genTitulo(topic, format);
+        if (format === 'story') return { title: t.title, summary: t.summary };
+
+        if (this.taskProvider('legenda') === this.taskProvider('hashtags')) {
+            const c = await this.generateCaption(t.title || topic); // caption+hashtags+cta (tarefa 'legenda')
+            return { title: t.title, summary: t.summary, caption: c.caption, hashtags: c.hashtags, cta: c.cta };
+        }
+        const c = await this.genLegendaOnly(topic, t);
+        const h = await this.genHashtagsOnly(topic, t);
+        return { title: t.title, summary: t.summary, caption: c.caption, hashtags: h.hashtags, cta: c.cta };
+    },
+
+    /**
+     * Carrossel de N slides (equivalente a /api/ai/carousel) pela IA atribuída à
+     * tarefa 'carrossel'. Devolve { slides:[{title,summary}], caption, hashtags, cta }.
      */
     async generateCarouselSlides(topic, n) {
         const prompt = `
@@ -523,18 +618,28 @@ export const ai = {
              "caption":"legenda do post (fórmula Mahungu)","hashtags":["#Tag1","#Tag2"],"cta":"${MAHUNGU_CTA}"}
             O array "slides" tem de ter exatamente ${n} elementos.
         `;
-        const text = await this.ask(prompt);
-        let raw = String(text).replace(/```json/gi, '').replace(/```/g, '').trim();
-        const s = raw.indexOf('{'); const e = raw.lastIndexOf('}');
-        if (s !== -1 && e > s) raw = raw.slice(s, e + 1);
-        let j = {};
-        try { j = JSON.parse(raw); } catch (err) { j = {}; }
+        const j = this.extractJsonObject(await this.runForTask('carrossel', prompt));
         const slides = Array.isArray(j.slides) ? j.slides
             .filter(x => x && (x.title || x.summary))
             .map(x => ({ title: String(x.title || '').trim(), summary: String(x.summary || '').trim() })) : [];
-        let hashtags = j.hashtags || [];
-        if (typeof hashtags === 'string') hashtags = hashtags.split(/[\s,]+/).filter(Boolean);
-        return { slides, caption: j.caption || '', hashtags, cta: j.cta || MAHUNGU_CTA };
+        return { slides, caption: j.caption || '', hashtags: this.normalizeHashtags(j.hashtags), cta: j.cta || MAHUNGU_CTA };
+    },
+
+    /**
+     * Humaniza um texto (equivalente a /api/ai/humanize) pela IA atribuída à
+     * tarefa 'humanizar'. Devolve o texto reescrito.
+     */
+    async humanizeText(text) {
+        const prompt = `
+            És editor da Mahungu (Moçambique). Reescreve o texto abaixo para soar a um jornalista
+            moçambicano real — humano, direto, com ritmo — SEM mudar os factos, nomes ou números.
+            Corta tiques de IA e clichés. Devolve APENAS o texto reescrito, sem aspas nem preâmbulos.
+
+            TEXTO:
+            ${text}
+        `;
+        const out = await this.runForTask('humanizar', prompt);
+        return String(out || '').trim();
     },
 
     /**
