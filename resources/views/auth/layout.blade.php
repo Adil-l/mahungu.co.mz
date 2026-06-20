@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Entrar') | Mahungu Studio</title>
+    <link rel="icon" type="image/png" href="/assets/img/favicon.png">
+    <link rel="apple-touch-icon" href="/assets/img/favicon.png">
     <link rel="stylesheet" href="/assets/css/style.css">
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
