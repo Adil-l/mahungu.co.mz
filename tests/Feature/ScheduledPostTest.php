@@ -129,4 +129,38 @@ class ScheduledPostTest extends TestCase
             ])
             ->assertStatus(201);
     }
+
+    public function test_story_without_caption_is_allowed(): void
+    {
+        config(['filesystems.media_disk' => 'media', 'filesystems.media_visibility' => null]);
+        Storage::fake('media');
+
+        $user = User::factory()->create();
+
+        // Stories vão SEM legenda: conteúdo vazio é aceite desde que haja imagem.
+        $res = $this->actingAs($user)->postJson('/api/scheduled-posts', [
+            'content' => '',
+            'platforms' => ['instagram'],
+            'scheduled_at' => now()->addDay()->toIso8601String(),
+            'media_data_url' => $this->dataUrl(),
+            'media_type' => 'story',
+        ]);
+
+        $res->assertStatus(201);
+        $this->assertSame('story', $res->json('media_type'));
+    }
+
+    public function test_text_only_post_still_requires_caption(): void
+    {
+        $user = User::factory()->create();
+
+        // Sem flyer nem imagem: a legenda continua obrigatória.
+        $this->actingAs($user)
+            ->postJson('/api/scheduled-posts', [
+                'content' => '',
+                'platforms' => ['twitter'],
+                'scheduled_at' => now()->addDay()->toIso8601String(),
+            ])
+            ->assertStatus(422);
+    }
 }

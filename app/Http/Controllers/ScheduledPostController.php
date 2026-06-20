@@ -53,7 +53,10 @@ class ScheduledPostController extends Controller
     {
         $validated = $request->validate([
             'flyer_id' => 'nullable|exists:flyers,id',
-            'content' => 'required_without:flyer_id|string|nullable',
+            // Conteúdo (legenda) só é obrigatório quando NÃO há flyer nem imagem.
+            // Stories vão sem legenda mas levam imagem (media_data_url), por isso
+            // passam sem conteúdo. Posts só-de-texto continuam a exigir legenda.
+            'content' => 'required_without_all:flyer_id,media_data_url,media_path|string|nullable',
             'platforms' => 'required|array|min:1',
             'platforms.*' => 'string|in:instagram,facebook,tiktok,twitter,threads',
             'scheduled_at' => 'required|date|after:now',

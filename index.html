@@ -982,7 +982,11 @@
                 </select>
             </div>
 
-            <div class="form-group">
+            <p id="schedule-story-nolegend" style="display:none; font-size: 13px; color: var(--text-muted); background: rgba(112,0,255,0.08); border: 1px solid rgba(112,0,255,0.25); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;">
+                <i data-lucide="zap" style="width:14px;height:14px;display:inline;vertical-align:middle;"></i>
+                Stories vão <strong>sem legenda</strong> — não precisas de escrever nada. Só escolhe o Story e a hora.
+            </p>
+            <div class="form-group" id="schedule-caption-group">
                 <label>Legenda / Conteúdo</label>
                 <textarea id="schedule-content" placeholder="Escreva a legenda, ou escolha um flyer acima para a preencher automaticamente..."></textarea>
                 <p id="schedule-caption-hint" style="display:none; font-size: 11px; color: var(--text-muted); margin-top: 6px;">

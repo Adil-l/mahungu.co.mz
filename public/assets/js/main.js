@@ -1328,10 +1328,11 @@ function onScheduleFlyerChange() {
         return;
     }
     const flyer = schedulerFlyers.find(f => String(f.id) === String(id));
-    const caption = composeFlyerCaption(flyer);
+    const isStory = (document.querySelector('input[name="postformat"]:checked')?.value || 'feed') === 'story';
+    const caption = isStory ? '' : composeFlyerCaption(flyer); // Stories vão sem legenda
     // Só sobrescreve se o utilizador ainda não escreveu nada (evita perder edições).
     if (caption && !textarea.value.trim()) textarea.value = caption;
-    if (hint) hint.style.display = caption ? 'block' : 'none';
+    if (hint) hint.style.display = (caption && !isStory) ? 'block' : 'none';
 
     // O formato já está escolhido nos botões (e filtra esta lista). Aqui só
     // carregamos os slides extra quando o item escolhido é um carrossel.
@@ -1354,6 +1355,18 @@ function onScheduleFormatChange() {
         else if (format === 'carousel') { hint.style.display = 'block'; hint.textContent = 'Slide 1 = flyer; adiciona as imagens seguintes. Aplica-se ao Instagram.'; }
         else { hint.style.display = 'none'; }
     }
+
+    // Stories vão SEM legenda → esconde o campo de legenda e mostra um aviso.
+    const isStory = format === 'story';
+    const capGroup = document.getElementById('schedule-caption-group');
+    const noLegend = document.getElementById('schedule-story-nolegend');
+    if (capGroup) capGroup.style.display = isStory ? 'none' : '';
+    if (noLegend) noLegend.style.display = isStory ? 'block' : 'none';
+    if (isStory) {
+        const ta = document.getElementById('schedule-content');
+        if (ta) ta.value = ''; // não enviar legenda num Story
+    }
+
     populateScheduleFlyers(format);
 }
 window.onScheduleFormatChange = onScheduleFormatChange;
@@ -1474,7 +1487,8 @@ async function saveScheduledPost() {
     const format = document.querySelector('input[name="postformat"]:checked')?.value || 'feed';
 
     if (platforms.length === 0) return ui.showToast("Selecione pelo menos uma plataforma.", "info");
-    if (!content) return ui.showToast("A legenda não pode estar vazia.", "info");
+    // Stories vão SEM legenda — não a exijas. Para feed/carrossel continua obrigatória.
+    if (!content && format !== 'story') return ui.showToast("A legenda não pode estar vazia.", "info");
     if (!datetime) return ui.showToast("Selecione a data e hora.", "info");
 
     // Os flyers vivem no IndexedDB (não na BD do servidor), por isso a referência
