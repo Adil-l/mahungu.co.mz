@@ -9,6 +9,7 @@ use App\Http\Controllers\InsightsController;
 use App\Http\Controllers\InstagramSourceController;
 use App\Http\Controllers\ProposalController;
 use App\Http\Controllers\NewsSourceController;
+use App\Http\Controllers\SchedulingController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ScheduledPostController;
 use App\Http\Controllers\SocialAccountController;
@@ -57,6 +58,13 @@ Route::middleware(['auth'])->group(function () {
 
     // Geração de texto editorial por IA (proxy Claude — chave no servidor).
     Route::post('/ai/generate', [AiController::class, 'generate']);
+    // Reescreve qualquer texto na voz da Mahungu (content-humanizer).
+    Route::post('/ai/humanize', [AiController::class, 'humanize']);
+    // Pacote completo a partir de um tema: headline + legenda + hashtags + CTA + variantes.
+    Route::post('/ai/content-package', [AiController::class, 'package']);
+
+    // Sugestões de agendamento (horários ótimos + cadência p/ página de notícias).
+    Route::get('/scheduling/suggestions', [SchedulingController::class, 'suggestions']);
 
     // Gerador de hashtags (proxy RapidAPI/Hashtagy).
     Route::get('/hashtags', [HashtagController::class, 'generate']);
