@@ -21,6 +21,18 @@ class SpaController extends Controller
         $html = file_get_contents(base_path('index.html'));
         $user = Auth::user();
 
+        // Cache-busting: anexa ?v=<versão> aos assets CSS/JS. O index.html é
+        // servido sempre fresco (sem cache), mas /assets/js/main.js não tinha
+        // versão — o browser servia a cópia antiga em cache e nunca via o código
+        // novo após um deploy. A versão é o mtime do main.js (muda a cada deploy,
+        // porque o checkout reescreve o ficheiro), forçando o re-download.
+        $assetVersion = @filemtime(public_path('assets/js/main.js')) ?: date('Ymd');
+        $html = preg_replace_callback(
+            '#\b(src|href)="(/assets/[^"?]+\.(?:js|css))"#i',
+            fn ($m) => $m[1].'="'.$m[2].'?v='.$assetVersion.'"',
+            $html
+        );
+
         // Token CSRF: substitui qualquer <meta name="csrf-token"> existente
         // (incluindo um literal `{{ csrf_token() }}` não renderizado, já que
         // o index.html é servido como HTML cru e não como Blade). Se não
