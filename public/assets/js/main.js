@@ -1402,6 +1402,7 @@ async function openSchedulerModal() {
     const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
     document.getElementById('schedule-datetime').value = localNow.toISOString().slice(0, 16);
 
+    loadSchedulingSuggestions(); // sugestões de horário/cadência (aditivo)
     lucide.createIcons();
 }
 
@@ -1462,6 +1463,72 @@ async function saveScheduledPost() {
         ui.showToast(err.message, "error");
     }
 }
+
+/**
+ * Reescreve a legenda atual na voz da Mahungu (POST /api/ai/humanize).
+ * Aditivo — não altera o fluxo de agendamento.
+ */
+async function humanizeCaption() {
+    const ta = document.getElementById('schedule-content');
+    const text = (ta?.value || '').trim();
+    if (!text) return ui.showToast('Escreve ou gera uma legenda primeiro.', 'info');
+    ui.showToast('A humanizar…', 'info');
+    try {
+        const res = await fetch('/api/ai/humanize', {
+            method: 'POST',
+            headers: apiHeaders(),
+            credentials: 'same-origin',
+            body: JSON.stringify({ text })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            return ui.showToast(data.error || 'Não foi possível humanizar (a IA está configurada no servidor?).', 'error');
+        }
+        ta.value = data.text || text;
+        ui.showToast('Legenda humanizada ✨', 'success');
+    } catch (e) {
+        ui.showToast('Erro ao humanizar.', 'error');
+    }
+}
+window.humanizeCaption = humanizeCaption;
+
+/** Converte um ISO (com fuso) para o valor de um <input datetime-local>. */
+function pickScheduleSlot(iso) {
+    const d = new Date(iso);
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    const input = document.getElementById('schedule-datetime');
+    if (input) input.value = local.toISOString().slice(0, 16);
+}
+window.pickScheduleSlot = pickScheduleSlot;
+
+/**
+ * Carrega sugestões de horário/cadência (GET /api/scheduling/suggestions) e
+ * mostra chips clicáveis que preenchem a data. Silencioso se falhar.
+ */
+async function loadSchedulingSuggestions() {
+    const box = document.getElementById('schedule-suggestions');
+    if (!box) return;
+    try {
+        const res = await fetch('/api/scheduling/suggestions?count=6', {
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        });
+        if (!res.ok) { box.style.display = 'none'; return; }
+        const d = await res.json();
+        const chips = (d.next_slots || []).map(iso => {
+            const t = new Date(iso);
+            const label = t.toLocaleString('pt-PT', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+            return `<button type="button" class="btn-chip" onclick="pickScheduleSlot('${iso}')">${label}</button>`;
+        }).join('');
+        const note = d.recommended_per_day?.note || '';
+        box.innerHTML = `<p style="font-size:11px;color:var(--text-muted);margin:0 0 6px;">💡 ${note}</p>`
+            + `<div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>`;
+        box.style.display = 'block';
+    } catch (e) {
+        box.style.display = 'none';
+    }
+}
+window.loadSchedulingSuggestions = loadSchedulingSuggestions;
 
 async function shareToStory(id) {
     if (!(await ui.confirm("Partilhar nos Stories", "Publicar a imagem deste post como Story no Instagram agora?", "zap"))) return;

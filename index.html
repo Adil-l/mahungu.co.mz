@@ -963,6 +963,9 @@
                 <button type="button" class="btn-chip" id="btn-generate-hashtags" style="margin-top: 10px;" onclick="generateHashtags()">
                     <i data-lucide="hash"></i> Gerar hashtags
                 </button>
+                <button type="button" class="btn-chip" style="margin-top: 10px; margin-left: 8px;" onclick="humanizeCaption()" title="Reescrever na voz da Mahungu (remove tiques de IA)">
+                    <i data-lucide="sparkles"></i> Humanizar
+                </button>
                 <button type="button" class="btn-chip" style="margin-top: 10px; margin-left: 8px;" onclick="clearScheduleCaption()" title="Limpar a legenda">
                     <i data-lucide="eraser"></i> Limpar legenda
                 </button>
@@ -988,6 +991,7 @@
             <div class="form-group">
                 <label>Data e hora</label>
                 <input type="datetime-local" id="schedule-datetime">
+                <div id="schedule-suggestions" style="margin-top:10px; display:none;"></div>
             </div>
 
             <button class="btn-main btn-success" style="margin-top: 4px;" onclick="saveScheduledPost()">
