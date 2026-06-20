@@ -14,6 +14,7 @@ use App\Http\Controllers\ScheduledPostController;
 use App\Http\Controllers\SocialAccountController;
 use App\Http\Controllers\SyncController;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -21,6 +22,25 @@ use Illuminate\Support\Facades\Route;
 | API Routes
 |--------------------------------------------------------------------------
 */
+
+// Health check (público) — para monitorização de uptime no Laravel Cloud.
+// Verifica conectividade à BD; 200 = ok, 503 = degradado.
+Route::get('/health', function () {
+    $database = 'ok';
+    try {
+        DB::connection()->getPdo();
+    } catch (\Throwable $e) {
+        $database = 'down';
+    }
+    $ok = $database === 'ok';
+
+    return response()->json([
+        'status' => $ok ? 'ok' : 'degraded',
+        'app' => config('app.name'),
+        'time' => now()->toIso8601String(),
+        'checks' => ['database' => $database],
+    ], $ok ? 200 : 503);
+});
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/user', function (Request $request) {
