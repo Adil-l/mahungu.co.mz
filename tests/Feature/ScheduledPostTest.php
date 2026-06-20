@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -27,7 +28,7 @@ class ScheduledPostTest extends TestCase
                 'scheduled_at' => now()->addDay()->toIso8601String(),
             ])
             ->assertStatus(422)
-            ->assertJsonFragment(['media' => ['O Instagram exige uma imagem para publicar.']]);
+            ->assertJsonStructure(['message', 'errors' => ['media']]);
     }
 
     public function test_instagram_with_image_is_scheduled(): void
@@ -47,6 +48,44 @@ class ScheduledPostTest extends TestCase
         $res->assertStatus(201);
         $this->assertNotNull($res->json('media_path'));
         Storage::disk('media')->assertExists($res->json('media_path'));
+    }
+
+    public function test_instagram_with_image_url_is_downloaded_and_scheduled(): void
+    {
+        config(['filesystems.media_disk' => 'media', 'filesystems.media_visibility' => null]);
+        Storage::fake('media');
+        // IP literal público → isPublicHttpUrl passa sem DNS; Http::fake intercepta.
+        Http::fake([
+            '8.8.8.8/*' => Http::response('fake-image-bytes', 200, ['Content-Type' => 'image/jpeg']),
+        ]);
+
+        $user = User::factory()->create();
+
+        $res = $this->actingAs($user)->postJson('/api/scheduled-posts', [
+            'content' => 'Flyer cuja imagem é um URL',
+            'platforms' => ['instagram'],
+            'scheduled_at' => now()->addDay()->toIso8601String(),
+            'media_data_url' => 'https://8.8.8.8/foto.jpg',
+        ]);
+
+        $res->assertStatus(201);
+        $this->assertNotNull($res->json('media_path'));
+        Storage::disk('media')->assertExists($res->json('media_path'));
+    }
+
+    public function test_instagram_rejects_private_url(): void
+    {
+        $user = User::factory()->create();
+
+        // URL para IP privado → bloqueado (anti-SSRF) → sem media → 422.
+        $this->actingAs($user)
+            ->postJson('/api/scheduled-posts', [
+                'content' => 'x',
+                'platforms' => ['instagram'],
+                'scheduled_at' => now()->addDay()->toIso8601String(),
+                'media_data_url' => 'http://127.0.0.1/foto.jpg',
+            ])
+            ->assertStatus(422);
     }
 
     public function test_twitter_without_image_is_allowed(): void

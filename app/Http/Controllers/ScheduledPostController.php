@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ScheduledPost;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -41,9 +42,12 @@ class ScheduledPostController extends Controller
         ]);
 
         // Guarda a imagem do flyer no servidor para a publicação automática.
+        // Aceita base64 (data URL) OU um URL http(s) de imagem (alguns flyers
+        // guardam a foto como URL em vez do base64 composto) — assim o Instagram
+        // não falha "exige imagem" só porque o formato da fonte é um URL.
         $mediaPath = $validated['media_path'] ?? null;
         if (!empty($validated['media_data_url'])) {
-            $mediaPath = $this->storeDataUrl($validated['media_data_url']) ?? $mediaPath;
+            $mediaPath = $this->storeImageSource($validated['media_data_url']) ?? $mediaPath;
         }
 
         // Carrossel: guarda os slides extra (slide 1 = media_path; 2..N = carousel_paths).
@@ -58,9 +62,14 @@ class ScheduledPostController extends Controller
         // O Instagram exige SEMPRE uma imagem (feed/story/carrossel). Recusa cedo
         // com erro claro em vez de deixar o job de publicação falhar mais tarde.
         if (in_array('instagram', $validated['platforms'], true) && empty($mediaPath)) {
+            $temFonte = ! empty($validated['media_data_url']) || ! empty($validated['media_path']);
+            $msg = $temFonte
+                ? 'A imagem deste flyer não pôde ser usada. Reabre o flyer no editor e guarda-o de novo (para gerar a imagem), depois agenda.'
+                : 'O Instagram exige uma imagem. Escolhe um flyer antes de agendar para o Instagram.';
+
             return response()->json([
-                'message' => 'O Instagram exige uma imagem. Escolhe um flyer (ou imagem) antes de agendar para o Instagram.',
-                'errors' => ['media' => ['O Instagram exige uma imagem para publicar.']],
+                'message' => $msg,
+                'errors' => ['media' => [$msg]],
             ], 422);
         }
 
@@ -97,13 +106,95 @@ class ScheduledPostController extends Controller
         if ($bytes === false) {
             return null;
         }
+        return $this->putBytes($bytes, $ext);
+    }
+
+    /**
+     * Resolve a fonte da imagem do flyer: base64 (data URL) OU URL http(s).
+     * (Alguns flyers guardam a foto como URL em vez do base64 composto.)
+     */
+    private function storeImageSource(string $src): ?string
+    {
+        if (str_starts_with($src, 'data:image/')) {
+            return $this->storeDataUrl($src);
+        }
+        if (preg_match('#^https?://#i', $src)) {
+            return $this->storeRemoteImage($src);
+        }
+
+        return null;
+    }
+
+    /**
+     * Descarrega uma imagem de um URL http(s) PÚBLICO e guarda-a no disco.
+     * Guarda anti-SSRF: só http/https que resolvam para IP público; só
+     * content-type image/*; tamanho limitado a 8 MB. Devolve o caminho ou null.
+     */
+    private function storeRemoteImage(string $url): ?string
+    {
+        if (! $this->isPublicHttpUrl($url)) {
+            return null;
+        }
+        try {
+            $res = Http::timeout(15)->get($url);
+        } catch (\Throwable $e) {
+            return null;
+        }
+        if (! $res->successful()) {
+            return null;
+        }
+        $ct = strtolower((string) $res->header('Content-Type'));
+        if (! str_starts_with($ct, 'image/')) {
+            return null;
+        }
+        $bytes = $res->body();
+        $len = strlen($bytes);
+        if ($len === 0 || $len > 8 * 1024 * 1024) {
+            return null;
+        }
+        $ext = match (true) {
+            str_contains($ct, 'png') => 'png',
+            str_contains($ct, 'webp') => 'webp',
+            str_contains($ct, 'gif') => 'gif',
+            default => 'jpg',
+        };
+
+        return $this->putBytes($bytes, $ext);
+    }
+
+    /** Grava bytes no disco de media e devolve o caminho relativo. */
+    private function putBytes(string $bytes, string $ext): string
+    {
         $path = 'scheduled/' . Str::uuid() . '.' . $ext;
         // Visibilidade configurável: 'public' para o S3 servir um URL acessível
         // (Instagram/Threads). Se o bucket não permitir ACLs, MEDIA_VISIBILITY vazio.
         $disk = Storage::disk(config('filesystems.media_disk'));
         $visibility = config('filesystems.media_visibility');
         $visibility ? $disk->put($path, $bytes, $visibility) : $disk->put($path, $bytes);
+
         return $path;
+    }
+
+    /** Só http/https que resolva exclusivamente para IP(s) público(s) — anti-SSRF. */
+    private function isPublicHttpUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+        $scheme = strtolower($parts['scheme'] ?? '');
+        $host = $parts['host'] ?? '';
+        if (! in_array($scheme, ['http', 'https'], true) || $host === '') {
+            return false;
+        }
+        $ips = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : (@gethostbynamel($host) ?: []);
+        if (empty($ips)) {
+            return false;
+        }
+        foreach ($ips as $ip) {
+            if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function show(ScheduledPost $scheduledPost)
