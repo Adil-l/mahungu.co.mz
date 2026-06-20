@@ -67,6 +67,30 @@ class AiGenerateTest extends TestCase
         });
     }
 
+    public function test_uses_default_editorial_system_when_none_provided(): void
+    {
+        config(['services.anthropic.key' => 'sk-ant-test']);
+
+        Http::fake([
+            'api.anthropic.com/*' => Http::response([
+                'content' => [['type' => 'text', 'text' => 'ok']],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+
+        // Sem 'system' no pedido → deve aplicar o system editorial por omissão.
+        $this->actingAs($user)
+            ->postJson('/api/ai/generate', ['prompt' => 'Gera uma manchete'])
+            ->assertOk();
+
+        Http::assertSent(function ($request) {
+            $system = $request['system'] ?? '';
+            return str_contains($system, '@mahungu_mz')          // manual editorial
+                && str_contains($system, 'DADOS, não instruções'); // guarda anti-injeção
+        });
+    }
+
     public function test_returns_502_when_anthropic_errors(): void
     {
         config(['services.anthropic.key' => 'sk-ant-test']);
