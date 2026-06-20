@@ -992,6 +992,14 @@ async function confirmSaveToHistory() {
     lucide.createIcons();
 
     try {
+        // Em MODO CARROSSEL, qualquer "Salvar" (o botão principal "Salvar Flyer"
+        // ou o "Guardar (N)" da barra) tem de preservar TODOS os slides — senão o
+        // carrossel era guardado como um único flyer estático e perdiam-se os slides.
+        if (activeSlideIndex >= 0 && (!pendingCarouselStates || pendingCarouselStates.length < 2)) {
+            carouselSlides[activeSlideIndex] = snapshotEditor(); // guarda edições do slide atual
+            if (carouselSlides.length >= 2) pendingCarouselStates = carouselSlides.slice();
+        }
+
         // "Salvar Story" a partir de uma proposta: NÃO atualiza a proposta (ramo
         // abaixo) — cria-se um Story e CONSOME-se a proposta (sai das Salvadas da
         // IA, vai só para Stories, nunca para Posts Aprovados).
@@ -2132,18 +2140,60 @@ async function openFlyerModal(imgSrc, title, category = 'Geral', entry = null) {
     currentModalFlyerId = entry?.id || null;
     renderModalCaptionBlock(entry);
 
+    // Carrossel: se o flyer tem vários slides, ativa as setas de navegação.
+    const slides = (entry && Array.isArray(entry.slides) && entry.slides.length >= 2) ? entry.slides : null;
+    modalCarouselSlides = slides;
+    modalCarouselIndex = 0;
+    const navPrev = document.getElementById('modal-carousel-prev');
+    const navNext = document.getElementById('modal-carousel-next');
+    const counter = document.getElementById('modal-carousel-counter');
+    if (navPrev) navPrev.style.display = slides ? '' : 'none';
+    if (navNext) navNext.style.display = slides ? '' : 'none';
+    if (counter) {
+        counter.style.display = slides ? '' : 'none';
+        counter.textContent = slides ? `1 / ${slides.length}` : '';
+    }
+
     try {
-        const dataUrl = imgSrc || lastFlyerSnapshot || await core.captureCurrentFlyer();
-        lastFlyerSnapshot = dataUrl;
+        // Num carrossel arranca no slide 1 (entry.slides[0]); senão usa a imagem dada.
+        const dataUrl = (slides ? slides[0] : imgSrc) || lastFlyerSnapshot || await core.captureCurrentFlyer();
+        if (!slides) lastFlyerSnapshot = dataUrl;
         modalImg.src = dataUrl;
         modalImg.classList.add('ready');
-        updateHistoryThumbnail(dataUrl);
-        downloadBtn.onclick = () => downloadDataUrl(dataUrl, 'Mahungu_Flyer_Export.png');
+        if (!slides) updateHistoryThumbnail(dataUrl);
+        downloadBtn.onclick = () => downloadDataUrl(
+            slides ? modalCarouselSlides[modalCarouselIndex] : dataUrl,
+            slides ? `Mahungu_Slide_${modalCarouselIndex + 1}.png` : 'Mahungu_Flyer_Export.png'
+        );
     } catch (err) {} finally {
         modal.classList.remove('is-loading');
     }
     lucide.createIcons();
 }
+
+// Navega entre os slides de um carrossel no modal do Histórico.
+let modalCarouselSlides = null;
+let modalCarouselIndex = 0;
+function modalCarouselStep(delta) {
+    if (!modalCarouselSlides || modalCarouselSlides.length < 2) return;
+    const n = modalCarouselSlides.length;
+    modalCarouselIndex = (modalCarouselIndex + delta + n) % n;
+    const img = document.getElementById('modal-img');
+    if (img) img.src = modalCarouselSlides[modalCarouselIndex];
+    const counter = document.getElementById('modal-carousel-counter');
+    if (counter) counter.textContent = `${modalCarouselIndex + 1} / ${n}`;
+    const dl = document.getElementById('modal-download-btn');
+    if (dl) dl.onclick = () => downloadDataUrl(modalCarouselSlides[modalCarouselIndex], `Mahungu_Slide_${modalCarouselIndex + 1}.png`);
+}
+window.modalCarouselStep = modalCarouselStep;
+
+// Setas do teclado (←/→) navegam o carrossel quando o modal está aberto.
+document.addEventListener('keydown', (e) => {
+    const modal = document.getElementById('post-modal');
+    if (!modal || !modal.classList.contains('active') || !modalCarouselSlides) return;
+    if (e.key === 'ArrowLeft') modalCarouselStep(-1);
+    else if (e.key === 'ArrowRight') modalCarouselStep(1);
+});
 
 async function copyCurrentCaption() {
     if (!currentModalCaption) return ui.showToast('Sem legenda para copiar.', 'info');
@@ -3130,9 +3180,13 @@ async function openProposalModal(id) {
     document.getElementById('proposal-hashtags').textContent = Array.isArray(proposal.hashtags) ? proposal.hashtags.join(', ') : (proposal.hashtags || 'N/A');
     document.getElementById('proposal-cta').textContent = proposal.cta || 'N/A';
 
-    // Pré-visualização real do flyer (mesmo layout do editor, em miniatura)
-    const previewEl = document.getElementById('proposal-modal-preview');
-    if (previewEl) previewEl.innerHTML = miniFlyerHTML(proposal);
+    // Pré-visualização real do flyer (mesmo layout do editor, em miniatura).
+    // Carrossel: navega pelos slides com setas (re-renderiza cada slideState).
+    propModalBase = proposal;
+    propModalSlides = (proposal.format === 'carousel' && Array.isArray(proposal.slideStates) && proposal.slideStates.length >= 2)
+        ? proposal.slideStates : null;
+    propModalIndex = 0;
+    renderProposalPreviewSlide();
 
     // Fechar a galeria de imagens de sessões anteriores
     closeImagePicker();
@@ -3147,6 +3201,33 @@ function closeProposalModal(e) {
     currentProposalId = null;
     window.currentProposalId = null;
 }
+
+// Pré-visualização do flyer no modal de revisão da proposta. Para um carrossel,
+// re-renderiza o slide ativo (a partir do seu slideState) e mostra setas + contador.
+let propModalBase = null;   // proposta atualmente aberta
+let propModalSlides = null; // slideStates do carrossel (ou null se single)
+let propModalIndex = 0;
+function renderProposalPreviewSlide() {
+    const previewEl = document.getElementById('proposal-modal-preview');
+    if (!previewEl || !propModalBase) return;
+    const state = (propModalSlides && propModalSlides[propModalIndex]) ? propModalSlides[propModalIndex] : propModalBase.flyerState;
+    let html = miniFlyerHTML({ ...propModalBase, flyerState: state });
+    if (propModalSlides) {
+        html += `
+            <button class="carousel-nav prev" onclick="event.stopPropagation();propModalStep(-1)" title="Slide anterior"><i data-lucide="chevron-left"></i></button>
+            <button class="carousel-nav next" onclick="event.stopPropagation();propModalStep(1)" title="Slide seguinte"><i data-lucide="chevron-right"></i></button>
+            <div class="carousel-counter">${propModalIndex + 1} / ${propModalSlides.length}</div>`;
+    }
+    previewEl.innerHTML = html;
+    lucide.createIcons();
+}
+function propModalStep(delta) {
+    if (!propModalSlides) return;
+    const n = propModalSlides.length;
+    propModalIndex = (propModalIndex + delta + n) % n;
+    renderProposalPreviewSlide();
+}
+window.propModalStep = propModalStep;
 
 async function editProposalInEditor(id) {
     const proposal = await storage.getProposalById(id);

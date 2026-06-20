@@ -732,7 +732,10 @@
     <div class="modal-container" onclick="event.stopPropagation()">
         <div class="modal-preview">
             <div class="modal-preview-frame">
+                <button class="carousel-nav prev" id="modal-carousel-prev" onclick="event.stopPropagation();modalCarouselStep(-1)" style="display:none;" title="Slide anterior"><i data-lucide="chevron-left"></i></button>
                 <img id="modal-img" src="" alt="Flyer Preview">
+                <button class="carousel-nav next" id="modal-carousel-next" onclick="event.stopPropagation();modalCarouselStep(1)" style="display:none;" title="Slide seguinte"><i data-lucide="chevron-right"></i></button>
+                <div class="carousel-counter" id="modal-carousel-counter" style="display:none;">1 / 1</div>
             </div>
         </div>
         <div class="modal-sidebar">

@@ -1829,6 +1829,47 @@ body.editor-active #tab-editor {
 }
 .proposal-badge.carousel i { width: 12px; height: 12px; }
 
+/* ── Navegação de slides nos modais de visualização (carrossel) ── */
+.modal-preview-frame, .proposal-preview-lg { position: relative; }
+.carousel-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(13, 14, 22, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 20;
+    backdrop-filter: blur(4px);
+    transition: background 0.15s, transform 0.15s;
+}
+.carousel-nav:hover { background: var(--primary, #d4522a); }
+.carousel-nav:active { transform: translateY(-50%) scale(0.92); }
+.carousel-nav.prev { left: 10px; }
+.carousel-nav.next { right: 10px; }
+.carousel-nav i { width: 22px; height: 22px; }
+.carousel-counter {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(13, 14, 22, 0.72);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    z-index: 20;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
 .proposal-card-info { padding: 14px 16px 8px; }
 
 .proposal-card-title {
