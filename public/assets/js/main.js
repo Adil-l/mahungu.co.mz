@@ -3892,6 +3892,23 @@ async function generateProposalAs(id, format) {
     const proposal = await storage.getProposalById(id);
     if (!proposal) return ui.showToast('Proposta não encontrada.', 'error');
 
+    // Carrossel: pergunta o nº de slides ANTES de abrir o editor — cancelar
+    // deixa o utilizador limpo na aba de propostas.
+    let carouselSlidesN = 0;
+    if (format === 'carousel') {
+        const nStr = await ui.prompt(
+            'Gerar carrossel com IA',
+            'Quantos slides ao todo? (2 a 10). A IA conta a notícia em slides numa só chamada.',
+            '5',
+            { placeholder: '5', confirmText: 'Gerar' }
+        );
+        if (nStr === null || nStr === undefined || String(nStr).trim() === '') return; // cancelou
+        carouselSlidesN = parseInt(nStr, 10);
+        if (!carouselSlidesN || carouselSlidesN < 2 || carouselSlidesN > 10) {
+            return ui.showToast('Indica um número entre 2 e 10.', 'info');
+        }
+    }
+
     // Garante imagem antes de abrir no editor (notícias novas podem não ter foto).
     if (!proposal.image) {
         try { await ensureProposalImage(proposal); await storage.saveProposal(proposal); } catch (e) {}
@@ -3904,8 +3921,8 @@ async function generateProposalAs(id, format) {
     const topic = buildProposalTopic(proposal);
 
     if (format === 'carousel') {
-        setEditorFormat('feed');               // carrossel usa o canvas de feed
-        await generateCarousel(topic, 5, true); // includeFirst: Slide 1 = gancho da notícia
+        setEditorFormat('feed');                            // carrossel usa o canvas de feed
+        await generateCarousel(topic, carouselSlidesN, true); // includeFirst: Slide 1 = gancho da notícia
     } else if (format === 'story') {
         setEditorFormat('story');              // 9:16; o package devolve só título (sem legenda)
         await generateContentPackage(topic);
