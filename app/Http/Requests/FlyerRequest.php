@@ -20,8 +20,10 @@ class FlyerRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'client_id' => 'nullable|integer', // ID do IndexedDB local — permite upsert sem duplicatas
             'title' => 'required|string|max:255',
             'category' => 'nullable|string|max:100',
+            'date' => 'nullable|string|max:50',
             'content' => 'nullable|string',
             'template' => 'nullable|string|max:50',
             'html' => 'nullable|string',

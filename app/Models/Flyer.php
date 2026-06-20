@@ -11,8 +11,10 @@ class Flyer extends Model
     use HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'client_id',
         'title',
         'category',
+        'date',
         'content',
         'template',
         'html',
@@ -21,12 +23,14 @@ class Flyer extends Model
         'status',
         'captions',
         'metadata',
+        'state',
         'approved_from',
     ];
 
     protected $casts = [
         'captions' => 'json',
         'metadata' => 'json',
+        'state' => 'json',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
