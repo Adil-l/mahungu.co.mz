@@ -120,18 +120,7 @@ export const images = {
             console.warn('ImagesService.fromStock falhou:', err.message);
             return '';
         }
-    },
-
-    /**
-     * Último recurso: gera uma imagem por IA (Pollinations, sem chave) para
-     * notícias sem qualquer foto. O URL gera a imagem ao ser carregado. Pede
-     * "sem texto" para não chocar com o título do flyer. Devolve sempre um URL.
-     * @param {string} query
-     * @returns {string}
-     */
-    aiGenerate(query) {
-        const prompt = `editorial news illustration about: ${String(query || 'notícias').trim()}. `
-            + `professional, high quality, no text, no words, no watermark`;
-        return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=1080&height=1350&nologo=true`;
     }
+    // NOTA: não há (nem deve haver) geração de imagens por IA. As fotos vêm
+    // sempre de fontes reais (artigo/Pexels/Unsplash/Openverse) ou da foto base.
 };
