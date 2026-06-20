@@ -63,6 +63,39 @@ class AiContentTest extends TestCase
             ->assertJsonFragment(['title' => 'Gasolina sobe hoje']);
     }
 
+    public function test_content_package_story_uses_light_prompt(): void
+    {
+        config(['services.anthropic.key' => 'sk-ant-test']);
+        Http::fake([
+            'api.anthropic.com/*' => Http::response([
+                'content' => [['type' => 'text', 'text' => json_encode([
+                    'title' => 'Cimeira da SADC chega a Maputo',
+                    'summary' => '15 chefes de Estado reunidos em Outubro',
+                ])]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->postJson('/api/ai/content-package', [
+                'topic' => 'Maputo recebe cimeira da SADC',
+                'format' => 'story',
+            ])
+            ->assertOk()
+            ->assertJsonFragment(['title' => 'Cimeira da SADC chega a Maputo']);
+
+        // Story vai SEM legenda: o prompt NÃO deve pedir legenda/hashtags (poupa
+        // créditos) e o teto de tokens deve ser baixo.
+        Http::assertSent(function ($request) {
+            $prompt = $request['messages'][0]['content'] ?? '';
+            return str_contains($prompt, 'STORY')
+                && ! str_contains($prompt, '5 parágrafos')
+                && ! str_contains($prompt, 'hashtags')
+                && ($request['max_tokens'] ?? 9999) <= 400;
+        });
+    }
+
     public function test_content_package_handles_non_json(): void
     {
         config(['services.anthropic.key' => 'sk-ant-test']);

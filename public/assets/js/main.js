@@ -3188,13 +3188,18 @@ async function generateContentPackage() {
     );
     if (!topic || !topic.trim()) return;
 
-    ui.showToast('A gerar conteúdo com IA…', 'info');
+    // Formato atual: carrossel (slide ativo) > story > feed. Stories vão SEM
+    // legenda, por isso pede-se só título+resumo (poupa créditos).
+    const fmt = activeSlideIndex >= 0 ? 'carousel' : editorFormat;
+    const isStory = fmt === 'story';
+
+    ui.showToast(isStory ? 'A gerar título do Story…' : 'A gerar conteúdo com IA…', 'info');
     try {
         const res = await fetch('/api/ai/content-package', {
             method: 'POST',
             headers: apiHeaders(),
             credentials: 'same-origin',
-            body: JSON.stringify({ topic: topic.trim() })
+            body: JSON.stringify({ topic: topic.trim(), format: fmt })
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -3210,15 +3215,32 @@ async function generateContentPackage() {
             editor.innerHTML = headlineHtml(data.title || '', data.summary || '');
             fitHeadline(editor);
         }
-        // Legenda/hashtags/CTA acompanham o flyer (usados ao agendar).
-        editorPostMeta = {
-            caption: data.caption || '',
-            hashtags: Array.isArray(data.hashtags) ? data.hashtags : [],
-            cta: data.cta || ''
-        };
+        // Story NÃO leva legenda → não guardar legenda/hashtags (não foram geradas).
+        // Feed/Carrossel: legenda/hashtags/CTA acompanham o flyer ao agendar.
+        editorPostMeta = isStory
+            ? { caption: '', hashtags: [], cta: '' }
+            : {
+                caption: data.caption || '',
+                hashtags: Array.isArray(data.hashtags) ? data.hashtags : [],
+                cta: data.cta || ''
+            };
         invalidateFlyerSnapshot();
-        autoSave();
-        ui.showToast('Pronto! Título no flyer; legenda e hashtags prontas para o agendamento ✨', 'success');
+
+        // Funciona em Feed, Story (mesmo #editor) e Carrossel. No carrossel
+        // preenche o SLIDE ATIVO (uma geração = um slide → poupa créditos).
+        if (activeSlideIndex >= 0) {
+            carouselSlides[activeSlideIndex] = snapshotEditor();
+            renderCarouselBar();
+            ui.showToast(`Slide ${activeSlideIndex + 1} preenchido pela IA ✨`, 'success');
+        } else {
+            autoSave();
+            ui.showToast(
+                isStory
+                    ? 'Story preenchido pela IA ✨ (sem legenda — Stories não levam legenda)'
+                    : 'Pronto! Título no flyer; legenda e hashtags prontas para o agendamento ✨',
+                'success'
+            );
+        }
     } catch (e) {
         ui.showToast('Erro ao gerar conteúdo com IA.', 'error');
     }

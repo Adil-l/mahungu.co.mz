@@ -120,24 +120,39 @@ TXT;
     {
         $data = $request->validate([
             'topic' => 'required|string|max:8000',
+            'format' => 'nullable|in:feed,story,carousel',
         ]);
 
         if (! $claude->configured()) {
             return response()->json(['error' => 'Claude não está configurado no servidor.'], 503);
         }
 
-        $prompt = "Tema/fonte da notícia:\n{$data['topic']}\n\n"
-            . "Devolve SÓ um objeto JSON válido (sem markdown, sem ```), com estas chaves exatas:\n"
-            . '{"title": "gancho ≤55 caracteres", '
-            . '"summary": "consequência/número ≤70 caracteres", '
-            . '"caption": "legenda de 5 parágrafos com marcador, 💬 pergunta e a terminar em 🔥 Siga a @mahungu_mz para mais notícias e tendências.", '
-            . '"hashtags": ["5 a 8 hashtags relevantes, SEM o símbolo #"], '
-            . '"cta": "chamada à ação curta", '
-            . '"x": "versão para o X/Twitter, ≤270 caracteres, com 1-2 hashtags", '
-            . '"threads": "versão conversacional para o Threads, a terminar com pergunta"}';
+        // Stories vão SEM legenda → não gastar tokens com legenda/hashtags/cta.
+        // Só título + resumo, e MAIS fortes/autossuficientes (não há legenda a
+        // dar contexto). Para feed/carrossel devolve o pacote completo.
+        if (($data['format'] ?? 'feed') === 'story') {
+            $prompt = "Tema/fonte da notícia:\n{$data['topic']}\n\n"
+                . "Isto é para um STORY do Instagram, que vai SEM legenda. O título e o "
+                . "resumo têm de contar tudo sozinhos: diretos, fortes e autossuficientes.\n"
+                . "Devolve SÓ um objeto JSON válido (sem markdown, sem ```), com estas chaves exatas:\n"
+                . '{"title": "manchete forte e completa ≤60 caracteres", '
+                . '"summary": "remate/consequência com número ou impacto ≤70 caracteres"}';
+            $maxTokens = 300; // título+resumo cabem folgados; poupa créditos
+        } else {
+            // Só as chaves que o editor usa (título/resumo no flyer; legenda/hashtags/cta
+            // ao agendar). Sem x/threads — não eram consumidos e gastavam tokens à toa.
+            $prompt = "Tema/fonte da notícia:\n{$data['topic']}\n\n"
+                . "Devolve SÓ um objeto JSON válido (sem markdown, sem ```), com estas chaves exatas:\n"
+                . '{"title": "gancho ≤55 caracteres", '
+                . '"summary": "consequência/número ≤70 caracteres", '
+                . '"caption": "legenda de 5 parágrafos com marcador, 💬 pergunta e a terminar em 🔥 Siga a @mahungu_mz para mais notícias e tendências.", '
+                . '"hashtags": ["5 a 8 hashtags relevantes, SEM o símbolo #"], '
+                . '"cta": "chamada à ação curta"}';
+            $maxTokens = 1200; // um pacote completo cabe folgado em 1200
+        }
 
         try {
-            $raw = $claude->generate($prompt, self::EDITORIAL_SYSTEM);
+            $raw = $claude->generate($prompt, self::EDITORIAL_SYSTEM, $maxTokens);
         } catch (RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], 502);
         }
