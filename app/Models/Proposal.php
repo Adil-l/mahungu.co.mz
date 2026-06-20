@@ -12,10 +12,17 @@ class Proposal extends Model
 
     protected $fillable = [
         'title',
+        'generatedTitle',
         'summary',
+        'generatedSummary',
+        'generatedCaption',
         'category',
+        'date',
         'captions',
         'template',
+        'suggestedTemplate',
+        'hashtags',
+        'cta',
         'status',
         'source_id',
         'source_name',
@@ -25,6 +32,7 @@ class Proposal extends Model
 
     protected $casts = [
         'captions' => 'json',
+        'hashtags' => 'json',
         'metadata' => 'json',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
