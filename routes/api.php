@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AiController;
 use App\Http\Controllers\FlyerController;
 use App\Http\Controllers\HashtagController;
 use App\Http\Controllers\ImageSearchController;
@@ -33,6 +34,9 @@ Route::middleware(['auth'])->group(function () {
     Route::apiResource('proposals', ProposalController::class);
     Route::post('/proposals/clear', [ProposalController::class, 'clear']);
     Route::apiResource('sources', NewsSourceController::class);
+
+    // Geração de texto editorial por IA (proxy Claude — chave no servidor).
+    Route::post('/ai/generate', [AiController::class, 'generate']);
 
     // Gerador de hashtags (proxy RapidAPI/Hashtagy).
     Route::get('/hashtags', [HashtagController::class, 'generate']);

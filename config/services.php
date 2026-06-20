@@ -87,6 +87,16 @@ return [
         'key' => env('UNSPLASH_ACCESS_KEY'),
     ],
 
+    // Anthropic (Claude) — geração editorial server-side. A chave fica no
+    // servidor (NUNCA exposta ao browser, ao contrário do Gemini client-side).
+    // Modelo predefinido: claude-opus-4-8 (o mais capaz da família Opus).
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+        'model' => env('ANTHROPIC_MODEL', 'claude-opus-4-8'),
+        'version' => env('ANTHROPIC_VERSION', '2023-06-01'),
+        'max_tokens' => (int) env('ANTHROPIC_MAX_TOKENS', 4096),
+    ],
+
     // Liga/desliga modo de simulação: quando true, os posts são marcados como
     // publicados sem chamar as APIs reais (útil para demonstrar o fluxo sem a
     // aprovação da Meta). Ver App\Jobs\PostToSocialMedia.

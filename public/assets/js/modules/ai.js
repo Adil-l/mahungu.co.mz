@@ -196,6 +196,29 @@ export const ai = {
         return text;
     },
 
+    // Claude (Anthropic) via proxy server-side — a chave fica no servidor
+    // (config/services.php), NUNCA no browser. Endpoint autenticado por sessão.
+    async callClaude(prompt) {
+        const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+        const response = await fetchWithTimeout('/api/ai/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrf
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ prompt })
+        });
+        // 503 = sem ANTHROPIC_API_KEY no servidor → deixa cair para o próximo provedor.
+        if (response.status === 503) throw new Error('Claude não configurado no servidor.');
+        if (!response.ok) throw new Error(`Claude HTTP ${response.status}`);
+        const data = await response.json();
+        const text = data?.text;
+        if (!text) throw new Error('Claude: resposta vazia.');
+        return text;
+    },
+
     async callLLM7(prompt) {
         const response = await fetchWithTimeout('https://api.llm7.io/v1/chat/completions', {
             method: 'POST',
@@ -241,6 +264,10 @@ export const ai = {
 
     async ask(prompt) {
         const providers = [];
+        // Claude server-side primeiro: melhor qualidade, sem expor chave nem
+        // limites dos provedores grátis. Se não estiver configurado (503), cai
+        // automaticamente para os seguintes.
+        providers.push(['Claude', (p) => this.callClaude(p)]);
         if (this.openaiKey) providers.push(['OpenAI', (p) => this.callOpenAI(p)]);
         if (this.apiKey) providers.push(['Gemini', (p) => this.callGemini(p)]);
         if (this.openrouterKey) providers.push(['OpenRouter', (p) => this.callOpenRouter(p)]);
