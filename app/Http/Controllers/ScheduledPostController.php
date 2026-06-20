@@ -55,6 +55,15 @@ class ScheduledPostController extends Controller
             }
         }
 
+        // O Instagram exige SEMPRE uma imagem (feed/story/carrossel). Recusa cedo
+        // com erro claro em vez de deixar o job de publicação falhar mais tarde.
+        if (in_array('instagram', $validated['platforms'], true) && empty($mediaPath)) {
+            return response()->json([
+                'message' => 'O Instagram exige uma imagem. Escolhe um flyer (ou imagem) antes de agendar para o Instagram.',
+                'errors' => ['media' => ['O Instagram exige uma imagem para publicar.']],
+            ], 422);
+        }
+
         $post = ScheduledPost::create([
             'user_id' => Auth::id(),
             'flyer_id' => $validated['flyer_id'] ?? null,
@@ -126,6 +135,16 @@ class ScheduledPostController extends Controller
             'media_path' => 'nullable|string',
         ]);
         // 'status' removido: o status só deve ser alterado pelo Job/Comando, nunca pelo usuário
+
+        // Não permitir ficar com o Instagram nas plataformas sem imagem.
+        $platforms = $validated['platforms'] ?? $scheduledPost->platforms ?? [];
+        $mediaPath = $validated['media_path'] ?? $scheduledPost->media_path;
+        if (in_array('instagram', $platforms, true) && empty($mediaPath)) {
+            return response()->json([
+                'message' => 'O Instagram exige uma imagem. Não é possível agendar para o Instagram sem imagem.',
+                'errors' => ['media' => ['O Instagram exige uma imagem para publicar.']],
+            ], 422);
+        }
 
         $scheduledPost->update($validated);
 

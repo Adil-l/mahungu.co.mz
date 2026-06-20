@@ -1435,6 +1435,11 @@ async function saveScheduledPost() {
     if (format === 'carousel' && schedulerCarouselSlides.length < 1) {
         return ui.showToast('Adiciona pelo menos 1 imagem (o slide 2) para o carrossel.', 'info');
     }
+    // O Instagram exige SEMPRE uma imagem (feed incluído) — sem flyer/imagem
+    // o post falharia na publicação. Bloqueia já com mensagem clara.
+    if (platforms.includes('instagram') && (!flyer || !flyer.image)) {
+        return ui.showToast('O Instagram exige uma imagem. Escolhe um flyer antes de agendar para o Instagram.', 'info');
+    }
 
     try {
         await scheduler.saveScheduledPost({
