@@ -172,6 +172,9 @@
         <button class="btn-main" id="btn-enter-carousel" onclick="enterCarouselMode()" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">
             <i data-lucide="images"></i> Criar carrossel
         </button>
+        <button class="btn-full btn-ai-generate" onclick="generateCarousel()" style="margin-top: 8px;" title="Define o nº de slides; a IA preenche todos a partir do título atual (1 só chamada)">
+            <i data-lucide="sparkles" style="width:14px;height:14px;"></i> Gerar carrossel com IA
+        </button>
         <div id="carousel-bar" class="carousel-bar" style="display:none;"></div>
     </div>
 
@@ -983,7 +986,10 @@
                     <i data-lucide="sparkles" style="width:12px;height:12px;display:inline;vertical-align:middle;"></i>
                     Legenda preenchida a partir do flyer — podes editá-la livremente antes de agendar.
                 </p>
-                <button type="button" class="btn-chip" id="btn-generate-hashtags" style="margin-top: 10px;" onclick="generateHashtags()">
+                <button type="button" class="btn-chip" style="margin-top: 10px;" onclick="regenerateCaption()" title="Gerar uma nova legenda a partir do flyer (sem regerar o título)">
+                    <i data-lucide="refresh-cw"></i> Nova legenda (IA)
+                </button>
+                <button type="button" class="btn-chip" id="btn-generate-hashtags" style="margin-top: 10px; margin-left: 8px;" onclick="generateHashtags()">
                     <i data-lucide="hash"></i> Gerar hashtags
                 </button>
                 <button type="button" class="btn-chip" style="margin-top: 10px; margin-left: 8px;" onclick="humanizeCaption()" title="Reescrever na voz da Mahungu (remove tiques de IA)">

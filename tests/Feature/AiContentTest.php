@@ -96,6 +96,71 @@ class AiContentTest extends TestCase
         });
     }
 
+    public function test_caption_only_returns_caption(): void
+    {
+        config(['services.anthropic.key' => 'sk-ant-test']);
+        Http::fake([
+            'api.anthropic.com/*' => Http::response([
+                'content' => [['type' => 'text', 'text' => json_encode([
+                    'caption' => '🚨 ATENÇÃO: ...\n\n💬 E tu?\n\n🔥 Siga a @mahungu_mz para mais notícias e tendências.',
+                    'hashtags' => ['Mocambique', 'Economia'],
+                    'cta' => 'Partilha',
+                ])]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->postJson('/api/ai/caption', ['topic' => 'Banco de Moçambique baixa juro'])
+            ->assertOk()
+            ->assertJsonStructure(['caption', 'hashtags', 'cta']);
+
+        // Não deve pedir título (é só legenda).
+        Http::assertSent(fn ($r) => str_contains($r['messages'][0]['content'] ?? '', 'SÓ a legenda'));
+    }
+
+    public function test_carousel_returns_slides_and_respects_count(): void
+    {
+        config(['services.anthropic.key' => 'sk-ant-test']);
+        $slides = [
+            ['title' => 'Slide 1', 'summary' => 'gancho'],
+            ['title' => 'Slide 2', 'summary' => 'desenvolvimento'],
+            ['title' => 'Slide 3', 'summary' => 'remate'],
+        ];
+        Http::fake([
+            'api.anthropic.com/*' => Http::response([
+                'content' => [['type' => 'text', 'text' => json_encode([
+                    'slides' => $slides,
+                    'caption' => '🔥 Siga a @mahungu_mz para mais notícias e tendências.',
+                    'hashtags' => ['Mocambique'],
+                    'cta' => 'Vê o carrossel',
+                ])]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->postJson('/api/ai/carousel', ['topic' => 'Orçamento do Estado 2026', 'slides' => 3])
+            ->assertOk()
+            ->assertJsonCount(3, 'slides')
+            ->assertJsonStructure(['slides' => [['title', 'summary']], 'caption', 'hashtags']);
+
+        // O prompt tem de pedir exatamente 3 slides (1 só chamada para todos).
+        Http::assertSent(fn ($r) => str_contains($r['messages'][0]['content'] ?? '', '3 slides'));
+    }
+
+    public function test_carousel_validates_slide_count(): void
+    {
+        config(['services.anthropic.key' => 'sk-ant-test']);
+        $user = User::factory()->create();
+        // fora do intervalo 2..10 → 422
+        $this->actingAs($user)
+            ->postJson('/api/ai/carousel', ['topic' => 'x', 'slides' => 99])
+            ->assertStatus(422);
+    }
+
     public function test_content_package_handles_non_json(): void
     {
         config(['services.anthropic.key' => 'sk-ant-test']);

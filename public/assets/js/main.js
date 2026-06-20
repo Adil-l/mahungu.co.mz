@@ -3247,6 +3247,87 @@ async function generateContentPackage() {
 }
 window.generateContentPackage = generateContentPackage;
 
+// Gera SÓ uma nova legenda (variações) a partir do flyer selecionado, sem
+// regerar o título → poupa créditos. Usado no modal de agendamento, onde a
+// legenda é visível/editável (#schedule-content). POST /api/ai/caption.
+async function regenerateCaption() {
+    const flyerId = document.getElementById('schedule-flyer')?.value;
+    const flyer = (schedulerFlyers || []).find(f => String(f.id) === String(flyerId));
+    const ta = document.getElementById('schedule-content');
+    const base = (flyer && flyer.title) ? flyer.title : (ta?.value || '').trim();
+    if (!base) return ui.showToast('Escolhe um flyer (ou escreve o tema) primeiro.', 'info');
+
+    ui.showToast('A gerar nova legenda…', 'info');
+    try {
+        const res = await fetch('/api/ai/caption', {
+            method: 'POST', headers: apiHeaders(), credentials: 'same-origin',
+            body: JSON.stringify({ topic: base })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return ui.showToast(data.error || 'Não foi possível gerar a legenda.', 'error');
+        if (!data.caption) return ui.showToast('A IA não devolveu legenda. Tenta de novo.', 'error');
+        const tags = (Array.isArray(data.hashtags) && data.hashtags.length)
+            ? '\n\n' + data.hashtags.map(h => '#' + String(h).replace(/^#/, '')).join(' ')
+            : '';
+        if (ta) ta.value = data.caption + tags;
+        ui.showToast('Nova legenda gerada ✨', 'success');
+    } catch (e) {
+        ui.showToast('Erro ao gerar a legenda.', 'error');
+    }
+}
+window.regenerateCaption = regenerateCaption;
+
+// Gera um CARROSSEL inteiro com IA: o utilizador valida o título (Slide 1) e
+// define o nº de slides; UMA chamada preenche os restantes (poupa créditos).
+// POST /api/ai/carousel.
+async function generateCarousel() {
+    const editor = document.getElementById('editor');
+    const baseTitle = editor ? editor.innerText.trim() : '';
+    if (!baseTitle) return ui.showToast('Primeiro define ou gera o título do Slide 1.', 'info');
+
+    const nStr = await ui.prompt(
+        'Gerar carrossel com IA',
+        'Quantos slides ao todo? (2 a 10). O Slide 1 mantém o teu título; a IA preenche os restantes numa só chamada.',
+        '5',
+        { placeholder: '5', confirmText: 'Gerar' }
+    );
+    const n = parseInt(nStr, 10);
+    if (!n || n < 2 || n > 10) return ui.showToast('Indica um número entre 2 e 10.', 'info');
+
+    ui.showToast(`A gerar ${n} slides numa só chamada…`, 'info');
+    try {
+        const res = await fetch('/api/ai/carousel', {
+            method: 'POST', headers: apiHeaders(), credentials: 'same-origin',
+            body: JSON.stringify({ topic: baseTitle, slides: n })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return ui.showToast(data.error || 'Não foi possível gerar o carrossel.', 'error');
+        const gen = Array.isArray(data.slides) ? data.slides : null;
+        if (!gen || gen.length < 2) return ui.showToast('A IA não devolveu slides. Tenta de novo ou reformula o tema.', 'error');
+
+        if (activeSlideIndex < 0) enterCarouselMode(); // garante o modo carrossel
+        const baseSnap = snapshotEditor(); // Slide 1 = título validado pelo utilizador
+        // Slide 1 fica como está; os restantes são os desenvolvimentos da IA
+        // (mantêm a mesma foto/estado — trocas a foto por slide se quiseres).
+        const devs = gen.slice(1).map(s => ({ ...baseSnap, html: headlineHtml(s.title || '', s.summary || '') }));
+        carouselSlides = [baseSnap, ...devs];
+        activeSlideIndex = 0;
+        loadEditorState(carouselSlides[0]);
+        if (editor) fitHeadline(editor);
+        renderCarouselBar();
+        // Uma legenda para o post inteiro (usada ao agendar).
+        editorPostMeta = {
+            caption: data.caption || '',
+            hashtags: Array.isArray(data.hashtags) ? data.hashtags : [],
+            cta: data.cta || ''
+        };
+        ui.showToast(`Carrossel de ${carouselSlides.length} slides gerado ✨ Revê cada slide (e troca a foto onde quiseres).`, 'success');
+    } catch (e) {
+        ui.showToast('Erro ao gerar o carrossel.', 'error');
+    }
+}
+window.generateCarousel = generateCarousel;
+
 // Transforma uma proposta (Salvada da IA) num Story 9:16: reutiliza o mesmo
 // carregamento no editor e ativa o formato story. O "Salvar" cria um NOVO
 // story (não mexe na proposta), que vai para a aba "Stories".

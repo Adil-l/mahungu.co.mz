@@ -62,6 +62,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/ai/humanize', [AiController::class, 'humanize']);
     // Pacote completo a partir de um tema: headline + legenda + hashtags + CTA + variantes.
     Route::post('/ai/content-package', [AiController::class, 'package']);
+    // Só a legenda (variações sem regerar o título).
+    Route::post('/ai/caption', [AiController::class, 'caption']);
+    // Carrossel de N slides numa única chamada (slide 1 = gancho, restantes desenvolvem).
+    Route::post('/ai/carousel', [AiController::class, 'carousel']);
 
     // Sugestões de agendamento (horários ótimos + cadência p/ página de notícias).
     Route::get('/scheduling/suggestions', [SchedulingController::class, 'suggestions']);

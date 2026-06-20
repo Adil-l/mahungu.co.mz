@@ -167,6 +167,88 @@ TXT;
     }
 
     /**
+     * Gera SÓ a legenda (variações) a partir de um título/tema, sem regerar o
+     * título — para o utilizador pedir nova legenda sem gastar a gerar o resto.
+     * POST /api/ai/caption { topic }
+     */
+    public function caption(Request $request, ClaudeService $claude): JsonResponse
+    {
+        $data = $request->validate([
+            'topic' => 'required|string|max:8000',
+        ]);
+
+        if (! $claude->configured()) {
+            return response()->json(['error' => 'Claude não está configurado no servidor.'], 503);
+        }
+
+        $prompt = "Notícia / título:\n{$data['topic']}\n\n"
+            . "Escreve SÓ a legenda para redes sociais desta notícia (não repitas o título como primeira linha).\n"
+            . "Devolve SÓ um objeto JSON válido (sem markdown, sem ```), com estas chaves exatas:\n"
+            . '{"caption": "legenda de 5 parágrafos com marcador, 💬 pergunta e a terminar em 🔥 Siga a @mahungu_mz para mais notícias e tendências.", '
+            . '"hashtags": ["5 a 8 hashtags relevantes, SEM o símbolo #"], '
+            . '"cta": "chamada à ação curta"}';
+
+        try {
+            $raw = $claude->generate($prompt, self::EDITORIAL_SYSTEM, 1000);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 502);
+        }
+
+        $pkg = $this->extractJson($raw);
+        if ($pkg === null) {
+            return response()->json(['raw' => trim($raw), 'warning' => 'A IA não devolveu JSON válido.'], 200);
+        }
+
+        return response()->json($pkg);
+    }
+
+    /**
+     * Gera um CARROSSEL coerente de N slides numa ÚNICA chamada (poupa créditos):
+     * slide 1 = gancho, seguintes desenvolvem a notícia, último remata. Devolve
+     * também UMA legenda para o post inteiro. POST /api/ai/carousel { topic, slides }
+     */
+    public function carousel(Request $request, ClaudeService $claude): JsonResponse
+    {
+        $data = $request->validate([
+            'topic' => 'required|string|max:8000',
+            'slides' => 'required|integer|min:2|max:10',
+        ]);
+
+        if (! $claude->configured()) {
+            return response()->json(['error' => 'Claude não está configurado no servidor.'], 503);
+        }
+
+        $n = (int) $data['slides'];
+        $prompt = "Tema / notícia:\n{$data['topic']}\n\n"
+            . "Cria um CARROSSEL coerente de EXATAMENTE {$n} slides para o Instagram. "
+            . "O slide 1 é o gancho/manchete; os slides seguintes desenvolvem a notícia "
+            . "(números, contexto, citações, impacto) e o último remata com conclusão/apelo. "
+            . "Texto curto e legível em cada slide (não encher).\n"
+            . "Devolve SÓ um objeto JSON válido (sem markdown, sem ```), com estas chaves exatas:\n"
+            . '{"slides": [{"title": "gancho do slide ≤55 caracteres", "summary": "remate ≤70 caracteres"}], '
+            . '"caption": "legenda do POST (5 parágrafos com marcador, 💬 pergunta e a terminar em 🔥 Siga a @mahungu_mz para mais notícias e tendências.)", '
+            . '"hashtags": ["5 a 8 hashtags SEM o símbolo #"], '
+            . '"cta": "chamada à ação curta"}'
+            . " O array \"slides\" tem de ter exatamente {$n} elementos.";
+
+        // Teto proporcional ao nº de slides (poupa créditos sem cortar a resposta).
+        $maxTokens = min(3000, 500 + $n * 220);
+
+        try {
+            $raw = $claude->generate($prompt, self::EDITORIAL_SYSTEM, $maxTokens);
+        } catch (RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 502);
+        }
+
+        $pkg = $this->extractJson($raw);
+        if ($pkg === null || ! isset($pkg['slides']) || ! is_array($pkg['slides'])) {
+            return response()->json(['raw' => trim($raw), 'warning' => 'A IA não devolveu slides válidos.'], 200);
+        }
+
+        return response()->json($pkg);
+    }
+
+    /**
      * Extrai o primeiro objeto JSON de uma resposta da IA (tolerante a code
      * fences e a texto à volta). Devolve null se não houver JSON válido.
      */
