@@ -219,20 +219,35 @@ TXT;
         }
 
         $n = (int) $data['slides'];
-        $prompt = "Tema / notícia:\n{$data['topic']}\n\n"
-            . "Cria um CARROSSEL coerente de EXATAMENTE {$n} slides para o Instagram. "
-            . "O slide 1 é o gancho/manchete; os slides seguintes desenvolvem a notícia "
-            . "(números, contexto, citações, impacto) e o último remata com conclusão/apelo. "
-            . "Texto curto e legível em cada slide (não encher).\n"
+        $last = $n;
+        $prompt = "Tema / notícia (usa SÓ estes factos — não inventes números nem nomes):\n{$data['topic']}\n\n"
+            . "És o melhor social media da Mahungu. Conta esta notícia como uma HISTÓRIA "
+            . "num CARROSSEL de EXATAMENTE {$n} slides para o Instagram, feito para PARAR o "
+            . "polegar e fazer o leitor deslizar até ao fim.\n\n"
+            . "ARCO NARRATIVO (cada slide = UMA ideia só, na ordem certa):\n"
+            . "- Slide 1 (GANCHO): pára o scroll. Provocação, número chocante ou pergunta "
+            . "que cria curiosidade e promete valor. NÃO entregues tudo — deixa vontade de deslizar.\n"
+            . ($n > 2
+                ? "- Slides 2 a " . ($last - 1) . " (DESENVOLVIMENTO): um facto/ideia forte por slide, "
+                    . "em progressão que cria tensão (o que aconteceu → porquê → quem é afetado → o que se segue). "
+                    . "Números concretos, contexto e impacto humano. Cada slide acaba deixando uma razão para deslizar (loop aberto). "
+                    . "Não repitas slides.\n"
+                : "")
+            . "- Slide {$last} (REMATE): fecha a história — o que isto significa para o leitor, "
+            . "uma 💬 pergunta de debate e um apelo claro a seguir a @mahungu_mz.\n\n"
+            . "REGRAS DE ESCRITA (legível à distância, sem encher):\n"
+            . "- title = a frase-impacto do slide (≤55 caracteres). summary = o complemento/remate (≤70 caracteres).\n"
+            . "- Frases curtas, verbo forte, português de Moçambique. Zero tiques de IA, zero clichés.\n"
+            . "- A legenda do post COMPLEMENTA (não repete) os slides.\n\n"
             . "Devolve SÓ um objeto JSON válido (sem markdown, sem ```), com estas chaves exatas:\n"
-            . '{"slides": [{"title": "gancho do slide ≤55 caracteres", "summary": "remate ≤70 caracteres"}], '
+            . '{"slides": [{"title": "frase-impacto ≤55 caracteres", "summary": "complemento/remate ≤70 caracteres"}], '
             . '"caption": "legenda do POST (5 parágrafos com marcador, 💬 pergunta e a terminar em 🔥 Siga a @mahungu_mz para mais notícias e tendências.)", '
             . '"hashtags": ["5 a 8 hashtags SEM o símbolo #"], '
             . '"cta": "chamada à ação curta"}'
-            . " O array \"slides\" tem de ter exatamente {$n} elementos.";
+            . " O array \"slides\" tem de ter exatamente {$n} elementos (exatamente {$n} slides).";
 
         // Teto proporcional ao nº de slides (poupa créditos sem cortar a resposta).
-        $maxTokens = min(3000, 500 + $n * 220);
+        $maxTokens = min(3200, 600 + $n * 230);
 
         try {
             $raw = $claude->generate($prompt, self::EDITORIAL_SYSTEM, $maxTokens);

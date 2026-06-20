@@ -1016,6 +1016,13 @@ async function confirmSaveToHistory() {
                     imgSrc: document.querySelector('.layer-photo .photo-single').src
                 };
                 proposal.status = 'pending'; // continua em "Salvadas" até aprovar
+                // Mantém a legenda gerada/editada junto da proposta (acompanha-a
+                // ao aprovar e ao agendar — não se perde).
+                if (editorPostMeta) {
+                    proposal.generatedCaption = editorPostMeta.caption || proposal.generatedCaption || '';
+                    proposal.hashtags = (editorPostMeta.hashtags && editorPostMeta.hashtags.length) ? editorPostMeta.hashtags : (proposal.hashtags || []);
+                    proposal.cta = editorPostMeta.cta || proposal.cta || '';
+                }
                 await storage.saveProposal(proposal); // local = fonte da verdade
                 closeSaveModal();
                 ui.showToast('Alterações salvas nas Salvadas da IA!', 'success');
@@ -3921,6 +3928,9 @@ async function generateProposalAs(id, format) {
     const topic = buildProposalTopic(proposal);
 
     if (format === 'carousel') {
+        // O carrossel é guardado como flyer próprio (multi-slide), não como
+        // proposta — desliga o vínculo para o save correr o ramo do carrossel.
+        editingProposalId = null;
         setEditorFormat('feed');                            // carrossel usa o canvas de feed
         await generateCarousel(topic, carouselSlidesN, true); // includeFirst: Slide 1 = gancho da notícia
     } else if (format === 'story') {
@@ -3929,6 +3939,16 @@ async function generateProposalAs(id, format) {
     } else {
         setEditorFormat('feed');
         await generateContentPackage(topic);
+    }
+
+    // Persiste a legenda gerada na própria proposta — assim acompanha-a ao
+    // APROVAR e ao AGENDAR sem precisar de clicar "Nova legenda". (Stories vão
+    // sem legenda, por isso editorPostMeta.caption fica vazio e o if salta.)
+    if (editorPostMeta && (editorPostMeta.caption || (editorPostMeta.hashtags || []).length)) {
+        proposal.generatedCaption = editorPostMeta.caption || '';
+        proposal.hashtags = editorPostMeta.hashtags || [];
+        proposal.cta = editorPostMeta.cta || '';
+        try { await storage.saveProposal(proposal); } catch (e) {}
     }
 }
 window.generateProposalAs = generateProposalAs;
