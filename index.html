@@ -18,6 +18,17 @@
 </head>
 <body>
 
+<!-- Botão hambúrguer (só aparece no telemóvel via CSS) -->
+<button class="mobile-nav-btn" onclick="toggleMobileNav()" aria-label="Abrir menu" title="Menu">
+    <i data-lucide="menu"></i>
+</button>
+<!-- Botão de ferramentas do editor (só no telemóvel, dentro do editor) -->
+<button class="mobile-tools-btn" onclick="toggleMobileTools()" aria-label="Ferramentas" title="Ferramentas">
+    <i data-lucide="sliders-horizontal"></i>
+</button>
+<!-- Fundo escuro dos drawers no telemóvel; clicar fecha tudo -->
+<div class="mobile-nav-backdrop" onclick="closeMobileDrawers()"></div>
+
 <!-- Sidebar ESQUERDA: Navegação Global -->
 <aside class="sidebar-left">
     <div class="sidebar-header">

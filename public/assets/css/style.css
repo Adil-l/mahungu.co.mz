@@ -2245,3 +2245,96 @@ body.theme-light .admin-table tbody tr:hover { background: rgba(20,22,40,0.03); 
 }
 .theme-switch button i, .theme-switch button svg { width: 16px; height: 16px; }
 .theme-switch button.active { background: var(--primary); color: #fff; }
+
+/* ════════════════════════════════════════════════════════════════════
+   RESPONSIVO — TELEMÓVEL (≤768px)
+   Sidebars viram drawers off-canvas (hambúrguer + ferramentas), o conteúdo
+   ocupa toda a largura, grids colapsam e modais ficam quase full-screen.
+   O flyer NÃO é alterado aqui — só escala via core.setScale().
+   ════════════════════════════════════════════════════════════════════ */
+
+/* Botões/backdrop móveis: escondidos no desktop. */
+.mobile-nav-btn, .mobile-tools-btn, .mobile-nav-backdrop { display: none; }
+
+@media (max-width: 768px) {
+    /* ── Botões flutuantes ── */
+    .mobile-nav-btn, .mobile-tools-btn {
+        display: flex; align-items: center; justify-content: center;
+        position: fixed; top: 12px; z-index: 13500;
+        width: 44px; height: 44px; border-radius: 12px;
+        background: rgba(15,16,26,0.96); border: 1px solid var(--glass-border);
+        color: var(--text); cursor: pointer; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+        box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+    }
+    .mobile-nav-btn { left: 12px; }
+    .mobile-tools-btn { right: 12px; display: none; } /* só dentro do editor */
+    body.editor-active .mobile-tools-btn { display: flex; }
+    .mobile-nav-btn i, .mobile-nav-btn svg,
+    .mobile-tools-btn i, .mobile-tools-btn svg { width: 22px; height: 22px; }
+
+    /* ── Sidebar de navegação como drawer (esquerda) ── */
+    .sidebar-left {
+        width: min(84vw, 300px);
+        transform: translateX(-100%);
+        transition: transform 0.28s ease;
+        box-shadow: none;
+    }
+    body.mobile-nav-open .sidebar-left { transform: translateX(0); box-shadow: 14px 0 44px rgba(0,0,0,0.65); }
+
+    /* ── Barra de ferramentas como drawer (direita, só no editor) ── */
+    .sidebar-right {
+        width: min(88vw, 340px);
+        transform: translateX(100%);
+        transition: transform 0.28s ease;
+    }
+    body.mobile-tools-open .sidebar-right { transform: translateX(0); box-shadow: -14px 0 44px rgba(0,0,0,0.65); }
+
+    /* ── Backdrop partilhado ── */
+    body.mobile-nav-open .mobile-nav-backdrop,
+    body.mobile-tools-open .mobile-nav-backdrop {
+        display: block; position: fixed; inset: 0; z-index: 12999;
+        background: rgba(0,0,0,0.55); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
+    }
+
+    /* ── Conteúdo ocupa tudo (drawers são overlay) ── */
+    .main-content { margin-left: 0 !important; margin-right: 0 !important; }
+    .content-wrapper { padding: 16px; padding-top: 66px; }
+
+    /* O colapso manual (78px) não se aplica no telemóvel: manda o drawer. */
+    body.sidebar-collapsed .sidebar-left { width: min(84vw, 300px); padding: 30px 20px; }
+    body.sidebar-collapsed .main-content { margin-left: 0 !important; }
+    body.sidebar-collapsed .nav-label { display: inline; }
+
+    /* ── Editor: usa a largura toda; o flyer reescala via JS ── */
+    body.editor-active .main-content { padding: 60px 8px 8px; height: auto; min-height: 100vh; overflow: auto; }
+    body.editor-active #tab-editor { height: auto; }
+
+    /* ── Cabeçalhos de página empilham ── */
+    .sidebar-header[style*="space-between"] { flex-direction: column; align-items: stretch !important; gap: 14px; }
+    .content-wrapper h1 { font-size: 20px !important; }
+    .header-actions { width: 100%; flex-wrap: wrap; gap: 8px; }
+    .header-actions .btn-pill { flex: 1 1 auto; justify-content: center; }
+
+    /* ── Grids colapsam (inclui os com grid-template inline) ── */
+    .dashboard-grid { grid-template-columns: 1fr !important; gap: 14px; margin-bottom: 22px; }
+    .dash-grid-2, .dash-grid { grid-template-columns: 1fr !important; }
+    .dash-kpis { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .analytics-card { padding: 20px; border-radius: 18px; }
+    .analytics-card .val { font-size: 34px; }
+    .analytics-card .icon { width: 46px; height: 46px; }
+    .proposals-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .chart-container { padding: 22px; border-radius: 20px; }
+
+    /* ── Modais quase full-screen, ancorados em baixo ── */
+    .modal-overlay { padding: 0; align-items: flex-end; }
+    .modal-container.modal-form {
+        max-width: 100% !important; width: 100%;
+        max-height: 94vh; border-radius: 18px 18px 0 0;
+        padding: 22px !important;
+    }
+}
+
+/* Ecrãs muito estreitos: KPIs e propostas em coluna única. */
+@media (max-width: 460px) {
+    .dash-kpis, .proposals-grid { grid-template-columns: 1fr; }
+}

@@ -20,9 +20,12 @@ export const core = {
 
         if (!isFlyerEditor) return;
 
-        const sidebarsWidth = 640; 
-        const horizontalPadding = 72;
-        const verticalPadding = 56;
+        // No telemóvel as sidebars são drawers (overlay), não ocupam largura;
+        // sem isto a largura útil ficava negativa e o flyer encolhia ao mínimo.
+        const mobile = window.innerWidth <= 768;
+        const sidebarsWidth = mobile ? 0 : 640;
+        const horizontalPadding = mobile ? 24 : 72;
+        const verticalPadding = mobile ? 120 : 56;
 
         const availableWidth = window.innerWidth - sidebarsWidth - horizontalPadding;
         const availableHeight = window.innerHeight - verticalPadding;

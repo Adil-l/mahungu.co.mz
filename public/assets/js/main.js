@@ -1961,10 +1961,38 @@ window.addEventListener('load', () => {
             const tabId = item.dataset.tab;
             if (tabId) {
                 showTab(tabId, item);
+                toggleMobileNav(false); // fecha o drawer ao navegar (telemóvel)
             }
         });
     });
 });
+
+// ── MENU MÓVEL (DRAWERS) ──
+// Abre/fecha a sidebar de navegação como drawer no telemóvel. Sem argumento
+// alterna; com `force` (true/false) força o estado. Abrir um drawer fecha o outro.
+function toggleMobileNav(force) {
+    const open = typeof force === 'boolean' ? force : !document.body.classList.contains('mobile-nav-open');
+    document.body.classList.toggle('mobile-nav-open', open);
+    if (open) document.body.classList.remove('mobile-tools-open');
+}
+window.toggleMobileNav = toggleMobileNav;
+
+// Abre/fecha a barra de FERRAMENTAS do editor (sidebar direita) no telemóvel.
+function toggleMobileTools(force) {
+    const open = typeof force === 'boolean' ? force : !document.body.classList.contains('mobile-tools-open');
+    document.body.classList.toggle('mobile-tools-open', open);
+    if (open) document.body.classList.remove('mobile-nav-open');
+    // O editor reescala quando a largura útil muda.
+    setTimeout(() => { if (core && core.setScale) core.setScale(); }, 300);
+}
+window.toggleMobileTools = toggleMobileTools;
+
+// Fecha ambos os drawers (usado pelo backdrop).
+function closeMobileDrawers() {
+    document.body.classList.remove('mobile-nav-open', 'mobile-tools-open');
+    setTimeout(() => { if (core && core.setScale) core.setScale(); }, 300);
+}
+window.closeMobileDrawers = closeMobileDrawers;
 
 function invalidateFlyerSnapshot() {
     lastFlyerSnapshot = '';
