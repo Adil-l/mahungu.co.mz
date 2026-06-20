@@ -77,6 +77,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/sync/{kind}', [SyncController::class, 'store']);
     Route::delete('/sync/{kind}/{clientId}', [SyncController::class, 'destroy']);
 
+    // Contagens por estado (exatas, independentes da paginação da lista).
+    // TEM de vir ANTES do apiResource senão "stats" é tratado como um {id}.
+    Route::get('/scheduled-posts/stats', [ScheduledPostController::class, 'stats']);
     Route::apiResource('scheduled-posts', ScheduledPostController::class);
     // Partilhar a imagem de um post (agendado/publicado) como Story do Instagram.
     Route::post('/scheduled-posts/{scheduledPost}/share-story', [ScheduledPostController::class, 'shareStory']);

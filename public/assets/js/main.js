@@ -1172,11 +1172,21 @@ async function renderScheduledPosts() {
 
     try {
         const posts = await scheduler.getScheduledPosts();
-        
-        // Update stats
-        document.getElementById('stats-pending-posts').textContent = posts.filter(p => p.status === 'pending').length;
-        document.getElementById('stats-posted-posts').textContent = posts.filter(p => p.status === 'posted').length;
-        document.getElementById('stats-failed-posts').textContent = posts.filter(p => p.status === 'failed').length;
+
+        // Contagens EXATAS do servidor (não limitadas à 1ª página da lista, que
+        // tem só 20 posts). "Agendados" inclui os que estão a processar; "Falhas"
+        // inclui os parcialmente publicados — coerente com o Dashboard.
+        try {
+            const stats = await scheduler.getStats();
+            document.getElementById('stats-pending-posts').textContent = stats.pending ?? 0;
+            document.getElementById('stats-posted-posts').textContent = stats.posted ?? 0;
+            document.getElementById('stats-failed-posts').textContent = stats.failed ?? 0;
+        } catch (e) {
+            // Fallback: conta a partir da página atual se o endpoint falhar.
+            document.getElementById('stats-pending-posts').textContent = posts.filter(p => p.status === 'pending' || p.status === 'processing').length;
+            document.getElementById('stats-posted-posts').textContent = posts.filter(p => p.status === 'posted').length;
+            document.getElementById('stats-failed-posts').textContent = posts.filter(p => p.status === 'failed' || p.status === 'partially_posted').length;
+        }
 
         if (posts.length === 0) {
             container.innerHTML = `
@@ -1509,7 +1519,7 @@ async function loadSchedulingSuggestions() {
     const box = document.getElementById('schedule-suggestions');
     if (!box) return;
     try {
-        const res = await fetch('/api/scheduling/suggestions?count=8', {
+        const res = await fetch('/api/scheduling/suggestions?count=6', {
             headers: { 'Accept': 'application/json' },
             credentials: 'same-origin'
         });
@@ -1535,15 +1545,15 @@ async function loadSchedulingSuggestions() {
         }).join('');
 
         box.innerHTML =
-            `<div style="border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:var(--surface-2,rgba(255,255,255,.03));">
-                <div style="font-weight:600;font-size:12px;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-                    <i data-lucide="sparkles" style="width:14px;height:14px;"></i> Sugestões de publicação
+            `<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface-2,rgba(255,255,255,.03));">
+                <div style="font-weight:600;font-size:12px;margin-bottom:6px;display:flex;align-items:center;gap:6px;">
+                    <i data-lucide="sparkles" style="width:13px;height:13px;"></i> Sugestões de publicação
                 </div>
-                ${cadencia ? `<p style="font-size:11px;color:var(--text-muted);margin:0 0 10px;">${cadencia}</p>` : ''}
-                ${picos ? `<p style="font-size:10px;color:var(--text-muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:.04em;">Janelas de pico (MZ)</p>
-                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">${picos}</div>` : ''}
-                <p style="font-size:10px;color:var(--text-muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:.04em;">Próximos horários ideais — clica para escolher</p>
-                <div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>
+                ${cadencia ? `<p style="font-size:11px;color:var(--text-muted);margin:0 0 8px;line-height:1.4;">${cadencia}</p>` : ''}
+                ${picos ? `<p style="font-size:9px;color:var(--text-muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:.04em;">Janelas de pico (MZ)</p>
+                <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px;">${picos}</div>` : ''}
+                <p style="font-size:9px;color:var(--text-muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:.04em;">Próximos horários — clica para escolher</p>
+                <div style="display:flex;flex-wrap:wrap;gap:5px;">${chips}</div>
             </div>`;
         box.style.display = 'block';
         if (window.lucide) lucide.createIcons();

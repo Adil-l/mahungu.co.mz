@@ -25,6 +25,30 @@ class ScheduledPostController extends Controller
             ->paginate($request->input('per_page', 20));
     }
 
+    /**
+     * Contagens por estado do utilizador autenticado, calculadas no servidor
+     * (SQL GROUP BY) — exatas mesmo com milhares de posts, ao contrário de
+     * contar a 1ª página da lista (que está limitada a 20).
+     */
+    public function stats()
+    {
+        $byStatus = ScheduledPost::where('user_id', Auth::id())
+            ->selectRaw('status, count(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        $g = fn (string $s) => (int) ($byStatus[$s] ?? 0);
+
+        // Agrupado como no Dashboard, para os números baterem em todo o lado.
+        return response()->json([
+            'pending'   => $g('pending') + $g('processing'),
+            'posted'    => $g('posted'),
+            'failed'    => $g('failed') + $g('partially_posted'),
+            'total'     => (int) $byStatus->sum(),
+            'by_status' => $byStatus,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([

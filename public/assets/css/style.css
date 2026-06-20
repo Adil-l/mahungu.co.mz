@@ -1449,6 +1449,19 @@ body.editor-active #tab-editor {
     box-shadow: 0 50px 100px rgba(0,0,0,0.8);
 }
 
+/* Modais de FORMULÁRIO: encolhem ao conteúdo, com teto de altura e scroll
+   interno. A .modal-container base é dimensionada para o preview do flyer
+   (min-height 620px, overflow hidden), o que tornava os formulários gigantes
+   e cortava conteúdo alto. O modal do flyer NÃO usa esta classe. */
+.modal-container.modal-form {
+    height: auto;
+    min-height: 0;
+    max-height: min(92vh, 840px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
 .modal-preview {
     flex: 1 1 auto;
     min-width: 0;

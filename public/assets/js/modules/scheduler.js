@@ -18,6 +18,16 @@ export const scheduler = {
         return Array.isArray(json) ? json : (json.data ?? []);
     },
 
+    // Contagens por estado calculadas no servidor (exatas, não limitadas à
+    // 1ª página da lista). Devolve { pending, posted, failed, total }.
+    async getStats() {
+        const response = await fetch('/api/scheduled-posts/stats', {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (!response.ok) throw new Error('Erro ao buscar estatísticas');
+        return response.json();
+    },
+
     // Partilha a imagem de um post como Story do Instagram (publica de imediato).
     async shareStory(id) {
         const response = await fetch(`/api/scheduled-posts/${id}/share-story`, {

@@ -88,6 +88,35 @@ class ScheduledPostTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_stats_groups_statuses_like_dashboard(): void
+    {
+        $user = User::factory()->create();
+
+        $make = function (string $status) use ($user) {
+            \App\Models\ScheduledPost::create([
+                'user_id' => $user->id,
+                'content' => 'x',
+                'platforms' => ['twitter'],
+                'scheduled_at' => now()->addDay(),
+                'status' => $status,
+            ]);
+        };
+        // pending + processing → "Agendados"; failed + partially_posted → "Falhas".
+        $make('pending'); $make('pending'); $make('processing');
+        $make('posted');
+        $make('failed'); $make('partially_posted');
+
+        $res = $this->actingAs($user)->getJson('/api/scheduled-posts/stats');
+
+        $res->assertStatus(200)
+            ->assertJson([
+                'pending' => 3, // 2 pending + 1 processing
+                'posted'  => 1,
+                'failed'  => 2, // 1 failed + 1 partially_posted
+                'total'   => 6,
+            ]);
+    }
+
     public function test_twitter_without_image_is_allowed(): void
     {
         $user = User::factory()->create();
