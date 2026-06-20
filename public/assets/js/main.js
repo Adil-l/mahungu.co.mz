@@ -1004,17 +1004,40 @@ async function confirmSaveToHistory() {
             const proposal = await storage.getProposalById(editingProposalId);
             if (proposal) {
                 const editor = document.getElementById('editor');
-                // Título agora é branco e o resumo laranja (ver headlineHtml).
-                const titleEl = editor.querySelector('.cor-branca');
-                const sumEl = editor.querySelector('.cor-laranja');
-                proposal.generatedTitle = (titleEl ? titleEl.textContent : editor.textContent).replace(/\s*-\s*$/, '').trim();
-                proposal.generatedSummary = sumEl ? sumEl.textContent.trim() : '';
-                // Guarda o estado visual editado para preview/aprovação fiéis.
-                proposal.flyerState = {
-                    html: editor.innerHTML,
-                    state: { ...core.editorState },
-                    imgSrc: document.querySelector('.layer-photo .photo-single').src
+                const titleFromHtml = (html) => {
+                    const d = document.createElement('div'); d.innerHTML = html || '';
+                    return {
+                        title: (d.querySelector('.cor-branca')?.textContent ?? d.textContent ?? '').replace(/\s*-\s*$/, '').trim(),
+                        summary: (d.querySelector('.cor-laranja')?.textContent ?? '').trim()
+                    };
                 };
+
+                // ── Carrossel a partir de proposta: guarda os SLIDES na proposta ──
+                // (fica em "Salvadas da IA" até ser aprovado, tal como o feed).
+                if (pendingCarouselStates && pendingCarouselStates.length >= 2) {
+                    proposal.format = 'carousel';
+                    proposal.slideStates = pendingCarouselStates.slice(); // estados editáveis
+                    proposal.flyerState = pendingCarouselStates[0];        // slide 1 = preview/base
+                    const t = titleFromHtml(pendingCarouselStates[0].html);
+                    proposal.generatedTitle = t.title;
+                    proposal.generatedSummary = t.summary;
+                    pendingCarouselStates = null;
+                    exitCarousel();
+                } else {
+                    // Feed (single): guarda o estado visual editado.
+                    proposal.format = 'feed';
+                    delete proposal.slideStates; // se foi reeditado como single, deixa de ser carrossel
+                    const titleEl = editor.querySelector('.cor-branca');
+                    const sumEl = editor.querySelector('.cor-laranja');
+                    proposal.generatedTitle = (titleEl ? titleEl.textContent : editor.textContent).replace(/\s*-\s*$/, '').trim();
+                    proposal.generatedSummary = sumEl ? sumEl.textContent.trim() : '';
+                    proposal.flyerState = {
+                        html: editor.innerHTML,
+                        state: { ...core.editorState },
+                        imgSrc: document.querySelector('.layer-photo .photo-single').src
+                    };
+                }
+
                 proposal.status = 'pending'; // continua em "Salvadas" até aprovar
                 // Mantém a legenda gerada/editada junto da proposta (acompanha-a
                 // ao aprovar e ao agendar — não se perde).
@@ -1025,7 +1048,12 @@ async function confirmSaveToHistory() {
                 }
                 await storage.saveProposal(proposal); // local = fonte da verdade
                 closeSaveModal();
-                ui.showToast('Alterações salvas nas Salvadas da IA!', 'success');
+                ui.showToast(
+                    proposal.format === 'carousel'
+                        ? `Carrossel (${proposal.slideStates.length} slides) salvo nas Salvadas da IA!`
+                        : 'Alterações salvas nas Salvadas da IA!',
+                    'success'
+                );
                 if (!document.getElementById('tab-ai-saved').classList.contains('hidden')) renderAISaved();
                 // Partilha com o servidor em segundo plano (não bloqueia a UI).
                 shareProposal(proposal).catch(e => console.error('Sync em segundo plano falhou:', e));
@@ -3130,9 +3158,31 @@ async function editProposalInEditor(id) {
     // Editar uma proposta: o "Salvar" atualiza-a e mantém-na em "Salvadas".
     editingProposalId = id;
     editingFlyerId = null;
+    if (activeSlideIndex >= 0) exitCarousel(); // estado limpo antes de carregar
 
     const editor = document.getElementById('editor');
     const photoSingle = document.querySelector('.layer-photo .photo-single');
+
+    // ── Proposta-CARROSSEL: recarrega os slides em modo carrossel ──
+    // (editar e "Guardar" mantém-na nas Salvadas; "Aprovar" cria o flyer.)
+    if (proposal.format === 'carousel' && Array.isArray(proposal.slideStates) && proposal.slideStates.length >= 2) {
+        editorPostMeta = {
+            caption: proposal.generatedCaption || '',
+            hashtags: proposal.hashtags || [],
+            cta: proposal.cta || ''
+        };
+        closeProposalModal();
+        const editorNav = document.querySelector('.main-nav .nav-item[data-tab="editor"]');
+        showTab('editor', editorNav);
+        setEditorFormat('feed');
+        carouselSlides = proposal.slideStates.slice();
+        activeSlideIndex = 0;
+        loadEditorState(carouselSlides[0]);
+        if (editor) fitHeadline(editor);
+        renderCarouselBar();
+        ui.showToast('Carrossel carregado. Edita e "Guardar" mantém-no nas Salvadas.', 'success');
+        return;
+    }
 
     if (proposal.flyerState) {
         // Já foi editada antes: recarrega exatamente o estado guardado.
@@ -3399,6 +3449,46 @@ async function approveAndSaveProposal(id) {
         // senão, monta a partir do título/resumo gerados pela IA.
         const editor = document.getElementById('editor');
         const photoSingle = document.querySelector('.layer-photo .photo-single');
+
+        // ── Aprovar uma proposta-CARROSSEL: captura cada slide → flyer carrossel ──
+        if (proposal.format === 'carousel' && Array.isArray(proposal.slideStates) && proposal.slideStates.length >= 2) {
+            document.querySelector('.flyer')?.classList.remove('is-story');
+            document.querySelector('.flyer-wrapper')?.classList.remove('is-story');
+            const slides = [];
+            for (const st of proposal.slideStates) {
+                loadEditorState(st);
+                await new Promise(r => setTimeout(r, 80)); // deixa a imagem/layout assentar
+                slides.push(await core.captureCurrentFlyer());
+            }
+            const newEntry = {
+                id: generateUniqueFlyerId(),
+                title: proposal.generatedTitle || 'Carrossel IA',
+                category: proposal.category || 'IA Gerado',
+                status: 'Aprovado',
+                date: new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }),
+                image: slides[0],
+                slides: slides,
+                slideStates: proposal.slideStates,
+                caption: proposal.generatedCaption || '',
+                hashtags: proposal.hashtags || [],
+                cta: proposal.cta || ''
+            };
+            await storage.saveFlyer(newEntry);
+            editingFlyerId = newEntry.id;
+            proposal.status = 'approved';
+            await storage.saveProposal(proposal);
+            editingProposalId = null;
+            updateDashboardStats();
+            closeProposalModal();
+            renderProposals();
+            renderAISaved();
+            ui.showToast(`Carrossel aprovado (${slides.length} slides) e salvo!`, 'success');
+            if (!document.getElementById('tab-history').classList.contains('hidden')) renderHistory();
+            Promise.all([shareFlyer(newEntry), shareProposal(proposal), storage.syncFlyerToServer(newEntry)])
+                .catch(e => console.error('Sync em segundo plano falhou:', e));
+            return;
+        }
+
         if (proposal.flyerState) {
             if (editor) editor.innerHTML = proposal.flyerState.html || '';
             core.editorState = { ...core.editorState, ...freshSplitDefaults(), ...(proposal.flyerState.state || {}) };
@@ -3716,20 +3806,22 @@ async function renderAISaved() {
             html += `<div class="date-group-header">${label}</div>`;
         }
 
+        const isCarousel = p.format === 'carousel' && Array.isArray(p.slideStates) && p.slideStates.length >= 2;
         html += `
         <article class="proposal-card is-ready">
             <label class="merge-check" title="Selecionar para unir num carrossel"><input type="checkbox" ${mergeSelection.has(p.id) ? 'checked' : ''} onchange="toggleMergeSelect(${p.id}, this.checked)"></label>
             <button class="proposal-preview" onclick="openProposalModal(${p.id})" title="Rever proposta">
                 ${miniFlyerHTML(p)}
                 <span class="proposal-badge ready">Pronta</span>
+                ${isCarousel ? `<span class="proposal-badge carousel"><i data-lucide="layers" size="12"></i> ${p.slideStates.length}</span>` : ''}
             </button>
             <div class="proposal-card-info">
                 <div class="proposal-card-title">${escapeHtml(p.generatedTitle || p.title)}</div>
                 <div class="proposal-card-meta">${escapeHtml(p.sourceName || 'Fonte')} • ${escapeHtml(p.date || '')}</div>
             </div>
             <div class="proposal-card-actions">
-                <button class="btn-mini" onclick="editProposalInEditor(${p.id})" title="Abrir no Editor"><i data-lucide="pen-tool"></i></button>
-                <button class="btn-mini" onclick="transformToStory(${p.id})" title="Transformar em Story (9:16)"><i data-lucide="smartphone"></i></button>
+                <button class="btn-mini" onclick="editProposalInEditor(${p.id})" title="${isCarousel ? 'Editar carrossel no Editor' : 'Abrir no Editor'}"><i data-lucide="pen-tool"></i></button>
+                ${isCarousel ? '' : `<button class="btn-mini" onclick="transformToStory(${p.id})" title="Transformar em Story (9:16)"><i data-lucide="smartphone"></i></button>`}
                 <button class="btn-mini" onclick="approveAndSaveProposal(${p.id})" title="Aprovar e Salvar"><i data-lucide="check-circle"></i></button>
                 <button class="btn-reject" onclick="rejectProposal(${p.id})" title="Rejeitar"><i data-lucide="x-circle"></i></button>
             </div>
@@ -3928,9 +4020,8 @@ async function generateProposalAs(id, format) {
     const topic = buildProposalTopic(proposal);
 
     if (format === 'carousel') {
-        // O carrossel é guardado como flyer próprio (multi-slide), não como
-        // proposta — desliga o vínculo para o save correr o ramo do carrossel.
-        editingProposalId = null;
+        // Mantém o vínculo à proposta: ao "Guardar", o carrossel (com os slides)
+        // fica nas "Salvadas da IA" até ser aprovado — igual ao feed.
         setEditorFormat('feed');                            // carrossel usa o canvas de feed
         await generateCarousel(topic, carouselSlidesN, true); // includeFirst: Slide 1 = gancho da notícia
     } else if (format === 'story') {

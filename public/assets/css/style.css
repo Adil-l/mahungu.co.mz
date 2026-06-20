@@ -1816,6 +1816,18 @@ body.editor-active #tab-editor {
 
 .proposal-badge.new { background: rgba(255, 152, 0, 0.15); color: #ff9800; border: 1px solid rgba(255, 152, 0, 0.4); }
 .proposal-badge.ready { background: rgba(40, 167, 69, 0.15); color: #28a745; border: 1px solid rgba(40, 167, 69, 0.4); }
+/* Badge "Carrossel N" — canto superior esquerdo, sobre a imagem. */
+.proposal-badge.carousel {
+    right: auto;
+    left: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(0, 168, 168, 0.18);
+    color: #45d0d0;
+    border: 1px solid rgba(0, 168, 168, 0.45);
+}
+.proposal-badge.carousel i { width: 12px; height: 12px; }
 
 .proposal-card-info { padding: 14px 16px 8px; }
 
