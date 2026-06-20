@@ -1509,21 +1509,44 @@ async function loadSchedulingSuggestions() {
     const box = document.getElementById('schedule-suggestions');
     if (!box) return;
     try {
-        const res = await fetch('/api/scheduling/suggestions?count=6', {
+        const res = await fetch('/api/scheduling/suggestions?count=8', {
             headers: { 'Accept': 'application/json' },
             credentials: 'same-origin'
         });
         if (!res.ok) { box.style.display = 'none'; return; }
         const d = await res.json();
+
+        // Cadência recomendada (quantos posts/dia para uma página de notícias).
+        const r = d.recommended_per_day || {};
+        const cadencia = (r.ideal)
+            ? `Página de notícias: ideal <b>~${r.ideal} posts/dia</b> (mín ${r.min}, máx ${r.max}).`
+            : '';
+
+        // Janelas de pico (quando o público está mais ativo em MZ).
+        const picos = (d.peak_windows || []).map(w =>
+            `<span class="btn-chip" style="cursor:default;opacity:.9;">${w.label} ${w.start}–${w.end}</span>`
+        ).join('');
+
+        // Próximos horários ideais — clicáveis (preenchem a Data e hora).
         const chips = (d.next_slots || []).map(iso => {
             const t = new Date(iso);
             const label = t.toLocaleString('pt-PT', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
             return `<button type="button" class="btn-chip" onclick="pickScheduleSlot('${iso}')">${label}</button>`;
         }).join('');
-        const note = d.recommended_per_day?.note || '';
-        box.innerHTML = `<p style="font-size:11px;color:var(--text-muted);margin:0 0 6px;">💡 ${note}</p>`
-            + `<div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>`;
+
+        box.innerHTML =
+            `<div style="border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:var(--surface-2,rgba(255,255,255,.03));">
+                <div style="font-weight:600;font-size:12px;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+                    <i data-lucide="sparkles" style="width:14px;height:14px;"></i> Sugestões de publicação
+                </div>
+                ${cadencia ? `<p style="font-size:11px;color:var(--text-muted);margin:0 0 10px;">${cadencia}</p>` : ''}
+                ${picos ? `<p style="font-size:10px;color:var(--text-muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:.04em;">Janelas de pico (MZ)</p>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">${picos}</div>` : ''}
+                <p style="font-size:10px;color:var(--text-muted);margin:0 0 4px;text-transform:uppercase;letter-spacing:.04em;">Próximos horários ideais — clica para escolher</p>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">${chips}</div>
+            </div>`;
         box.style.display = 'block';
+        if (window.lucide) lucide.createIcons();
     } catch (e) {
         box.style.display = 'none';
     }
