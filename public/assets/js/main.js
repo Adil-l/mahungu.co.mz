@@ -3179,13 +3179,18 @@ async function editProposalInEditor(id) {
 // Mahungu a partir de um tema, e preenche o editor de uma vez. O título/resumo
 // vão para a headline do flyer; a legenda/hashtags/cta ficam em editorPostMeta
 // (acompanham o flyer ao guardar e aparecem ao agendar). POST /api/ai/content-package.
-async function generateContentPackage() {
-    const topic = await ui.prompt(
-        'Gerar tudo com IA',
-        'Sobre que notícia/tema é o flyer? Cola a manchete ou descreve em 1 frase.',
-        '',
-        { placeholder: 'ex: Selecção de Moçambique vence Zâmbia por 2-1', confirmText: 'Gerar' }
-    );
+async function generateContentPackage(topicArg) {
+    // topicArg vem dos botões da Proposta de IA (tema já conhecido — sem prompt).
+    // Sem argumento (botão do editor), pergunta o tema ao utilizador.
+    let topic = typeof topicArg === 'string' ? topicArg : null;
+    if (!topic) {
+        topic = await ui.prompt(
+            'Gerar tudo com IA',
+            'Sobre que notícia/tema é o flyer? Cola a manchete ou descreve em 1 frase.',
+            '',
+            { placeholder: 'ex: Selecção de Moçambique vence Zâmbia por 2-1', confirmText: 'Gerar' }
+        );
+    }
     if (!topic || !topic.trim()) return;
 
     // Formato atual: carrossel (slide ativo) > story > feed. Stories vão SEM
@@ -3280,18 +3285,25 @@ window.regenerateCaption = regenerateCaption;
 // Gera um CARROSSEL inteiro com IA: o utilizador valida o título (Slide 1) e
 // define o nº de slides; UMA chamada preenche os restantes (poupa créditos).
 // POST /api/ai/carousel.
-async function generateCarousel() {
+async function generateCarousel(topicArg, slidesArg, includeFirst) {
     const editor = document.getElementById('editor');
-    const baseTitle = editor ? editor.innerText.trim() : '';
+    // topicArg vem da Proposta de IA (a notícia inteira); sem ele, usa o título
+    // atual do editor como tema (Slide 1 validado pelo utilizador).
+    const baseTitle = (typeof topicArg === 'string' && topicArg.trim())
+        ? topicArg.trim()
+        : (editor ? editor.innerText.trim() : '');
     if (!baseTitle) return ui.showToast('Primeiro define ou gera o título do Slide 1.', 'info');
 
-    const nStr = await ui.prompt(
-        'Gerar carrossel com IA',
-        'Quantos slides ao todo? (2 a 10). O Slide 1 mantém o teu título; a IA preenche os restantes numa só chamada.',
-        '5',
-        { placeholder: '5', confirmText: 'Gerar' }
-    );
-    const n = parseInt(nStr, 10);
+    let n = Number.isInteger(slidesArg) ? slidesArg : null;
+    if (!n) {
+        const nStr = await ui.prompt(
+            'Gerar carrossel com IA',
+            'Quantos slides ao todo? (2 a 10). O Slide 1 mantém o teu título; a IA preenche os restantes numa só chamada.',
+            '5',
+            { placeholder: '5', confirmText: 'Gerar' }
+        );
+        n = parseInt(nStr, 10);
+    }
     if (!n || n < 2 || n > 10) return ui.showToast('Indica um número entre 2 e 10.', 'info');
 
     ui.showToast(`A gerar ${n} slides numa só chamada…`, 'info');
@@ -3306,11 +3318,13 @@ async function generateCarousel() {
         if (!gen || gen.length < 2) return ui.showToast('A IA não devolveu slides. Tenta de novo ou reformula o tema.', 'error');
 
         if (activeSlideIndex < 0) enterCarouselMode(); // garante o modo carrossel
-        const baseSnap = snapshotEditor(); // Slide 1 = título validado pelo utilizador
-        // Slide 1 fica como está; os restantes são os desenvolvimentos da IA
-        // (mantêm a mesma foto/estado — trocas a foto por slide se quiseres).
-        const devs = gen.slice(1).map(s => ({ ...baseSnap, html: headlineHtml(s.title || '', s.summary || '') }));
-        carouselSlides = [baseSnap, ...devs];
+        const baseSnap = snapshotEditor(); // foto/estado base partilhado pelos slides
+        // includeFirst (Proposta de IA): TODOS os slides vêm da IA — o Slide 1 é o
+        // gancho da notícia. Sem includeFirst (editor): Slide 1 mantém o título do
+        // utilizador e a IA só desenvolve os restantes. Todos herdam a mesma foto.
+        carouselSlides = includeFirst
+            ? gen.map(s => ({ ...baseSnap, html: headlineHtml(s.title || '', s.summary || '') }))
+            : [baseSnap, ...gen.slice(1).map(s => ({ ...baseSnap, html: headlineHtml(s.title || '', s.summary || '') }))];
         activeSlideIndex = 0;
         loadEditorState(carouselSlides[0]);
         if (editor) fitHeadline(editor);
@@ -3616,7 +3630,7 @@ async function renderProposals() {
 
         html += `
         <article class="proposal-card">
-            <button class="proposal-preview" onclick="generateProposalContent(${p.id})" title="Gerar com IA">
+            <button class="proposal-preview" onclick="generateProposalAs(${p.id}, 'feed')" title="Gerar flyer de Feed e abrir no editor">
                 ${miniFlyerHTML(p)}
                 <span class="proposal-badge new">Nova</span>
             </button>
@@ -3624,8 +3638,10 @@ async function renderProposals() {
                 <div class="proposal-card-title">${escapeHtml(p.generatedTitle || p.title)}</div>
                 <div class="proposal-card-meta">${escapeHtml(p.sourceName || 'Fonte')} • ${escapeHtml(p.date || '')}</div>
             </div>
-            <div class="proposal-card-actions">
-                <button class="btn-mini proposal-generate-btn" onclick="generateProposalContent(${p.id})"><i data-lucide="sparkles"></i> Gerar com IA</button>
+            <div class="proposal-card-actions proposal-gen-actions">
+                <button class="btn-gen btn-gen-feed" onclick="generateProposalAs(${p.id}, 'feed')" title="Gerar flyer de Feed (1080×1350)"><i data-lucide="image"></i> Feed</button>
+                <button class="btn-gen btn-gen-story" onclick="generateProposalAs(${p.id}, 'story')" title="Gerar Story (9:16) — abre já no formato vertical, sem legenda"><i data-lucide="smartphone"></i> Stories</button>
+                <button class="btn-gen btn-gen-carousel" onclick="generateProposalAs(${p.id}, 'carousel')" title="Gerar carrossel — conta a notícia em vários slides"><i data-lucide="layers"></i> Carrossel</button>
                 <button class="btn-reject" onclick="rejectProposal(${p.id})" title="Ignorar"><i data-lucide="x"></i></button>
             </div>
         </article>`;
@@ -3858,6 +3874,47 @@ async function ensureProposalImage(proposal) {
     if (!found) found = images.aiGenerate(topic);
     if (found) proposal.image = found;
 }
+
+// Tema rico para a IA a partir de uma proposta: manchete + texto-fonte (limitado
+// para poupar tokens). Ancorar nos factos reais evita que a IA invente.
+function buildProposalTopic(p) {
+    const title = (p.generatedTitle || p.title || '').trim();
+    const body = String(p.sourceText || p.summary || '').trim().slice(0, 1500);
+    return [title, body].filter(Boolean).join('\n\n') || title || 'Notícia de Moçambique';
+}
+
+// Gera a partir de uma Proposta de IA JÁ no formato escolhido e abre no editor,
+// pronto a rever/guardar. format ∈ 'feed' | 'story' | 'carousel'.
+// - feed: flyer 1080×1350 com título+legenda+hashtags.
+// - story: 9:16, SEM legenda (poupa créditos; título forte e autossuficiente).
+// - carousel: conta a notícia em N slides (todos vindos da IA) numa só chamada.
+async function generateProposalAs(id, format) {
+    const proposal = await storage.getProposalById(id);
+    if (!proposal) return ui.showToast('Proposta não encontrada.', 'error');
+
+    // Garante imagem antes de abrir no editor (notícias novas podem não ter foto).
+    if (!proposal.image) {
+        try { await ensureProposalImage(proposal); await storage.saveProposal(proposal); } catch (e) {}
+    }
+
+    // Carrega a proposta no editor (foto + estado base) e muda para a aba Editor.
+    await editProposalInEditor(id);
+    if (activeSlideIndex >= 0) exitCarousel(); // limpa qualquer carrossel anterior
+
+    const topic = buildProposalTopic(proposal);
+
+    if (format === 'carousel') {
+        setEditorFormat('feed');               // carrossel usa o canvas de feed
+        await generateCarousel(topic, 5, true); // includeFirst: Slide 1 = gancho da notícia
+    } else if (format === 'story') {
+        setEditorFormat('story');              // 9:16; o package devolve só título (sem legenda)
+        await generateContentPackage(topic);
+    } else {
+        setEditorFormat('feed');
+        await generateContentPackage(topic);
+    }
+}
+window.generateProposalAs = generateProposalAs;
 
 async function generateProposalContent(id) {
     const proposal = await storage.getProposalById(id);

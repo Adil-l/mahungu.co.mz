@@ -1856,6 +1856,55 @@ body.editor-active #tab-editor {
     font-weight: 700;
 }
 
+/* ── 3 botões de geração por formato (Feed / Stories / Carrossel) ── */
+/* Os 3 formatos ocupam uma linha em colunas iguais; "Ignorar" vira um X no
+   canto da imagem (liberta a linha toda para os botões). */
+.proposal-gen-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.proposal-gen-actions .btn-gen {
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 4px;
+    border-radius: 9px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    line-height: 1;
+    white-space: nowrap;
+    transition: all 0.18s;
+}
+
+.proposal-gen-actions .btn-gen i { width: 13px; height: 13px; flex: 0 0 auto; }
+
+/* Feed = laranja da marca · Stories = violeta · Carrossel = azul-petróleo */
+.btn-gen-feed { background: rgba(212, 82, 42, 0.12); color: #ff8a5c; border: 1px solid rgba(212, 82, 42, 0.35); }
+.btn-gen-feed:hover { background: rgba(212, 82, 42, 0.22); }
+.btn-gen-story { background: rgba(112, 0, 255, 0.12); color: #b78cff; border: 1px solid rgba(112, 0, 255, 0.35); }
+.btn-gen-story:hover { background: rgba(112, 0, 255, 0.22); }
+.btn-gen-carousel { background: rgba(0, 168, 168, 0.12); color: #45d0d0; border: 1px solid rgba(0, 168, 168, 0.35); }
+.btn-gen-carousel:hover { background: rgba(0, 168, 168, 0.22); }
+
+/* "Ignorar" como X sobreposto no canto superior direito da imagem. */
+.proposal-gen-actions .btn-reject {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 32px;
+    height: 32px;
+    background: rgba(13, 14, 22, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(4px);
+    z-index: 2;
+}
+.proposal-gen-actions .btn-reject:hover { background: #ff4444; border-color: #ff4444; }
+
 .date-group-header {
     grid-column: 1 / -1;
     margin: 30px 0 10px;
