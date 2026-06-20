@@ -1870,6 +1870,36 @@ body.editor-active #tab-editor {
     border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
+/* ── Seletor de provedores de IA (Definições) ── */
+.ai-providers { display: flex; flex-direction: column; gap: 8px; }
+.ai-prov {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.ai-prov:hover { border-color: var(--primary); }
+.ai-prov input[type="checkbox"] { width: 18px; height: 18px; accent-color: #7000ff; cursor: pointer; flex: 0 0 auto; }
+.ai-prov-name { font-weight: 700; font-size: 13px; color: #fff; flex: 1; }
+.ai-prov-tag {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-muted);
+    border: 1px solid var(--glass-border);
+}
+.ai-prov-tag.tag-paid { background: rgba(112, 0, 255, 0.15); color: #b78cff; border-color: rgba(112, 0, 255, 0.4); }
+.ai-prov-tag.tag-free { background: rgba(40, 167, 69, 0.15); color: #45d07a; border-color: rgba(40, 167, 69, 0.4); }
+
 .proposal-card-info { padding: 14px 16px 8px; }
 
 .proposal-card-title {

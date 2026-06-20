@@ -262,17 +262,33 @@ export const ai = {
         return m.includes('429') || m.includes('rate') || m.includes('limit') || m.includes('queue');
     },
 
+    // Provedor está ativo nas Definições? (sem definição = todos ativos, por
+    // retrocompatibilidade). Liga/desliga: setting 'aiProviders'.
+    providerEnabled(id) {
+        const map = storage.getSetting('aiProviders', null);
+        if (!map || typeof map !== 'object') return true;
+        return map[id] !== false;
+    },
+
     async ask(prompt) {
         const providers = [];
-        // Claude server-side primeiro: melhor qualidade, sem expor chave nem
-        // limites dos provedores grátis. Se não estiver configurado (503), cai
-        // automaticamente para os seguintes.
-        providers.push(['Claude', (p) => this.callClaude(p)]);
-        if (this.openaiKey) providers.push(['OpenAI', (p) => this.callOpenAI(p)]);
-        if (this.apiKey) providers.push(['Gemini', (p) => this.callGemini(p)]);
-        if (this.openrouterKey) providers.push(['OpenRouter', (p) => this.callOpenRouter(p)]);
-        providers.push(['llm7', (p) => this.callLLM7(p)]);
-        providers.push(['Pollinations', (p) => this.callPollinations(p)]);
+        // Cadeia por ordem de preferência, respeitando os provedores LIGADOS nas
+        // Definições (o utilizador pode desligar alguns e usar só um).
+        // Claude server-side primeiro: melhor qualidade, sem expor chave. Se não
+        // estiver configurado (503), cai automaticamente para os seguintes.
+        if (this.providerEnabled('claude')) providers.push(['Claude', (p) => this.callClaude(p)]);
+        if (this.providerEnabled('openai') && this.openaiKey) providers.push(['OpenAI', (p) => this.callOpenAI(p)]);
+        if (this.providerEnabled('gemini') && this.apiKey) providers.push(['Gemini', (p) => this.callGemini(p)]);
+        if (this.providerEnabled('openrouter') && this.openrouterKey) providers.push(['OpenRouter', (p) => this.callOpenRouter(p)]);
+        if (this.providerEnabled('free')) {
+            providers.push(['llm7', (p) => this.callLLM7(p)]);
+            providers.push(['Pollinations', (p) => this.callPollinations(p)]);
+        }
+        // Rede de segurança: se o utilizador desligou tudo, usa as IA gratuitas
+        // (não exigem chave) para a geração nunca morrer por completo.
+        if (providers.length === 0) {
+            providers.push(['llm7', (p) => this.callLLM7(p)], ['Pollinations', (p) => this.callPollinations(p)]);
+        }
 
         // Tenta a cadeia de provedores; se TODOS falharem por rate-limit (429),
         // espera (backoff) e tenta de novo — respeita o limite de ~1 pedido/seg.
@@ -472,6 +488,53 @@ export const ai = {
         const text = await this.ask(prompt);
         const j = this.parseProposalJSON(text, { title: items[0]?.title || 'Resumo', summary: '', category });
         return { caption: j.caption, hashtags: j.hashtags, cta: j.cta };
+    },
+
+    // ── FALLBACK quando o Claude (servidor) está DESLIGADO nas Definições ──
+    // Reproduzem, pela cadeia cliente (Gemini/grátis/…), o que os endpoints
+    // /api/ai/content-package e /api/ai/carousel fazem no servidor.
+
+    /**
+     * Pacote a partir de um tema (equivalente a /api/ai/content-package).
+     * Story devolve só {title, summary} (sem legenda — poupa); feed/carrossel
+     * devolvem também caption/hashtags/cta. Usa generateContent (cadeia cliente).
+     */
+    async generatePackage(topic, format = 'feed') {
+        const r = await this.generateContent({ title: topic, summary: '', category: 'Geral', sourceText: topic });
+        if (format === 'story') return { title: r.flyerTitle, summary: r.flyerSummary };
+        return { title: r.flyerTitle, summary: r.flyerSummary, caption: r.caption, hashtags: r.hashtags, cta: r.cta };
+    },
+
+    /**
+     * Carrossel de N slides (equivalente a /api/ai/carousel) pela cadeia cliente.
+     * Devolve { slides:[{title,summary}], caption, hashtags, cta }.
+     */
+    async generateCarouselSlides(topic, n) {
+        const prompt = `
+            ${MAHUNGU_LANGUAGE_RULE}
+            ${this.brandDirectives()}
+            Conta esta notícia como uma HISTÓRIA num CARROSSEL de EXATAMENTE ${n} slides para Instagram:
+            "${topic}"
+            Slide 1 = gancho que pára o scroll; slides do meio desenvolvem (um facto/ideia por slide,
+            criando curiosidade para deslizar); último slide remata + apelo a seguir a @mahungu_mz.
+            ${MAHUNGU_ANTI_FABRICATION}
+            Responde APENAS em JSON estrito (sem texto à volta):
+            {"slides":[{"title":"frase-impacto ≤55","summary":"complemento ≤70"}],
+             "caption":"legenda do post (fórmula Mahungu)","hashtags":["#Tag1","#Tag2"],"cta":"${MAHUNGU_CTA}"}
+            O array "slides" tem de ter exatamente ${n} elementos.
+        `;
+        const text = await this.ask(prompt);
+        let raw = String(text).replace(/```json/gi, '').replace(/```/g, '').trim();
+        const s = raw.indexOf('{'); const e = raw.lastIndexOf('}');
+        if (s !== -1 && e > s) raw = raw.slice(s, e + 1);
+        let j = {};
+        try { j = JSON.parse(raw); } catch (err) { j = {}; }
+        const slides = Array.isArray(j.slides) ? j.slides
+            .filter(x => x && (x.title || x.summary))
+            .map(x => ({ title: String(x.title || '').trim(), summary: String(x.summary || '').trim() })) : [];
+        let hashtags = j.hashtags || [];
+        if (typeof hashtags === 'string') hashtags = hashtags.split(/[\s,]+/).filter(Boolean);
+        return { slides, caption: j.caption || '', hashtags, cta: j.cta || MAHUNGU_CTA };
     },
 
     /**

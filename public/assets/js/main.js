@@ -3331,6 +3331,15 @@ async function editProposalInEditor(id) {
 // Mahungu a partir de um tema, e preenche o editor de uma vez. O título/resumo
 // vão para a headline do flyer; a legenda/hashtags/cta ficam em editorPostMeta
 // (acompanham o flyer ao guardar e aparecem ao agendar). POST /api/ai/content-package.
+// Claude (servidor, pago) está LIGADO nas Definições? Sem definição = ligado.
+// Quando desligado, as funções que usavam o endpoint Claude caem para a cadeia
+// cliente (Gemini/grátis/…), respeitando a escolha do utilizador.
+function aiClaudeEnabled() {
+    const map = storage.getSetting('aiProviders', null);
+    if (!map || typeof map !== 'object') return true;
+    return map.claude !== false;
+}
+
 async function generateContentPackage(topicArg) {
     // topicArg vem dos botões da Proposta de IA (tema já conhecido — sem prompt).
     // Sem argumento (botão do editor), pergunta o tema ao utilizador.
@@ -3352,19 +3361,29 @@ async function generateContentPackage(topicArg) {
 
     ui.showToast(isStory ? 'A gerar título do Story…' : 'A gerar conteúdo com IA…', 'info');
     try {
-        const res = await fetch('/api/ai/content-package', {
-            method: 'POST',
-            headers: apiHeaders(),
-            credentials: 'same-origin',
-            body: JSON.stringify({ topic: topic.trim(), format: fmt })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-            return ui.showToast(data.error || 'Não foi possível gerar (a IA tem chave/créditos no servidor?).', 'error');
+        let data;
+        if (aiClaudeEnabled()) {
+            const res = await fetch('/api/ai/content-package', {
+                method: 'POST',
+                headers: apiHeaders(),
+                credentials: 'same-origin',
+                body: JSON.stringify({ topic: topic.trim(), format: fmt })
+            });
+            data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                return ui.showToast(data.error || 'Não foi possível gerar (a IA tem chave/créditos no servidor?).', 'error');
+            }
+            // Se a IA não devolveu JSON limpo, o backend manda {raw, warning}.
+            if (!data.title && data.raw) {
+                return ui.showToast('A IA respondeu sem o formato esperado. Tenta de novo ou reformula o tema.', 'error');
+            }
+        } else {
+            // Claude desligado → cadeia cliente (Gemini/grátis/…). Carrossel usa o
+            // pacote 'feed' (só se aproveita título/resumo no slide ativo).
+            data = await ai.generatePackage(topic.trim(), isStory ? 'story' : 'feed');
         }
-        // Se a IA não devolveu JSON limpo, o backend manda {raw, warning}.
-        if (!data.title && data.raw) {
-            return ui.showToast('A IA respondeu sem o formato esperado. Tenta de novo ou reformula o tema.', 'error');
+        if (!data || !data.title) {
+            return ui.showToast('A IA não devolveu conteúdo. Tenta de novo ou reformula o tema.', 'error');
         }
 
         const editor = document.getElementById('editor');
@@ -3416,13 +3435,18 @@ async function regenerateCaption() {
 
     ui.showToast('A gerar nova legenda…', 'info');
     try {
-        const res = await fetch('/api/ai/caption', {
-            method: 'POST', headers: apiHeaders(), credentials: 'same-origin',
-            body: JSON.stringify({ topic: base })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) return ui.showToast(data.error || 'Não foi possível gerar a legenda.', 'error');
-        if (!data.caption) return ui.showToast('A IA não devolveu legenda. Tenta de novo.', 'error');
+        let data;
+        if (aiClaudeEnabled()) {
+            const res = await fetch('/api/ai/caption', {
+                method: 'POST', headers: apiHeaders(), credentials: 'same-origin',
+                body: JSON.stringify({ topic: base })
+            });
+            data = await res.json().catch(() => ({}));
+            if (!res.ok) return ui.showToast(data.error || 'Não foi possível gerar a legenda.', 'error');
+        } else {
+            data = await ai.generateCaption(base); // cadeia cliente (Claude desligado)
+        }
+        if (!data || !data.caption) return ui.showToast('A IA não devolveu legenda. Tenta de novo.', 'error');
         const tags = (Array.isArray(data.hashtags) && data.hashtags.length)
             ? '\n\n' + data.hashtags.map(h => '#' + String(h).replace(/^#/, '')).join(' ')
             : '';
@@ -3460,12 +3484,17 @@ async function generateCarousel(topicArg, slidesArg, includeFirst) {
 
     ui.showToast(`A gerar ${n} slides numa só chamada…`, 'info');
     try {
-        const res = await fetch('/api/ai/carousel', {
-            method: 'POST', headers: apiHeaders(), credentials: 'same-origin',
-            body: JSON.stringify({ topic: baseTitle, slides: n })
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) return ui.showToast(data.error || 'Não foi possível gerar o carrossel.', 'error');
+        let data;
+        if (aiClaudeEnabled()) {
+            const res = await fetch('/api/ai/carousel', {
+                method: 'POST', headers: apiHeaders(), credentials: 'same-origin',
+                body: JSON.stringify({ topic: baseTitle, slides: n })
+            });
+            data = await res.json().catch(() => ({}));
+            if (!res.ok) return ui.showToast(data.error || 'Não foi possível gerar o carrossel.', 'error');
+        } else {
+            data = await ai.generateCarouselSlides(baseTitle, n); // cadeia cliente (Claude desligado)
+        }
         const gen = Array.isArray(data.slides) ? data.slides : null;
         if (!gen || gen.length < 2) return ui.showToast('A IA não devolveu slides. Tenta de novo ou reformula o tema.', 'error');
 
@@ -4466,6 +4495,15 @@ function openAISettings() {
     if (intervalInput) intervalInput.value = storage.getSetting('monitoringInterval', 15);
     const ageInput = document.getElementById('news-age-days');
     if (ageInput) ageInput.value = String(storage.getSetting('maxNewsAgeDays', 3));
+
+    // Provedores de IA ligados/desligados (sem definição = todos ligados).
+    const prov = storage.getSetting('aiProviders', null);
+    const isOn = id => !prov || typeof prov !== 'object' || prov[id] !== false;
+    ['claude', 'gemini', 'openai', 'openrouter', 'free'].forEach(id => {
+        const cb = document.getElementById('prov-' + id);
+        if (cb) cb.checked = isOn(id);
+    });
+
     modal.classList.add('active');
     lucide.createIcons();
 }
@@ -4481,6 +4519,16 @@ function saveAISettings() {
     const openrouterKey = (document.getElementById('ai-openrouter-key')?.value || '').trim();
     const interval = parseInt(document.getElementById('monitoring-interval').value) || 15;
     const newsAge = parseInt(document.getElementById('news-age-days').value) || 3;
+
+    // Provedores de IA ligados/desligados. Tem de ficar pelo menos um ligado.
+    const ids = ['claude', 'gemini', 'openai', 'openrouter', 'free'];
+    const aiProviders = {};
+    ids.forEach(id => { aiProviders[id] = !!document.getElementById('prov-' + id)?.checked; });
+    if (!ids.some(id => aiProviders[id])) {
+        return ui.showToast('Liga pelo menos um provedor de IA.', 'info');
+    }
+    storage.updateSetting('aiProviders', aiProviders);
+
     storage.updateSetting('apiKey', apiKey);
     storage.updateSetting('openaiKey', openaiKey);
     storage.updateSetting('openrouterKey', openrouterKey);

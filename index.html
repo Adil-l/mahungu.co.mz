@@ -811,11 +811,23 @@
         <div class="modal-header" style="margin-bottom: 25px;">
             <div>
                 <div class="modal-eyebrow">Configurações</div>
-                <h2 style="color: #fff; font-size: 20px;">Mahungu AI (Gemini)</h2>
+                <h2 style="color: #fff; font-size: 20px;">Inteligência Artificial</h2>
             </div>
             <button class="close-modal" onclick="closeAISettings()"><i data-lucide="x"></i></button>
         </div>
         
+        <div class="form-group">
+            <label>Provedores de IA — liga/desliga os que queres usar</label>
+            <p style="font-size: 11px; color: var(--text-muted); margin: 2px 0 10px;">Desliga os que não queres. Para usar <strong>só um</strong>, desliga os restantes. O Claude é o pago (servidor); as "IA Gratuitas" não precisam de chave.</p>
+            <div class="ai-providers">
+                <label class="ai-prov"><input type="checkbox" id="prov-claude"><span class="ai-prov-name">Claude</span><span class="ai-prov-tag tag-paid">paga · servidor</span></label>
+                <label class="ai-prov"><input type="checkbox" id="prov-gemini"><span class="ai-prov-name">Google Gemini</span><span class="ai-prov-tag">precisa de chave</span></label>
+                <label class="ai-prov"><input type="checkbox" id="prov-openai"><span class="ai-prov-name">OpenAI</span><span class="ai-prov-tag">precisa de chave</span></label>
+                <label class="ai-prov"><input type="checkbox" id="prov-openrouter"><span class="ai-prov-name">OpenRouter</span><span class="ai-prov-tag">grátis/pago · chave</span></label>
+                <label class="ai-prov"><input type="checkbox" id="prov-free"><span class="ai-prov-name">IA Gratuitas</span><span class="ai-prov-tag tag-free">llm7 + Pollinations · sem chave</span></label>
+            </div>
+        </div>
+
         <div class="form-group">
             <label>OpenAI API Key (recomendado)</label>
             <div style="position: relative; display: flex; gap: 10px; align-items: center;">
