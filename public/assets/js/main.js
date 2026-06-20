@@ -3337,6 +3337,11 @@ function getGroupLabel(timestamp) {
     return d.toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' });
 }
 
+// Limite de cartões renderizados de uma vez. Filtros/pesquisa operam sobre o
+// conjunto TODO; só não despejamos milhares de cartões no DOM (evita o freeze
+// com muitas propostas — cada cartão tem mini-flyer + ícones lucide).
+const PROPOSALS_RENDER_LIMIT = 60;
+
 async function renderProposals() {
     const container = document.getElementById('proposals-container');
     if (!container) return;
@@ -3382,10 +3387,13 @@ async function renderProposals() {
         return tsB - tsA;
     });
 
+    const total = filtered.length;
+    const shown = filtered.slice(0, PROPOSALS_RENDER_LIMIT);
+
     let currentGroup = '';
     let html = '';
 
-    filtered.forEach(p => {
+    shown.forEach(p => {
         const label = getGroupLabel(p.timestamp || (p.id > 1000000000000 ? p.id : null));
         if (label !== currentGroup) {
             currentGroup = label;
@@ -3408,6 +3416,10 @@ async function renderProposals() {
             </div>
         </article>`;
     });
+
+    if (total > shown.length) {
+        html += `<div class="date-group-header" style="grid-column:1/-1;text-align:center;color:var(--text-muted);">A mostrar as ${shown.length} mais recentes de ${total}. Usa a pesquisa/categorias acima para encontrar outras, ou ignora/limpa as antigas.</div>`;
+    }
 
     container.innerHTML = html;
     lucide.createIcons();
@@ -3454,10 +3466,13 @@ async function renderAISaved() {
         return tsB - tsA;
     });
 
+    const totalReady = filtered.length;
+    const shownReady = filtered.slice(0, PROPOSALS_RENDER_LIMIT);
+
     let currentGroup = '';
     let html = '';
 
-    filtered.forEach(p => {
+    shownReady.forEach(p => {
         const label = getGroupLabel(p.timestamp || (p.id > 1000000000000 ? p.id : null));
         if (label !== currentGroup) {
             currentGroup = label;
@@ -3483,6 +3498,10 @@ async function renderAISaved() {
             </div>
         </article>`;
     });
+
+    if (totalReady > shownReady.length) {
+        html += `<div class="date-group-header" style="grid-column:1/-1;text-align:center;color:var(--text-muted);">A mostrar as ${shownReady.length} mais recentes de ${totalReady}. Usa a pesquisa/categorias para encontrar outras.</div>`;
+    }
 
     container.innerHTML = html;
     updateMergeBar();
