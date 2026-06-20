@@ -1317,17 +1317,20 @@ body.editor-active #tab-editor {
 
 .m-info {
     flex: 1;
+    min-width: 0; /* permite encolher; sem isto um URL longo alarga o card e corta a página */
 }
 
 .m-title {
     font-size: 16px;
     font-weight: 700;
     margin-bottom: 5px;
+    overflow-wrap: anywhere;
 }
 
 .m-meta {
     font-size: 12px;
     color: var(--text-muted);
+    overflow-wrap: anywhere; /* o URL quebra dentro do card em vez de transbordar */
 }
 
 .m-actions {
@@ -2326,12 +2329,31 @@ body.theme-light .admin-table tbody tr:hover { background: rgba(20,22,40,0.03); 
     .chart-container { padding: 22px; border-radius: 20px; }
 
     /* ── Modais quase full-screen, ancorados em baixo ── */
+    /* NÃO mexer no padding: alguns modais usam padding:0 (chat, fontes) e têm
+       padding interno próprio — forçá-lo cortava o botão de enviar. */
     .modal-overlay { padding: 0; align-items: flex-end; }
     .modal-container.modal-form {
         max-width: 100% !important; width: 100%;
         max-height: 94vh; border-radius: 18px 18px 0 0;
-        padding: 22px !important;
     }
+
+    /* ── Modal de Proposta: as 2 colunas empilham (senão a direita esmaga) ── */
+    .proposal-review-body { flex-direction: column; gap: 18px; }
+    .proposal-review-preview { width: 100%; align-items: center; }
+    .proposal-preview-lg { margin: 0 auto; }
+    .proposal-review-fields { max-height: none; overflow: visible; width: 100%; padding-right: 0; }
+
+    /* ── Drawer: anular o estado "recolhido" (78px) — no telemóvel manda o drawer ── */
+    body.sidebar-collapsed .nav-item { justify-content: flex-start; padding: 12px 15px; gap: 12px; }
+    body.sidebar-collapsed .nav-label { display: inline; }
+    body.sidebar-collapsed .sidebar-header img { max-width: 150px !important; margin: 0; }
+    body.sidebar-collapsed .sidebar-footer { flex-direction: row; }
+    body.sidebar-collapsed #mahungu-userbox { align-items: stretch; }
+
+    /* ── Header do gráfico: título trunca em vez de empurrar os toggles ── */
+    .chart-header { left: 16px; right: 16px; top: 18px; gap: 8px; }
+    .chart-title { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .chart-controls .btn-mini { padding: 7px 10px; }
 }
 
 /* Ecrãs muito estreitos: KPIs e propostas em coluna única. */
