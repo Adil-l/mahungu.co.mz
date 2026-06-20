@@ -38,3 +38,6 @@
 .playwright-mcp/
 *.doc
 *.docx
+
+# Artefactos de testes (Storage::fake)
+/storage/framework/testing
