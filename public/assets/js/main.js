@@ -4044,15 +4044,16 @@ function applyGenerationToProposal(proposal, result) {
 // 1) imagem do próprio artigo (og:image) — relevante e nítida;
 // 2) Pexels/Unsplash (foto profissional por tema);
 // 3) Openverse (banco de imagens livres);
-// 4) último recurso: foto base da Mahungu (NUNCA imagem gerada por IA — o
-//    utilizador troca a foto à mão no editor).
+// 4) último recurso: geração de imagem (Pollinations — serviço gratuito, NÃO
+//    usa a API do Claude; o Claude só gera TEXTO).
 async function ensureProposalImage(proposal) {
     if (proposal.image) return;
     const topic = proposal.generatedTitle || proposal.title || proposal.category;
     let found = await images.fromArticle(proposal.source_url || proposal.link || proposal.url);
     if (!found) found = await images.fromStock(topic);
     if (!found) found = await images.findBest(topic);
-    proposal.image = found || DEFAULT_FLYER_PHOTO;
+    if (!found) found = images.aiGenerate(topic);
+    if (found) proposal.image = found;
 }
 
 // Tema rico para a IA a partir de uma proposta: manchete + texto-fonte (limitado
