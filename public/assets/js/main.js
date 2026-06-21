@@ -3328,8 +3328,11 @@ async function editProposalInEditor(id) {
     closeProposalModal();
     const editorNav = document.querySelector('.main-nav .nav-item[data-tab="editor"]');
     showTab('editor', editorNav);
-    setEditorFormat('feed'); // proposta abre em feed (transformToStory muda depois)
-    ui.showToast("Proposta carregada no editor!", "success");
+    // Abre no formato da proposta (story 9:16 ou feed). Para story, ao guardar
+    // cria-se o Story (consome a proposta — ver confirmSaveToHistory).
+    setEditorFormat(proposal.format === 'story' ? 'story' : 'feed');
+    if (editor) fitHeadline(editor);
+    ui.showToast(proposal.format === 'story' ? "Story carregado no editor!" : "Proposta carregada no editor!", "success");
 }
 
 // Gera um PACOTE de conteúdo (título + legenda + hashtags + CTA) na voz da
@@ -3640,18 +3643,25 @@ async function approveAndSaveProposal(id) {
 
         if (editor && !proposal.flyerState) fitHeadline(editor);
 
+        // Story (9:16) vs Feed: aplica o formato ANTES de capturar (o Story
+        // captura 1080×1920 e vai para a aba "Stories"; legenda fica vazia).
+        const isStoryProposal = proposal.format === 'story';
+        setEditorFormat(isStoryProposal ? 'story' : 'feed');
+        if (editor) fitHeadline(editor);
+
         const dataUrl = await core.captureCurrentFlyer();
         const newEntry = {
             id: generateUniqueFlyerId(),
             title: proposal.generatedTitle || "Flyer Gerado pela IA",
             category: proposal.category || "IA Gerado", // Assuming proposal has a category or default
             status: 'Aprovado',
+            format: isStoryProposal ? 'story' : 'feed',
             date: new Date().toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' }),
             image: dataUrl,
-            // Legenda/hashtags/CTA gerados pela IA, guardados com o flyer
-            caption: proposal.generatedCaption || '',
-            hashtags: proposal.hashtags || [],
-            cta: proposal.cta || '',
+            // Legenda/hashtags/CTA gerados pela IA (Stories vão sem legenda).
+            caption: isStoryProposal ? '' : (proposal.generatedCaption || ''),
+            hashtags: isStoryProposal ? [] : (proposal.hashtags || []),
+            cta: isStoryProposal ? '' : (proposal.cta || ''),
             state: {
                 html: editor.innerHTML,
                 state: core.editorState,
@@ -3677,8 +3687,9 @@ async function approveAndSaveProposal(id) {
         closeProposalModal();
         renderProposals();
         renderAISaved();
-        ui.showToast("Proposta aprovada e flyer salvo!", "success");
+        ui.showToast(isStoryProposal ? "Story aprovado e salvo!" : "Proposta aprovada e flyer salvo!", "success");
         if (document.getElementById('tab-history').classList.contains('hidden') === false) renderHistory();
+        if (document.getElementById('tab-stories') && !document.getElementById('tab-stories').classList.contains('hidden')) renderStories();
         // Sincroniza com o servidor em PARALELO e em segundo plano (não bloqueia a UI).
         Promise.all([shareFlyer(newEntry), shareProposal(proposal)])
             .catch(e => console.error('Sync em segundo plano falhou:', e));
@@ -3939,6 +3950,7 @@ async function renderAISaved() {
         }
 
         const isCarousel = p.format === 'carousel' && Array.isArray(p.slideStates) && p.slideStates.length >= 2;
+        const isStory = !isCarousel && p.format === 'story';
         html += `
         <article class="proposal-card is-ready">
             <label class="merge-check" title="Selecionar para unir num carrossel"><input type="checkbox" ${mergeSelection.has(p.id) ? 'checked' : ''} onchange="toggleMergeSelect(${p.id}, this.checked)"></label>
@@ -3946,6 +3958,7 @@ async function renderAISaved() {
                 ${miniFlyerHTML(p)}
                 <span class="proposal-badge ready">Pronta</span>
                 ${isCarousel ? `<span class="proposal-badge carousel"><i data-lucide="layers" size="12"></i> ${p.slideStates.length}</span>` : ''}
+                ${isStory ? `<span class="proposal-badge story"><i data-lucide="zap" size="12"></i> Story</span>` : ''}
             </button>
             <div class="proposal-card-info">
                 <div class="proposal-card-title">${escapeHtml(p.generatedTitle || p.title)}</div>
@@ -4424,6 +4437,10 @@ window.selectPickerImage = selectPickerImage;
 // ── CONTEÚDO DE ENGAJAMENTO (IA, sem RSS) ──
 
 function openEngagementModal() {
+    // Repõe o formato em Feed (e esconde o nº de slides) ao abrir.
+    const feedRadio = document.querySelector('input[name="engagement-format"][value="feed"]');
+    if (feedRadio) feedRadio.checked = true;
+    onEngagementFormatChange();
     document.getElementById('engagement-modal').classList.add('active');
     lucide.createIcons();
 }
@@ -4433,9 +4450,20 @@ function closeEngagementModal(e) {
     document.getElementById('engagement-modal').classList.remove('active');
 }
 
+// Mostra/esconde o nº de slides conforme o formato escolhido (só carrossel).
+function onEngagementFormatChange() {
+    const fmt = document.querySelector('input[name="engagement-format"]:checked')?.value || 'feed';
+    const grp = document.getElementById('engagement-slides-group');
+    if (grp) grp.style.display = fmt === 'carousel' ? 'block' : 'none';
+}
+window.onEngagementFormatChange = onEngagementFormatChange;
+
+// Cria conteúdo de engajamento (sem notícia) em Feed, Story ou Carrossel. Vai
+// para "Salvadas da IA" (status pending) — editas/aprovas como qualquer proposta.
 async function generateEngagementContent() {
     const vibe = document.getElementById('engagement-vibe').value;
     const tema = document.getElementById('engagement-topic').value.trim();
+    const format = document.querySelector('input[name="engagement-format"]:checked')?.value || 'feed';
     const btn = document.getElementById('btn-engagement-generate');
 
     const originalHtml = btn ? btn.innerHTML : '';
@@ -4446,27 +4474,55 @@ async function generateEngagementContent() {
     }
 
     try {
-        const result = await ai.generateEngagement(vibe, tema);
         const proposal = {
             id: generateUniqueFlyerId(),
-            title: result.flyerTitle,
-            summary: result.flyerSummary,
             category: 'Engajamento',
             sourceName: 'Mahungu AI',
             date: new Date().toLocaleDateString('pt-PT'),
             status: 'pending',
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            title: tema || vibe
         };
-        applyGenerationToProposal(proposal, result);
-        await ensureProposalImage(proposal);
+
+        if (format === 'carousel') {
+            const n = Math.min(10, Math.max(2, parseInt(document.getElementById('engagement-slides')?.value, 10) || 5));
+            const topic = tema ? `${vibe} — ${tema}` : vibe;
+            const car = await ai.generateCarouselSlides(topic, n);
+            const slides = Array.isArray(car.slides) ? car.slides.filter(s => s.title || s.summary) : [];
+            if (slides.length < 2) throw new Error('A IA não devolveu slides.');
+            proposal.title = slides[0].title;
+            proposal.summary = slides[0].summary;
+            await ensureProposalImage(proposal);
+            const img = flyerPhotoUrl(proposal.image);
+            const baseState = { zoom: 1, posX: 0, posY: 0, fontSize: 72, ...freshSplitDefaults() };
+            proposal.format = 'carousel';
+            proposal.slideStates = slides.map(s => ({ html: headlineHtml(s.title, s.summary), state: { ...baseState }, imgSrc: img }));
+            proposal.flyerState = proposal.slideStates[0];
+            proposal.generatedTitle = slides[0].title;
+            proposal.generatedSummary = slides[0].summary;
+            proposal.generatedCaption = car.caption || '';
+            proposal.hashtags = Array.isArray(car.hashtags) ? car.hashtags : [];
+            proposal.cta = car.cta || '';
+        } else {
+            const result = await ai.generateEngagement(vibe, tema);
+            proposal.title = result.flyerTitle;
+            proposal.summary = result.flyerSummary;
+            await ensureProposalImage(proposal);
+            applyGenerationToProposal(proposal, result);
+            proposal.format = format; // 'feed' ou 'story'
+            if (format === 'story') { proposal.generatedCaption = ''; proposal.hashtags = []; proposal.cta = ''; } // Stories sem legenda
+        }
+
         await storage.saveProposal(proposal);
         await shareProposal(proposal); // Salvados visíveis para todos
 
         updateDashboardStats();
         renderProposals();
+        renderAISaved();
         closeEngagementModal();
         document.getElementById('engagement-topic').value = '';
-        ui.showToast('Conteúdo de engajamento criado! 🎉', 'success');
+        const label = format === 'carousel' ? 'Carrossel' : (format === 'story' ? 'Story' : 'Post');
+        ui.showToast(`${label} de engajamento criado nas Salvadas da IA! 🎉`, 'success');
     } catch (err) {
         console.error('Erro ao gerar engajamento:', err);
         ui.showToast('Erro ao gerar conteúdo. Tente novamente.', 'error');

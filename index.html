@@ -1149,6 +1149,20 @@
             <input type="text" id="engagement-topic" placeholder="Ex: futebol moçambicano, música, história de Maputo...">
         </div>
 
+        <div class="form-group">
+            <label>Formato</label>
+            <div class="platform-selector" style="display:flex; gap:8px; flex-wrap:wrap;">
+                <label class="platform-chip"><input type="radio" name="engagement-format" value="feed" checked onchange="onEngagementFormatChange()"><i data-lucide="square"></i> Feed</label>
+                <label class="platform-chip"><input type="radio" name="engagement-format" value="story" onchange="onEngagementFormatChange()"><i data-lucide="zap"></i> Story</label>
+                <label class="platform-chip"><input type="radio" name="engagement-format" value="carousel" onchange="onEngagementFormatChange()"><i data-lucide="images"></i> Carrossel</label>
+            </div>
+        </div>
+
+        <div class="form-group" id="engagement-slides-group" style="display:none;">
+            <label>Nº de slides (2 a 10)</label>
+            <input type="number" id="engagement-slides" min="2" max="10" value="5" style="width: 100%;">
+        </div>
+
         <button class="btn-main btn-success" style="margin-top: 10px;" onclick="generateEngagementContent()" id="btn-engagement-generate">
             <i data-lucide="sparkles"></i> Criar com IA
         </button>

@@ -1828,6 +1828,18 @@ body.editor-active #tab-editor {
     border: 1px solid rgba(0, 168, 168, 0.45);
 }
 .proposal-badge.carousel i { width: 12px; height: 12px; }
+/* Badge "Story" — canto superior esquerdo, abaixo de um eventual carrossel. */
+.proposal-badge.story {
+    right: auto;
+    left: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(112, 0, 255, 0.18);
+    color: #b78cff;
+    border: 1px solid rgba(112, 0, 255, 0.45);
+}
+.proposal-badge.story i { width: 12px; height: 12px; }
 
 /* ── Navegação de slides nos modais de visualização (carrossel) ── */
 .modal-preview-frame, .proposal-preview-lg { position: relative; }
