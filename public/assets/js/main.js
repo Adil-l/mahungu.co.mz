@@ -2,7 +2,7 @@ import { storage } from './modules/storage.js';
 import { ai } from './modules/ai.js';
 import { core } from './modules/core.js';
 import { ui } from './modules/ui.js';
-import { automation, IMPACT_KEYWORDS } from './modules/automation.js';
+import { automation } from './modules/automation.js';
 import { scheduler } from './modules/scheduler.js';
 import { images } from './modules/images.js';
 
@@ -203,6 +203,13 @@ function proposalOrigin(p) {
     if (p.sourceType === 'instagram' || p.sourceType === 'rss') return p.sourceType;
     return /instagram\.com/i.test(p.sourceUrl || '') ? 'instagram' : 'rss';
 }
+
+// Léxico de "impacto geral" — definido LOCALMENTE aqui (não importado de
+// automation.js) de propósito: os imports de módulos ES não levam o ?v= do
+// cache-busting, por isso importar um export NOVO de outro módulo parte a SPA
+// quando o browser ainda tem esse módulo em cache. Mantendo-o local, o main.js
+// fica auto-suficiente. (Cópia do mesmo léxico de automation.js.)
+const IMPACT_KEYWORDS = /(govern|ministr|president|eleic|elei[çc]|partido|frelimo|renamo|parlament|\blei\b|decret|greve|manifesta|protest|combust[íi]vel|gasolina|gas[óo]leo|metical|pre[çc]o|sal[áa]rio|imposto|economia|infla[çc]|d[óo]lar|emprego|despedimento|corrup|esc[âa]ndal|pol[ée]mic|recorde|hist[óo]ric|in[ée]dit|morte|morr|faleceu|acidente|ataque|viol[êe]nc|terror|cabo delgado|sa[úu]de|hospital|surto|c[óo]lera|covid|vacina|futebol|mamba|mundial|\bcopa|sele[çc][ãa]o|campe[ãa]o|\bfinal\b|estrei|champions|fifa|\bgolo|transfer|contrat|pol[íi]cia|tribunal|deten[çc]|pris[ãa]o|viral|chocante|bomb[áa]stic|sensa[çc])/i;
 
 // ── POTENCIAL VIRAL (estrela ⭐) — heurística 100% LOCAL, ZERO créditos de IA ──
 // Pontua 0–100 a probabilidade de uma notícia "puxar" engajamento, combinando
