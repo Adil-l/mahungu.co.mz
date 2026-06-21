@@ -151,6 +151,52 @@ class AiContentTest extends TestCase
         Http::assertSent(fn ($r) => str_contains($r['messages'][0]['content'] ?? '', '3 slides'));
     }
 
+    public function test_package_clamps_long_title(): void
+    {
+        config(['services.anthropic.key' => 'sk-ant-test']);
+        $longTitle = 'Conselho de Ministros aprovou nova subida do preço dos combustíveis a partir de amanhã';
+        Http::fake([
+            'api.anthropic.com/*' => Http::response([
+                'content' => [['type' => 'text', 'text' => json_encode([
+                    'title' => $longTitle,
+                    'summary' => 'Gasolina passa a 93,86 MT',
+                    'caption' => 'x', 'hashtags' => ['Mocambique'], 'cta' => 'y',
+                ])]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $res = $this->actingAs($user)->postJson('/api/ai/content-package', ['topic' => 'Combustíveis'])->assertOk();
+
+        // O título longo tem de ser cortado para uma chamada curta (≤42).
+        $this->assertLessThanOrEqual(42, mb_strlen($res->json('title')));
+        $this->assertNotEmpty($res->json('title'));
+    }
+
+    public function test_carousel_clamps_long_slide_titles(): void
+    {
+        config(['services.anthropic.key' => 'sk-ant-test']);
+        $slides = [
+            ['title' => 'Este é um título de slide demasiado longo que nunca caberia bem no flyer', 'summary' => 'remate'],
+            ['title' => 'Outro título exageradamente comprido para um slide de carrossel do Instagram', 'summary' => 'remate 2'],
+        ];
+        Http::fake([
+            'api.anthropic.com/*' => Http::response([
+                'content' => [['type' => 'text', 'text' => json_encode([
+                    'slides' => $slides, 'caption' => 'c', 'hashtags' => ['x'], 'cta' => 'v',
+                ])]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $res = $this->actingAs($user)->postJson('/api/ai/carousel', ['topic' => 'x', 'slides' => 2])->assertOk();
+
+        foreach ($res->json('slides') as $slide) {
+            $this->assertLessThanOrEqual(40, mb_strlen($slide['title']), 'título do slide demasiado longo');
+            $this->assertNotEmpty($slide['title']);
+        }
+    }
+
     public function test_carousel_validates_slide_count(): void
     {
         config(['services.anthropic.key' => 'sk-ant-test']);
