@@ -3,6 +3,7 @@
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AiController;
 use App\Http\Controllers\ArticleExtractController;
+use App\Http\Controllers\MetaController;
 use App\Http\Controllers\FlyerController;
 use App\Http\Controllers\HashtagController;
 use App\Http\Controllers\ImageSearchController;
@@ -50,6 +51,12 @@ Route::get('/health', function (\App\Services\ClaudeService $claude) {
         ],
     ], $ok ? 200 : 503);
 });
+
+// Callbacks PÚBLICOS da Meta (chamados pelos servidores da Meta com signed_request
+// assinado; isentos de CSRF em App\Http\Middleware\VerifyCsrfToken). Necessários
+// para a App Review (Data Deletion + Deauthorize).
+Route::post('/meta/data-deletion', [MetaController::class, 'dataDeletion'])->name('meta.data-deletion');
+Route::post('/meta/deauthorize', [MetaController::class, 'deauthorize'])->name('meta.deauthorize');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/user', function (Request $request) {
