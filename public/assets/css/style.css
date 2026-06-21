@@ -141,16 +141,18 @@ body.sidebar-collapsed #mahungu-userbox button { font-size: 0 !important; gap: 0
 }
 .control-label { color: var(--text-muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
 
-/* Seletor de formato do editor (Feed · Story · Carrossel) */
-.format-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+/* Seletor de formato do editor (Feed · Story · Carrossel) — sidebar estreita
+   (280px): chips compactos com o ícone EM CIMA do rótulo, 3 colunas iguais que
+   encolhem (min-width:0) para "Carrossel" caber sem cortar. */
+.format-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .format-seg-btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-    padding: 9px 6px; border-radius: 9px; font-size: 12px; font-weight: 700;
-    cursor: pointer; line-height: 1; white-space: nowrap;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+    min-width: 0; padding: 9px 3px; border-radius: 9px; font-size: 10.5px; font-weight: 700;
+    cursor: pointer; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     background: rgba(255, 255, 255, 0.05); color: var(--text-muted);
     border: 1px solid var(--glass-border); transition: all 0.15s;
 }
-.format-seg-btn i { width: 14px; height: 14px; }
+.format-seg-btn i { width: 18px; height: 18px; flex: 0 0 auto; }
 .format-seg-btn:hover { color: #fff; border-color: rgba(255, 255, 255, 0.25); }
 .format-seg-btn.active { background: rgba(212, 82, 42, 0.18); color: #ff8a5c; border-color: rgba(212, 82, 42, 0.5); }
 
