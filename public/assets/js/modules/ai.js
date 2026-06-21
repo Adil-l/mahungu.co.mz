@@ -55,6 +55,7 @@ Estrutura em parágrafos separados por uma linha em branco:
 4) 💬 Uma pergunta que convide ao comentário/debate.
 5) 🔥 Siga a @mahungu_mz para mais notícias e tendências.
 Português de Moçambique. Tom claro e envolvente, nunca burocrático. Use \\n\\n entre parágrafos.
+NUNCA uses travessões (— ou –); usa vírgula, ponto ou dois pontos.
 `;
 
 const MAHUNGU_CTA = '🔥 Siga a @mahungu_mz para mais notícias e tendências.';
