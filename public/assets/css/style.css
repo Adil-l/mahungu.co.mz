@@ -1871,7 +1871,9 @@ body.editor-active #tab-editor {
 }
 
 /* ── Seletor de provedores de IA (Definições) ── */
-.ai-providers { display: flex; flex-direction: column; gap: 8px; }
+.ai-providers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 900px) { .ai-providers { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .ai-providers { grid-template-columns: 1fr; } }
 .ai-prov {
     display: flex;
     align-items: center;
@@ -1918,7 +1920,9 @@ body.editor-active #tab-editor {
 .profile-panel.hidden { display: none; }
 
 /* ── Definições / Backup: secções em cartões + grelhas ── */
-.settings-stack { display: flex; flex-direction: column; gap: 18px; max-width: 920px; }
+/* Sem max-width: o conteúdo enche a largura do content-wrapper, ficando a
+   margem direita igual à esquerda (alinhado com o cabeçalho e os separadores). */
+.settings-stack { display: flex; flex-direction: column; gap: 18px; width: 100%; }
 .settings-section {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--glass-border);
