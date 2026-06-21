@@ -117,6 +117,30 @@ class AiContentTest extends TestCase
         Http::assertSent(fn ($r) => str_contains($r['system'] ?? '', 'NUNCA inventes factos'));
     }
 
+    public function test_caption_prompt_asks_for_complete_grounded_caption(): void
+    {
+        // A legenda deve ser COMPLETA com TODOS os factos reais (não despachada),
+        // E ao mesmo tempo proibida de inventar — as duas coisas juntas.
+        config(['services.anthropic.key' => 'sk-ant-test']);
+        Http::fake([
+            'api.anthropic.com/*' => Http::response([
+                'content' => [['type' => 'text', 'text' => json_encode([
+                    'caption' => 'c', 'hashtags' => ['x'], 'cta' => 'y',
+                ])]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $this->actingAs($user)->postJson('/api/ai/caption', ['topic' => 'Notícia rica em factos'])->assertOk();
+
+        Http::assertSent(function ($request) {
+            $prompt = $request['messages'][0]['content'] ?? '';
+            return str_contains($prompt, 'COMPLETA')
+                && str_contains($prompt, 'TODOS os factos')
+                && str_contains($prompt, 'sem inventar');
+        });
+    }
+
     public function test_content_package_story_uses_light_prompt(): void
     {
         config(['services.anthropic.key' => 'sk-ant-test']);

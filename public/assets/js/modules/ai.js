@@ -47,14 +47,16 @@ const MAHUNGU_CAPTION_OPENINGS = '🚨 ATENÇÃO: | 🚨 ÚLTIMA HORA: | 🔥 EM
 // Fórmula da LEGENDA (post): FACTO + CONTEXTO + IMPACTO + PERGUNTA + CTA.
 const MAHUNGU_CAPTION_RULES = `
 REGRAS DA LEGENDA (Manual Mahungu) — informar rápido, explicar contexto e gerar interação.
-Estrutura em parágrafos separados por uma linha em branco (usa SÓ os parágrafos que a FONTE permitir):
+Escreve uma legenda COMPLETA e envolvente que aproveite TODOS os factos relevantes da FONTE.
+Estrutura em parágrafos separados por uma linha em branco:
 1) Abra com UM destes marcadores (alterne): ${MAHUNGU_CAPTION_OPENINGS}
    seguido do FACTO principal numa frase curta.
-2) Explique o que aconteceu com os números, nomes ou decisões QUE ESTIVEREM NA FONTE (2 a 4 linhas).
+2) Desenvolva o que aconteceu com os números, nomes ou decisões QUE ESTIVEREM NA FONTE (2 a 4 linhas).
 3) Contexto: porquê, quem está envolvido e impacto — SÓ com base na fonte (2 a 4 linhas).
 4) 💬 Uma pergunta que convide ao comentário/debate.
 5) 🔥 Siga a @mahungu_mz para mais notícias e tendências.
-NUNCA inventes números, nomes, datas nem "o que acontece a seguir". Se a fonte for curta, faz uma legenda mais curta e verdadeira (menos parágrafos), nunca preencher com suposições.
+COMPRIMENTO proporcional ao material REAL: fonte rica = legenda completa (4 a 5 parágrafos); fonte só com o essencial = legenda mais curta mas BEM ESCRITA (gancho + facto + 💬 pergunta + CTA). Nunca despachar em 1 linha quando há factos; nunca encher com invenção quando não há.
+NUNCA inventes números, nomes, datas nem "o que acontece a seguir". Na dúvida sobre um facto, não o uses. A riqueza vem dos factos reais + tom/enquadramento, nunca de invenção.
 Português de Moçambique. Tom claro e envolvente, nunca burocrático. Use \\n\\n entre parágrafos.
 NUNCA uses travessões (— ou –); usa vírgula, ponto ou dois pontos.
 `;
