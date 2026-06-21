@@ -186,7 +186,23 @@ body.sidebar-collapsed #mahungu-userbox button { font-size: 0 !important; gap: 0
 }
 .btn-tool.laranja span { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
 .btn-tool.branco span { width: 8px; height: 8px; border-radius: 50%; background: #fff; }
-.btn-full { border: none; background: transparent; color: var(--text-muted); font-size: 11px; text-decoration: underline; cursor: pointer; }
+/* Botão secundário de largura total (Fundo duplo, Limpar Formatação, Gerar carrossel). */
+.btn-full {
+    width: 100%;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+}
+.btn-full:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.25); }
+.btn-full i { width: 15px; height: 15px; }
+/* "Fundo duplo" ativo (split ligado). */
+.btn-full.active { background: rgba(212, 82, 42, 0.16); color: #ff8a5c; border-color: rgba(212, 82, 42, 0.5); }
 
 /* ── NOVOS CONTROLES EDITOR ── */
 .range-group {
@@ -1198,7 +1214,7 @@ body.editor-active #tab-editor {
     width: 100%; height: 100%;
     background: rgba(0, 0, 0, 0.85);
     backdrop-filter: blur(8px);
-    z-index: 11000;
+    z-index: 13800; /* prompts/confirmações acima dos modais */
     display: none;
     align-items: center;
     justify-content: center;
@@ -1259,7 +1275,7 @@ body.editor-active #tab-editor {
     position: fixed;
     bottom: 30px;
     right: 30px;
-    z-index: 12000;
+    z-index: 14000; /* toasts sempre acima de modais e diálogos */
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -1440,7 +1456,7 @@ body.editor-active #tab-editor {
     width: 100%; height: 100%;
     background: rgba(0, 0, 0, 0.85);
     backdrop-filter: blur(8px);
-    z-index: 10000;
+    z-index: 13600; /* acima das sidebars (13000) — modais abertos do editor não ficam tapados */
     display: none;
     align-items: center;
     justify-content: center;
@@ -1532,6 +1548,8 @@ body.editor-active #tab-editor {
     flex-direction: column;
     padding: 28px;
     background: rgba(10, 11, 20, 0.95);
+    min-height: 0;       /* deixa a legenda encolher/scrollar dentro da coluna */
+    overflow: hidden;    /* o scroll é interno (na legenda), não na coluna toda */
 }
 
 .modal-header {
@@ -1605,7 +1623,8 @@ body.editor-active #tab-editor {
 }
 
 .modal-actions {
-    margin-top: 24px;
+    margin-top: 16px;
+    flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -2100,7 +2119,10 @@ body.editor-active #tab-editor {
     border-radius: 12px;
     padding: 14px 16px;
     margin-top: 16px;
-    max-height: 220px;
+    /* Preenche o espaço disponível da coluna e faz scroll só quando a legenda
+       é longa — em vez de ficar limitada a 220px (cortando o início). */
+    flex: 1 1 auto;
+    min-height: 90px;
     overflow-y: auto;
 }
 

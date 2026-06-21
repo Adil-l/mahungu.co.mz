@@ -356,7 +356,7 @@ export const ai = {
         return {
             flyerTitle: flyerTitle,
             flyerSummary: flyerSummary,
-            caption: j.caption || j.legenda || `${newsItem.title}\n\n${MAHUNGU_CTA}`,
+            caption: this.tidyText(j.caption || j.legenda || `${newsItem.title}\n\n${MAHUNGU_CTA}`),
             hashtags: hashtags,
             cta: j.cta || j.callToAction || MAHUNGU_CTA,
             template: template
@@ -539,9 +539,18 @@ export const ai = {
         return h.map(x => String(x).trim()).filter(Boolean);
     },
 
-    // Garante manchete curta: corta no último espaço (sem reticências) se exceder.
+    // Remove travessões (— –) que a IA insiste em usar: " — " vira ", ".
+    tidyText(text) {
+        return String(text || '')
+            .replace(/\s*[—–]\s*/g, ', ')
+            .replace(/\s*,\s*,/g, ',')
+            .replace(/[ \t]+/g, ' ')
+            .trim();
+    },
+
+    // Garante manchete curta e sem travessões: corta no último espaço se exceder.
     clampHeadline(text, max) {
-        text = String(text || '').replace(/\s+/g, ' ').trim();
+        text = this.tidyText(String(text || '').replace(/\s+/g, ' '));
         if (text.length <= max) return text;
         let cut = text.slice(0, max);
         const sp = cut.lastIndexOf(' ');
@@ -581,7 +590,7 @@ export const ai = {
             Responde APENAS em JSON estrito: {"caption":"legenda completa","cta":"${MAHUNGU_CTA}"}
         `;
         const j = this.extractJsonObject(await this.runForTask('legenda', prompt));
-        return { caption: j.caption || j.legenda || '', cta: j.cta || MAHUNGU_CTA };
+        return { caption: this.tidyText(j.caption || j.legenda || ''), cta: j.cta || MAHUNGU_CTA };
     },
 
     // Só HASHTAGS (tarefa 'hashtags').
@@ -642,7 +651,7 @@ export const ai = {
         const slides = Array.isArray(j.slides) ? j.slides
             .filter(x => x && (x.title || x.summary))
             .map(x => ({ title: this.clampHeadline(x.title || '', 46), summary: this.clampHeadline(x.summary || '', 62) })) : [];
-        return { slides, caption: j.caption || '', hashtags: this.normalizeHashtags(j.hashtags), cta: j.cta || MAHUNGU_CTA };
+        return { slides, caption: this.tidyText(j.caption || ''), hashtags: this.normalizeHashtags(j.hashtags), cta: j.cta || MAHUNGU_CTA };
     },
 
     /**

@@ -197,6 +197,29 @@ class AiContentTest extends TestCase
         }
     }
 
+    public function test_strips_em_dashes_from_title_and_caption(): void
+    {
+        config(['services.anthropic.key' => 'sk-ant-test']);
+        Http::fake([
+            'api.anthropic.com/*' => Http::response([
+                'content' => [['type' => 'text', 'text' => json_encode([
+                    'title' => 'Combustíveis sobem — já amanhã',
+                    'summary' => 'Gasolina passa a 93,86 MT',
+                    'caption' => '🚨 ATENÇÃO: subida confirmada — vem aí mais uma.',
+                    'hashtags' => ['Mocambique'], 'cta' => 'Partilha',
+                ])]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $res = $this->actingAs($user)->postJson('/api/ai/content-package', ['topic' => 'Combustíveis'])->assertOk();
+
+        // Sem travessões — (em/en dash) no título nem na legenda.
+        $this->assertStringNotContainsString('—', $res->json('title'));
+        $this->assertStringNotContainsString('—', $res->json('caption'));
+        $this->assertStringNotContainsString('–', $res->json('caption'));
+    }
+
     public function test_carousel_validates_slide_count(): void
     {
         config(['services.anthropic.key' => 'sk-ant-test']);

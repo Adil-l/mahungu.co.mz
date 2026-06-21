@@ -926,6 +926,9 @@ function loadEditorState(s) {
     const editor = document.getElementById('editor');
     if (editor) editor.innerHTML = s.html || '';
     core.editorState = { ...core.editorState, ...freshSplitDefaults(), ...(s.state || {}) };
+    // Cada slide herda o SEU próprio tamanho de texto (senão todos ficavam com o
+    // tamanho do slide 1). Aplica o fontSize guardado no estado deste slide.
+    if (editor && core.editorState.fontSize) editor.style.fontSize = core.editorState.fontSize + 'px';
     const photo = document.querySelector('.layer-photo .photo-single');
     if (photo && isValidImageSrc(s.imgSrc)) photo.src = s.imgSrc;
     applyBackgroundState();
@@ -3581,15 +3584,23 @@ async function generateCarousel(topicArg, slidesArg, includeFirst) {
 
         if (activeSlideIndex < 0) enterCarouselMode(); // garante o modo carrossel
         const baseSnap = snapshotEditor(); // foto/estado base partilhado pelos slides
+        // Cada slide herda o SEU tamanho de texto (auto-ajuste pelo comprimento do
+        // próprio título+resumo), não o do slide 1.
+        const slideFrom = (s) => ({
+            ...baseSnap,
+            html: headlineHtml(s.title || '', s.summary || ''),
+            state: { ...baseSnap.state, fontSize: headlineFontSize((String(s.title || '') + String(s.summary || '')).length) }
+        });
         // includeFirst (Proposta de IA): TODOS os slides vêm da IA — o Slide 1 é o
         // gancho da notícia. Sem includeFirst (editor): Slide 1 mantém o título do
         // utilizador e a IA só desenvolve os restantes. Todos herdam a mesma foto.
         carouselSlides = includeFirst
-            ? gen.map(s => ({ ...baseSnap, html: headlineHtml(s.title || '', s.summary || '') }))
-            : [baseSnap, ...gen.slice(1).map(s => ({ ...baseSnap, html: headlineHtml(s.title || '', s.summary || '') }))];
+            ? gen.map(slideFrom)
+            : [baseSnap, ...gen.slice(1).map(slideFrom)];
         activeSlideIndex = 0;
         loadEditorState(carouselSlides[0]);
         if (editor) fitHeadline(editor);
+        carouselSlides[0] = snapshotEditor(); // guarda o tamanho ajustado do slide 1
         renderCarouselBar();
         // Uma legenda para o post inteiro (usada ao agendar).
         editorPostMeta = {
@@ -4564,9 +4575,14 @@ async function generateEngagementContent() {
             proposal.summary = slides[0].summary;
             await ensureProposalImage(proposal);
             const img = flyerPhotoUrl(proposal.image);
-            const baseState = { zoom: 1, posX: 0, posY: 0, fontSize: 72, ...freshSplitDefaults() };
+            const baseState = { zoom: 1, posX: 0, posY: 0, ...freshSplitDefaults() };
             proposal.format = 'carousel';
-            proposal.slideStates = slides.map(s => ({ html: headlineHtml(s.title, s.summary), state: { ...baseState }, imgSrc: img }));
+            // Cada slide herda o seu próprio tamanho de texto (pelo comprimento).
+            proposal.slideStates = slides.map(s => ({
+                html: headlineHtml(s.title, s.summary),
+                state: { ...baseState, fontSize: headlineFontSize((String(s.title || '') + String(s.summary || '')).length) },
+                imgSrc: img
+            }));
             proposal.flyerState = proposal.slideStates[0];
             proposal.generatedTitle = slides[0].title;
             proposal.generatedSummary = slides[0].summary;

@@ -186,12 +186,15 @@ TXT;
             return response()->json(['raw' => trim($raw), 'warning' => 'A IA não devolveu JSON válido.'], 200);
         }
 
-        // Rede de segurança: garante título/resumo curtos mesmo se o modelo exagerar.
+        // Rede de segurança: título/resumo curtos e SEM travessões mesmo se a IA exagerar.
         if (isset($package['title'])) {
             $package['title'] = $this->clampHeadline($package['title'], $titleMax);
         }
         if (isset($package['summary'])) {
             $package['summary'] = $this->clampHeadline($package['summary'], $summaryMax);
+        }
+        if (isset($package['caption'])) {
+            $package['caption'] = $this->tidyText($package['caption']);
         }
 
         return response()->json($package);
@@ -228,6 +231,9 @@ TXT;
         $pkg = $this->extractJson($raw);
         if ($pkg === null) {
             return response()->json(['raw' => trim($raw), 'warning' => 'A IA não devolveu JSON válido.'], 200);
+        }
+        if (isset($pkg['caption'])) {
+            $pkg['caption'] = $this->tidyText($pkg['caption']); // sem travessões
         }
 
         return response()->json($pkg);
@@ -300,8 +306,24 @@ TXT;
             }
         }
         unset($slide);
+        if (isset($pkg['caption'])) {
+            $pkg['caption'] = $this->tidyText($pkg['caption']); // sem travessões
+        }
 
         return response()->json($pkg);
+    }
+
+    /**
+     * Remove travessões (— –) que a IA insiste em usar: " — " vira ", " e
+     * qualquer traço solto desaparece. Normaliza espaços/vírgulas duplicadas.
+     */
+    private function tidyText(?string $text): string
+    {
+        $text = (string) $text;
+        $text = preg_replace('/\s*[—–]\s*/u', ', ', $text); // " — " → ", "
+        $text = preg_replace('/\s*,\s*,/u', ',', $text);     // ", ," → ","
+        $text = preg_replace('/[ \t]+/u', ' ', $text);        // espaços repetidos
+        return trim($text);
     }
 
     /**
@@ -310,7 +332,7 @@ TXT;
      */
     private function clampHeadline(?string $text, int $max): string
     {
-        $text = trim(preg_replace('/\s+/u', ' ', (string) $text));
+        $text = $this->tidyText(preg_replace('/\s+/u', ' ', (string) $text));
         if (mb_strlen($text) <= $max) {
             return $text;
         }
