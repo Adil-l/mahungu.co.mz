@@ -63,14 +63,14 @@ TXT;
      * nos prompts de título/carrossel para evitar títulos longos e explicativos.
      */
     private const HEADLINE_COPY_RULES = <<<'TXT'
-ESTILO DO TÍTULO (curto e chamativo — pára o scroll):
-- O título é uma CHAMADA curta que gera CURIOSIDADE. NÃO é uma frase completa nem um resumo da notícia.
-- Corta artigos e palavras dispensáveis. Verbo forte. SEM ponto final. Nada de "subtítulos" colados.
-- Cria uma lacuna de curiosidade (o leitor quer deslizar/saber mais), mas sem clickbait falso nem mentir.
-- O RESUMO (não o título) carrega o número/consequência. O título carrega o impacto/curiosidade.
-- MAU (longo, explica tudo): "Conselho de Ministros aprovou nova subida do preço dos combustíveis a partir de amanhã".
-- BOM (curto, curioso): título "Combustíveis voltam a subir" + resumo "Gasolina passa a 93,86 MT amanhã".
-- REGRA DURA: se não couber no limite de caracteres, REESCREVE mais curto. Nunca entregues um título longo.
+ESTILO DO TÍTULO (forte, chamativo e que gera CURIOSIDADE — pára o scroll):
+- O título é um GANCHO de impacto: [QUEM] + [AÇÃO com VERBO FORTE] que CHAMA A ATENÇÃO e dá vontade de saber mais.
+- Fórmula: INFORMAÇÃO + IMPACTO + CURIOSIDADE. Direto, sem ponto final, sem explicar TUDO nem palavras dispensáveis (artigos, "a partir de"…).
+- O RESUMO é a frase-impacto que carrega o número/consequência; o título carrega o gancho/curiosidade. Sem clickbait falso nem mentir.
+- Título + resumo JUNTOS formam um headline de ~80 a 100 caracteres, compreensível em menos de 3 segundos.
+- MAU (comprido, explica tudo): "Conselho de Ministros aprovou nova subida do preço dos combustíveis a partir de amanhã".
+- BOM (forte e curioso): título "Combustíveis voltam a subir já amanhã" + resumo "Gasolina passa a 93,86 MT".
+- REGRA: mantém o título dentro do limite de caracteres. Se passar, reescreve mais curto SEM perder a força (não cortes a meio).
 TXT;
 
     public function generate(Request $request, ClaudeService $claude): JsonResponse
@@ -147,26 +147,27 @@ TXT;
         // dar contexto). Para feed/carrossel devolve o pacote completo.
         $isStory = ($data['format'] ?? 'feed') === 'story';
         if ($isStory) {
-            $titleMax = 44;
-            $summaryMax = 62;
+            $titleMax = 52;
+            $summaryMax = 74;
             $prompt = "Tema/fonte da notícia:\n{$data['topic']}\n\n"
-                . "Isto é para um STORY do Instagram, que vai SEM legenda. O título e o "
-                . "resumo têm de contar tudo sozinhos, mas o TÍTULO é curto e chamativo.\n"
+                . "Isto é para um STORY do Instagram, que vai SEM legenda. O título e o resumo "
+                . "têm de contar tudo sozinhos — FORTES e autossuficientes — mas o título tem de "
+                . "CHAMAR A ATENÇÃO e gerar curiosidade, sem ficar comprido.\n"
                 . self::HEADLINE_COPY_RULES . "\n"
                 . "Devolve SÓ um objeto JSON válido (sem markdown, sem ```), com estas chaves exatas:\n"
-                . '{"title": "chamada curta e curiosa ≤44 caracteres", '
-                . '"summary": "remate/consequência com número ou impacto ≤62 caracteres"}';
+                . '{"title": "manchete forte e chamativa que gera curiosidade ≤52 caracteres", '
+                . '"summary": "remate/consequência com número ou impacto ≤74 caracteres"}';
             $maxTokens = 300; // título+resumo cabem folgados; poupa créditos
         } else {
-            $titleMax = 42;
-            $summaryMax = 60;
+            $titleMax = 48;
+            $summaryMax = 66;
             // Só as chaves que o editor usa (título/resumo no flyer; legenda/hashtags/cta
             // ao agendar). Sem x/threads — não eram consumidos e gastavam tokens à toa.
             $prompt = "Tema/fonte da notícia:\n{$data['topic']}\n\n"
                 . self::HEADLINE_COPY_RULES . "\n"
                 . "Devolve SÓ um objeto JSON válido (sem markdown, sem ```), com estas chaves exatas:\n"
-                . '{"title": "chamada curta e curiosa ≤42 caracteres (NÃO uma frase completa)", '
-                . '"summary": "consequência/número ≤60 caracteres", '
+                . '{"title": "manchete forte e chamativa que gera curiosidade ≤48 caracteres", '
+                . '"summary": "consequência/número ≤66 caracteres", '
                 . '"caption": "legenda de 5 parágrafos com marcador, 💬 pergunta e a terminar em 🔥 Siga a @mahungu_mz para mais notícias e tendências.", '
                 . '"hashtags": ["5 a 8 hashtags relevantes, SEM o símbolo #"], '
                 . '"cta": "chamada à ação curta"}';
@@ -267,11 +268,11 @@ TXT;
             . "uma 💬 pergunta de debate e um apelo claro a seguir a @mahungu_mz.\n\n"
             . self::HEADLINE_COPY_RULES . "\n"
             . "REGRAS DE ESCRITA (legível à distância, sem encher):\n"
-            . "- title = CHAMADA curta e curiosa do slide (≤38 caracteres) — NÃO uma frase completa. summary = o complemento/remate (≤55 caracteres).\n"
+            . "- title = frase-impacto curta e chamativa do slide (gancho ≤44 caracteres) que gera curiosidade. summary = o complemento/remate (≤60 caracteres).\n"
             . "- Frases curtas, verbo forte, português de Moçambique. Zero tiques de IA, zero clichés.\n"
             . "- A legenda do post COMPLEMENTA (não repete) os slides.\n\n"
             . "Devolve SÓ um objeto JSON válido (sem markdown, sem ```), com estas chaves exatas:\n"
-            . '{"slides": [{"title": "chamada curta e curiosa ≤38 caracteres", "summary": "complemento/remate ≤55 caracteres"}], '
+            . '{"slides": [{"title": "chamada curta e chamativa ≤44 caracteres", "summary": "complemento/remate ≤60 caracteres"}], '
             . '"caption": "legenda do POST (5 parágrafos com marcador, 💬 pergunta e a terminar em 🔥 Siga a @mahungu_mz para mais notícias e tendências.)", '
             . '"hashtags": ["5 a 8 hashtags SEM o símbolo #"], '
             . '"cta": "chamada à ação curta"}'
@@ -291,11 +292,11 @@ TXT;
             return response()->json(['raw' => trim($raw), 'warning' => 'A IA não devolveu slides válidos.'], 200);
         }
 
-        // Rede de segurança: títulos dos slides curtos e chamativos (corta exageros).
+        // Rede de segurança: títulos dos slides chamativos mas sem exageros de comprimento.
         foreach ($pkg['slides'] as &$slide) {
             if (is_array($slide)) {
-                $slide['title'] = $this->clampHeadline($slide['title'] ?? '', 40);
-                $slide['summary'] = $this->clampHeadline($slide['summary'] ?? '', 56);
+                $slide['title'] = $this->clampHeadline($slide['title'] ?? '', 46);
+                $slide['summary'] = $this->clampHeadline($slide['summary'] ?? '', 62);
             }
         }
         unset($slide);

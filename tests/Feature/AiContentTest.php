@@ -168,8 +168,8 @@ class AiContentTest extends TestCase
         $user = User::factory()->create();
         $res = $this->actingAs($user)->postJson('/api/ai/content-package', ['topic' => 'Combustíveis'])->assertOk();
 
-        // O título longo tem de ser cortado para uma chamada curta (≤42).
-        $this->assertLessThanOrEqual(42, mb_strlen($res->json('title')));
+        // O título longo tem de ser cortado para uma chamada curta (≤48).
+        $this->assertLessThanOrEqual(48, mb_strlen($res->json('title')));
         $this->assertNotEmpty($res->json('title'));
     }
 
@@ -192,7 +192,7 @@ class AiContentTest extends TestCase
         $res = $this->actingAs($user)->postJson('/api/ai/carousel', ['topic' => 'x', 'slides' => 2])->assertOk();
 
         foreach ($res->json('slides') as $slide) {
-            $this->assertLessThanOrEqual(40, mb_strlen($slide['title']), 'título do slide demasiado longo');
+            $this->assertLessThanOrEqual(46, mb_strlen($slide['title']), 'título do slide demasiado longo');
             $this->assertNotEmpty($slide['title']);
         }
     }

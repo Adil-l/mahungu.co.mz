@@ -30,13 +30,15 @@ REGRAS DO HEADLINE (Manual Mahungu) — captar atenção em menos de 3 segundos:
   gera, aumenta, reduz, sobe, cai, acusa, promete, abre, encerra, preocupa, alerta,
   intensifica, reforça, volta a, enfrenta, reage, exige, denuncia.
 - Inclua sempre consequência, impacto ou NÚMERO quando possível.
-- NUNCA linguagem burocrática/institucional. O título é uma CHAMADA curta e curiosa, NÃO uma frase completa.
-  MAU (longo, explica tudo): "Conselho de Ministros aprovou nova subida do preço dos combustíveis a partir de amanhã".
-  BOM (curto, curioso): "Combustíveis voltam a subir" + "Gasolina passa a 93,86 MT amanhã".
+- NUNCA linguagem burocrática/institucional. O título tem de CHAMAR A ATENÇÃO e gerar curiosidade — forte e direto, sem ser arrastado nem explicar tudo.
+  MAU (comprido, explica tudo): "Conselho de Ministros aprovou nova subida do preço dos combustíveis a partir de amanhã".
+  BOM (forte e curioso): "Combustíveis voltam a subir já amanhã" + "Gasolina passa a 93,86 MT".
+- Fórmula emocional: INFORMAÇÃO + IMPACTO + CURIOSIDADE.
 - No flyer o headline é dividido:
-  * "flyerTitle"  = GANCHO curto e curioso com VERBO FORTE (quem + ação). MÁX 42 caracteres. Corta artigos e palavras dispensáveis; sem ponto final.
-  * "flyerSummary" = CONSEQUÊNCIA, NÚMERO ou IMPACTO concreto. MÁX 60 caracteres.
-  * REGRA DURA: se não couber, reescreve mais curto — nunca entregues um título longo.
+  * "flyerTitle"  = GANCHO de impacto: [QUEM] + [AÇÃO com VERBO FORTE] que chama a atenção e gera curiosidade. MÁX 48 caracteres. Sem ponto final.
+  * "flyerSummary" = frase-impacto com a CONSEQUÊNCIA, NÚMERO ou IMPACTO concreto. MÁX 66 caracteres.
+  * Juntos formam um headline de ~80 a 100 caracteres, compreensível em menos de 3 segundos.
+  * REGRA: mantém dentro do limite; se passar, reescreve mais curto SEM perder a força.
 `;
 
 // Aberturas oficiais das legendas (alternar entre elas).
@@ -347,9 +349,9 @@ export const ai = {
         const validTemplates = ['classic', 'modern', 'neon', 'split'];
         const template = validTemplates.includes(j.template) ? j.template : 'classic';
 
-        // Título curto e chamativo (corte limpo no espaço); o resumo carrega o número/consequência.
-        const flyerTitle = this.clampHeadline(j.flyerTitle || j.title || newsItem.title || 'Sem título', 46);
-        const flyerSummary = this.clampHeadline(j.flyerSummary || j.flyerSubtitle || j.summary || newsItem.summary || '', 66);
+        // Título forte e chamativo (corte limpo no espaço); o resumo carrega o número/consequência.
+        const flyerTitle = this.clampHeadline(j.flyerTitle || j.title || newsItem.title || 'Sem título', 48);
+        const flyerSummary = this.clampHeadline(j.flyerSummary || j.flyerSubtitle || j.summary || newsItem.summary || '', 70);
 
         return {
             flyerTitle: flyerTitle,
@@ -549,19 +551,22 @@ export const ai = {
 
     // Só TÍTULO + RESUMO (tarefa 'titulo'). Story → mais forte/autossuficiente.
     async genTitulo(topic, format = 'feed') {
+        const isStory = format === 'story';
+        const titleMax = isStory ? 52 : 48;
+        const summaryMax = isStory ? 74 : 66;
         const prompt = `
             ${MAHUNGU_LANGUAGE_RULE}
             ${this.brandDirectives()}
             Notícia/tema: "${topic}"
             ${MAHUNGU_HEADLINE_RULES}
-            ${format === 'story' ? 'É para um STORY (vai SEM legenda): o título é curto e curioso; o resumo carrega o número/impacto.' : ''}
+            ${isStory ? 'É para um STORY (vai SEM legenda): título e resumo FORTES e autossuficientes, mas o título tem de chamar a atenção e gerar curiosidade.' : ''}
             ${MAHUNGU_ANTI_FABRICATION}
-            Responde APENAS em JSON estrito: {"title":"chamada curta e curiosa ≤42 caracteres (NÃO uma frase completa)","summary":"consequência/número ≤60 caracteres"}
+            Responde APENAS em JSON estrito: {"title":"manchete forte e chamativa que gera curiosidade ≤${titleMax} caracteres","summary":"consequência/número ≤${summaryMax} caracteres"}
         `;
         const j = this.extractJsonObject(await this.runForTask('titulo', prompt));
         return {
-            title: this.clampHeadline(j.title || j.flyerTitle || '', 42),
-            summary: this.clampHeadline(j.summary || j.flyerSummary || '', 60)
+            title: this.clampHeadline(j.title || j.flyerTitle || '', titleMax),
+            summary: this.clampHeadline(j.summary || j.flyerSummary || '', summaryMax)
         };
     },
 
@@ -627,16 +632,16 @@ export const ai = {
             criando curiosidade para deslizar); último slide remata + apelo a seguir a @mahungu_mz.
             ${MAHUNGU_HEADLINE_RULES}
             ${MAHUNGU_ANTI_FABRICATION}
-            Cada "title" é uma CHAMADA curta e curiosa (≤38 caracteres), NÃO uma frase completa.
+            Cada "title" é uma frase-impacto curta e chamativa (gancho ≤44 caracteres) que gera curiosidade.
             Responde APENAS em JSON estrito (sem texto à volta):
-            {"slides":[{"title":"chamada curta e curiosa ≤38","summary":"complemento ≤55"}],
+            {"slides":[{"title":"chamada curta e chamativa ≤44","summary":"complemento ≤60"}],
              "caption":"legenda do post (fórmula Mahungu)","hashtags":["#Tag1","#Tag2"],"cta":"${MAHUNGU_CTA}"}
             O array "slides" tem de ter exatamente ${n} elementos.
         `;
         const j = this.extractJsonObject(await this.runForTask('carrossel', prompt));
         const slides = Array.isArray(j.slides) ? j.slides
             .filter(x => x && (x.title || x.summary))
-            .map(x => ({ title: this.clampHeadline(x.title || '', 40), summary: this.clampHeadline(x.summary || '', 56) })) : [];
+            .map(x => ({ title: this.clampHeadline(x.title || '', 46), summary: this.clampHeadline(x.summary || '', 62) })) : [];
         return { slides, caption: j.caption || '', hashtags: this.normalizeHashtags(j.hashtags), cta: j.cta || MAHUNGU_CTA };
     },
 
