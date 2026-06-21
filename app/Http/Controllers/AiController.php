@@ -98,7 +98,9 @@ TXT;
     private const ANTI_FABRICATION = <<<'TXT'
 ANCORAGEM NOS FACTOS (OBRIGATÓRIO — proibido inventar):
 - Usa EXCLUSIVAMENTE o que está na FONTE/tema acima. A FONTE é a única verdade.
-- NUNCA inventes nem "preenchas" nomes, números, datas, valores, cargos, locais, citações, estatísticas nem "o que acontece a seguir" que NÃO estejam na FONTE.
+- ASSUNTO E DOMÍNIO: entende o tema PELA FONTE e NÃO o mudes. Se é desporto, é desporto (não vira guerra, política ou economia). Um nome próprio refere a MESMA pessoa/entidade da fonte: o nome de um jogador é esse jogador, NUNCA o confundas com algo homónimo (um navio, empresa, lugar ou projeto com o mesmo nome). Ex.: "Yamal" numa notícia de futebol é o jogador Lamine Yamal, não um porta-aviões.
+- NUNCA inventes estatísticas (posse de bola, finalizações, percentagens), golos, marcadores, resultados, citações nem "o que acontece a seguir" que NÃO estejam na FONTE.
+- NUNCA inventes nem "preenchas" nomes, números, datas, valores, cargos, locais nem acontecimentos que NÃO estejam na FONTE.
 - Inclui um número/nome SÓ se aparecer na FONTE. Se a FONTE não os tiver, escreve SEM eles, não adivinhes. Na dúvida sobre um facto, NÃO o uses.
 - Não troques um facto por outro parecido nem mudes a ação dos verbos (ex.: "convocado" não é "jogou"; "anunciou" não é "confirmou"). Preserva a ação exata.
 - APROVEITA TODOS os factos reais da FONTE para fazer uma legenda completa e envolvente (não despachar). O comprimento segue o material REAL: fonte rica = legenda completa; fonte pobre = mais curta mas bem escrita. Nunca encher com suposições.
@@ -196,16 +198,18 @@ TXT;
             $summaryMax = 66;
             // Só as chaves que o editor usa (título/resumo no flyer; legenda/hashtags/cta
             // ao agendar). Sem x/threads — não eram consumidos e gastavam tokens à toa.
+            $thin = $this->isThinSource($data['topic']);
             $prompt = "Tema/fonte da notícia:\n{$data['topic']}\n\n"
                 . self::ANTI_FABRICATION . "\n"
+                . ($thin ? "NOTA: a fonte acima é curta (post de redes sociais ou manchete). ADAPTA-a, identifica bem o assunto pela fonte, e NÃO inventes factos para encher.\n" : '')
                 . self::HEADLINE_COPY_RULES . "\n"
                 . "Devolve SÓ um objeto JSON válido (sem markdown, sem ```), com estas chaves exatas:\n"
                 . '{"title": "manchete forte e chamativa que gera curiosidade ≤48 caracteres", '
                 . '"summary": "consequência/número ≤66 caracteres", '
-                . '"caption": "legenda COMPLETA e envolvente no formato Mahungu, aproveitando TODOS os factos da FONTE (4 a 5 parágrafos quando a fonte é rica; mais curta mas bem escrita quando a fonte só traz o essencial; nunca inventar para encher), com marcador, 💬 pergunta e a terminar em 🔥 Siga a @mahungu_mz para mais notícias e tendências.", '
+                . $this->captionSpec($thin)
                 . '"hashtags": ["5 a 8 hashtags relevantes, SEM o símbolo #"], '
                 . '"cta": "chamada à ação curta"}';
-            $maxTokens = 1200; // um pacote completo cabe folgado em 1200
+            $maxTokens = $thin ? 600 : 1200; // fonte fina não precisa de pacote longo (poupa créditos)
         }
 
         try {
@@ -249,12 +253,14 @@ TXT;
             return response()->json(['error' => 'Claude não está configurado no servidor.'], 503);
         }
 
+        $thin = $this->isThinSource($data['topic']);
         $prompt = "Notícia / fonte:\n{$data['topic']}\n\n"
             . self::ANTI_FABRICATION . "\n"
+            . ($thin ? "NOTA: a fonte acima é curta (post de redes sociais ou manchete). ADAPTA-a, identifica bem o assunto, e NÃO inventes factos para encher.\n" : '')
             . "Escreve SÓ a legenda para redes sociais desta notícia (não repitas o título como primeira linha). "
-            . "Aproveita TODOS os factos da fonte acima para uma legenda completa e envolvente. Se a fonte só tiver o título e mais nada, faz uma legenda mais curta mas BEM ESCRITA (gancho + facto + pergunta + CTA), sem inventar números, nomes nem contexto.\n"
+            . "Aproveita os factos da fonte acima; nunca inventes números, estatísticas, golos, eventos nem contexto que não estejam lá.\n"
             . "Devolve SÓ um objeto JSON válido (sem markdown, sem ```), com estas chaves exatas:\n"
-            . '{"caption": "legenda COMPLETA e envolvente no formato Mahungu, com TODOS os factos da fonte (4 a 5 parágrafos quando a fonte é rica; mais curta mas bem escrita quando só há o essencial; nunca inventar), com marcador, 💬 pergunta e a terminar em 🔥 Siga a @mahungu_mz para mais notícias e tendências.", '
+            . $this->captionSpec($thin)
             . '"hashtags": ["5 a 8 hashtags relevantes, SEM o símbolo #"], '
             . '"cta": "chamada à ação curta"}';
 
@@ -348,6 +354,29 @@ TXT;
         }
 
         return response()->json($pkg);
+    }
+
+    /**
+     * Decide se a FONTE é "fina" (post de redes sociais, manchete, teaser de RSS):
+     * pouco texto para uma legenda completa SEM inventar. Nesse caso usa-se
+     * ADAPTAÇÃO LEVE (mantém o tom da fonte, sem fabricar números/eventos).
+     */
+    private function isThinSource(string $topic): bool
+    {
+        return mb_strlen(trim($topic)) < 500;
+    }
+
+    /**
+     * Descritor da chave "caption" no JSON, conforme a fonte é fina ou rica.
+     * Fonte fina → legenda curta que ADAPTA (anti-invenção); rica → completa.
+     */
+    private function captionSpec(bool $thin): string
+    {
+        if ($thin) {
+            return '"caption": "legenda CURTA que ADAPTA a fonte mantendo o MESMO tema e tom (a fonte costuma ser um post de redes sociais ou manchete): marcador + 1 a 2 frases com o facto REAL da fonte + 💬 pergunta + a terminar em 🔥 Siga a @mahungu_mz para mais notícias e tendências. NÃO escrevas parágrafos de contexto inventado; NÃO inventes números, estatísticas, golos, resultados, citações nem eventos que não estejam na fonte", ';
+        }
+
+        return '"caption": "legenda COMPLETA e envolvente no formato Mahungu, aproveitando TODOS os factos da FONTE (4 a 5 parágrafos quando a fonte é rica; mais curta mas bem escrita quando a fonte só traz o essencial; nunca inventar para encher), com marcador, 💬 pergunta e a terminar em 🔥 Siga a @mahungu_mz para mais notícias e tendências.", ';
     }
 
     /**

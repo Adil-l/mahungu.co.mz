@@ -86,7 +86,9 @@ ${MAHUNGU_AUDIENCE_RULE}`;
 const MAHUNGU_ANTI_FABRICATION = `
 ANCORAGEM (OBRIGATÓRIO — anti-invenção):
 - Baseia-te EXCLUSIVAMENTE nos factos presentes na FONTE acima.
-- NUNCA inventes nomes, números, datas, valores, locais ou citações que não estejam na FONTE.
+- ASSUNTO E DOMÍNIO: entende o tema PELA FONTE e NÃO o mudes. Se é desporto, é desporto (não vira guerra, política nem economia). Um nome próprio refere a MESMA pessoa/entidade da fonte: o nome de um jogador é esse jogador, NUNCA o confundas com algo homónimo (um navio, empresa, lugar ou projeto com o mesmo nome). Ex.: "Yamal" numa notícia de futebol é o jogador Lamine Yamal, não um porta-aviões.
+- NUNCA inventes estatísticas (posse de bola, finalizações, percentagens), golos, marcadores, resultados nem citações que não estejam na FONTE.
+- NUNCA inventes nomes, números, datas, valores, locais que não estejam na FONTE.
 - Inclui números/nomes APENAS se aparecerem na FONTE; se não houver, escreve sem eles.
 - Não SUBSTITUAS um facto por outro parecido nem mudes o significado dos verbos/ações.
   Exemplos de distorção PROIBIDA: trocar "começar/estrear" por "marcar golo";

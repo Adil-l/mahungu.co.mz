@@ -131,13 +131,83 @@ class AiContentTest extends TestCase
         ]);
 
         $user = User::factory()->create();
-        $this->actingAs($user)->postJson('/api/ai/caption', ['topic' => 'Notícia rica em factos'])->assertOk();
+        // Fonte RICA (longa) → modo completo (não o de adaptação leve).
+        $this->actingAs($user)->postJson('/api/ai/caption', [
+            'topic' => str_repeat('A selecção venceu por 2-0 e apurou-se para a fase seguinte do Mundial. ', 12),
+        ])->assertOk();
 
         Http::assertSent(function ($request) {
             $prompt = $request['messages'][0]['content'] ?? '';
             return str_contains($prompt, 'COMPLETA')
                 && str_contains($prompt, 'TODOS os factos')
-                && str_contains($prompt, 'sem inventar');
+                && str_contains($prompt, 'nunca inventes');
+        });
+    }
+
+    public function test_thin_source_uses_light_adaptation(): void
+    {
+        // Fonte curta (post de IG) → legenda de ADAPTAÇÃO LEVE, sem pedir 5 parágrafos.
+        config(['services.anthropic.key' => 'sk-ant-test']);
+        Http::fake([
+            'api.anthropic.com/*' => Http::response([
+                'content' => [['type' => 'text', 'text' => json_encode([
+                    'title' => 'x', 'summary' => 'y', 'caption' => 'z',
+                    'hashtags' => ['x'], 'cta' => 'w',
+                ])]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $this->actingAs($user)->postJson('/api/ai/content-package', [
+            'topic' => 'Yamal é titular para enfrentar a Arábia Saudita na Copa',
+        ])->assertOk();
+
+        Http::assertSent(function ($request) {
+            $prompt = $request['messages'][0]['content'] ?? '';
+            return str_contains($prompt, 'ADAPTA a fonte')          // modo leve
+                && ! str_contains($prompt, '4 a 5 parágrafos');     // não pede legenda longa
+        });
+    }
+
+    public function test_rich_source_uses_full_caption(): void
+    {
+        config(['services.anthropic.key' => 'sk-ant-test']);
+        Http::fake([
+            'api.anthropic.com/*' => Http::response([
+                'content' => [['type' => 'text', 'text' => json_encode([
+                    'title' => 'x', 'summary' => 'y', 'caption' => 'z',
+                    'hashtags' => ['x'], 'cta' => 'w',
+                ])]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $this->actingAs($user)->postJson('/api/ai/content-package', [
+            'topic' => str_repeat('A selecção venceu por 2-0 e apurou-se para a fase seguinte do Mundial. ', 12),
+        ])->assertOk();
+
+        Http::assertSent(fn ($r) => str_contains($r['messages'][0]['content'] ?? '', '4 a 5 parágrafos'));
+    }
+
+    public function test_prompts_forbid_changing_domain_and_entity(): void
+    {
+        // A regra anti-confusão de domínio/entidade (ex.: Yamal jogador ≠ navio) tem de ir no prompt.
+        config(['services.anthropic.key' => 'sk-ant-test']);
+        Http::fake([
+            'api.anthropic.com/*' => Http::response([
+                'content' => [['type' => 'text', 'text' => json_encode([
+                    'caption' => 'c', 'hashtags' => ['x'], 'cta' => 'y',
+                ])]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $this->actingAs($user)->postJson('/api/ai/caption', ['topic' => 'Yamal contra Arábia Saudita'])->assertOk();
+
+        Http::assertSent(function ($request) {
+            $prompt = $request['messages'][0]['content'] ?? '';
+            return str_contains($prompt, 'DOMÍNIO')
+                && str_contains($prompt, 'porta-aviões'); // exemplo do guarda anti-confusão
         });
     }
 

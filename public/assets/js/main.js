@@ -4337,6 +4337,9 @@ async function ensureArticleText(p) {
     if (!p || p.articleText) return !!p?.articleText;        // já temos (cache)
     const url = (p.sourceUrl || '').trim();
     const have = String(p.sourceText || p.summary || '').trim();
+    // Instagram exige login/JS → a extração não funciona; a própria legenda do
+    // post já É a fonte. Não vale a pena gastar o round-trip.
+    if (p.sourceType === 'instagram' || /instagram\.com/i.test(url)) return false;
     if (!/^https?:\/\//i.test(url) || have.length >= 600) return false; // já é rico ou sem URL
     try {
         const res = await fetch(`/api/article-extract?url=${encodeURIComponent(url)}`, {
