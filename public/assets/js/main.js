@@ -96,7 +96,7 @@ function isValidImageSrc(src) {
 function escapeHtml(s) {
     return String(s ?? '')
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // Monta o HTML do título do flyer: TÍTULO (branco) - RESUMO (laranja), com o

@@ -51,6 +51,12 @@ class FeedProxyController extends Controller
                 CURLOPT_RESOLVE => ["{$host}:{$port}:" . implode(',', $ips)],
                 CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; MahunguBot/1.0; +https://mahungu.co.mz)',
                 CURLOPT_HTTPHEADER => ['Accept: application/rss+xml, application/xml, text/xml, */*'],
+                // Teto de ~5 MB para não esgotar a memória da instância pequena
+                // (MAXFILESIZE corta com Content-Length; a progress-function corta
+                // mesmo sem ele — slowloris/resposta gigante).
+                CURLOPT_MAXFILESIZE => 5000000,
+                CURLOPT_NOPROGRESS => false,
+                CURLOPT_PROGRESSFUNCTION => static fn ($ch, $dlTotal, $dlNow) => $dlNow > 5000000 ? 1 : 0,
                 CURLOPT_HEADERFUNCTION => function ($ch, $header) use (&$location) {
                     if (stripos($header, 'location:') === 0) {
                         $location = trim(substr($header, 9));

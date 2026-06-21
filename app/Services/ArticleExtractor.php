@@ -19,6 +19,9 @@ class ArticleExtractor
     /** Máximo de caracteres de texto a devolver (chega para ancorar a IA). */
     private const MAX_CHARS = 4000;
 
+    /** Teto de bytes a descarregar (anti-OOM/slowloris na instância pequena). */
+    private const MAX_BYTES = 5000000;
+
     /**
      * Devolve o texto do artigo em $url, ou null se não for seguro/não der.
      */
@@ -127,6 +130,12 @@ class ArticleExtractor
                 CURLOPT_RESOLVE => ["{$host}:{$port}:" . implode(',', $ips)],
                 CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; MahunguBot/1.0; +https://mahungu.co.mz)',
                 CURLOPT_HTTPHEADER => ['Accept: text/html,application/xhtml+xml,*/*'],
+                // Limite de tamanho (~5 MB) p/ não esgotar memória na instância pequena:
+                // MAXFILESIZE corta quando há Content-Length; a progress-function corta
+                // mesmo quando o servidor não o envia (slowloris/resposta gigante).
+                CURLOPT_MAXFILESIZE => self::MAX_BYTES,
+                CURLOPT_NOPROGRESS => false,
+                CURLOPT_PROGRESSFUNCTION => static fn ($ch, $dlTotal, $dlNow) => $dlNow > self::MAX_BYTES ? 1 : 0,
                 CURLOPT_HEADERFUNCTION => function ($ch, $header) use (&$location) {
                     if (stripos($header, 'location:') === 0) {
                         $location = trim(substr($header, 9));
