@@ -3,8 +3,9 @@
 @section('title', 'Termos de Serviço')
 
 @section('content')
+    <p class="legal-eyebrow">Legal</p>
     <h1>Termos de Serviço</h1>
-    <p class="updated">Última atualização: {{ date('d/m/Y') }}</p>
+    <p class="legal-updated">Última atualização: {{ date('d/m/Y') }}</p>
 
     <p>Ao usar a Mahungu concordas com estes termos. Se não concordares, não uses o serviço.</p>
 

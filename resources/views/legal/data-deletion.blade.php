@@ -3,12 +3,13 @@
 @section('title', 'Eliminação de Dados')
 
 @section('content')
+    <p class="legal-eyebrow">Legal</p>
     <h1>Eliminação de Dados</h1>
-    <p class="updated">Como pedir a remoção dos teus dados da Mahungu.</p>
+    <p class="legal-updated">Como pedir a remoção dos teus dados da Mahungu.</p>
 
     @if($code)
         @if($record)
-            <p>✅ O teu pedido de eliminação foi <strong>recebido e processado</strong>.</p>
+            <p><span aria-hidden="true">✅</span> O teu pedido de eliminação foi <strong>recebido e processado</strong>.</p>
             <ul>
                 <li>Código de confirmação: <code>{{ $code }}</code></li>
                 <li>Data: {{ \Illuminate\Support\Carbon::parse($record['at'])->format('d/m/Y H:i') }} (UTC)</li>
@@ -20,7 +21,7 @@
             <p>Não encontrámos nenhum pedido com o código <code>{{ $code }}</code>. Pode já ter
             expirado ou estar incorreto. Se precisares, contacta-nos.</p>
         @endif
-        <hr style="border:none;border-top:1px solid var(--border);margin:26px 0;">
+        <hr class="legal-divider">
     @endif
 
     <h2>Como eliminar os teus dados</h2>

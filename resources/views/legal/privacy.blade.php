@@ -3,8 +3,9 @@
 @section('title', 'Política de Privacidade')
 
 @section('content')
+    <p class="legal-eyebrow">Legal</p>
     <h1>Política de Privacidade</h1>
-    <p class="updated">Última atualização: {{ date('d/m/Y') }}</p>
+    <p class="legal-updated">Última atualização: {{ date('d/m/Y') }}</p>
 
     <p>A Mahungu ("nós") é uma plataforma de gestão e publicação de conteúdo para redes
     sociais, focada em notícias de Moçambique. Esta política explica que dados tratamos,

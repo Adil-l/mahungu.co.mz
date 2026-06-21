@@ -11,8 +11,8 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         body {
-            display: flex; align-items: center; justify-content: center;
-            min-height: 100vh; padding: 24px; position: relative; overflow: hidden;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; padding: 24px 24px 18px; position: relative; overflow-x: hidden;
         }
         /* Fundo com brilhos animados na cor da marca */
         body.guest::before, body.guest::after {
@@ -33,7 +33,7 @@
         @keyframes floatB { 0%,100% { transform: translate(0,0); } 50% { transform: translate(-50px,-30px); } }
 
         .auth-card {
-            position: relative; z-index: 1;
+            position: relative; z-index: 1; margin: auto;
             width: 100%; max-width: 410px;
             background: rgba(20, 21, 34, 0.72);
             border: 1px solid var(--glass-border);
@@ -73,6 +73,24 @@
         .auth-links > div { margin-top: 10px; }
         .auth-card .btn-main { margin-top: 6px; width: 100%; }
         .auth-card .btn-main:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        /* Links legais (exigidos pela App Review da Meta) — discretos, no fundo, em fluxo. */
+        .auth-legal {
+            position: relative; z-index: 1; margin-top: 18px; flex-shrink: 0;
+            display: flex; gap: 10px; align-items: center; justify-content: center;
+            flex-wrap: wrap; padding: 0 16px;
+            font-size: 12.5px; color: var(--text-muted);
+        }
+        .auth-legal a { color: var(--text-muted); text-decoration: none; font-weight: 500; transition: color 0.2s; border-radius: 4px; }
+        .auth-legal a:hover { color: var(--primary); text-decoration: underline; }
+        .auth-legal a:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(212,82,42,0.25); color: var(--primary); }
+        .auth-legal .sep { opacity: 0.4; }
+
+        /* Respeita quem prefere menos movimento. */
+        @media (prefers-reduced-motion: reduce) {
+            .auth-card { animation: none; }
+            body.guest::before, body.guest::after { animation: none; }
+        }
     </style>
 </head>
 <body class="guest">
@@ -82,6 +100,14 @@
         </div>
         @yield('content')
     </div>
+
+    <footer class="auth-legal">
+        <a href="/privacidade">Privacidade</a>
+        <span class="sep" aria-hidden="true">·</span>
+        <a href="/termos">Termos</a>
+        <span class="sep" aria-hidden="true">·</span>
+        <a href="/eliminar-dados">Eliminar dados</a>
+    </footer>
 
     <script>
         async function authPost(url, data) {
