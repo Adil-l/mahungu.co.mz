@@ -22,7 +22,8 @@ const IG_MIN_LIKES = 100;       // curtidas mínimas p/ contar como tração
 const IG_MIN_COMMENTS = 10;     // ou comentários mínimos
 const IG_STRONG_LIKES = 5000;   // viral óbvio → dispensa o critério de tópico
 // Léxico alargado de "impacto geral" (política, economia, segurança, saúde, grandes nomes/desporto…).
-const IMPACT_KEYWORDS = /(govern|ministr|president|eleic|elei[çc]|partido|frelimo|renamo|parlament|\blei\b|decret|greve|manifesta|protest|combust[íi]vel|gasolina|gas[óo]leo|metical|pre[çc]o|sal[áa]rio|imposto|economia|infla[çc]|d[óo]lar|emprego|despedimento|corrup|esc[âa]ndal|pol[ée]mic|recorde|hist[óo]ric|in[ée]dit|morte|morr|faleceu|acidente|ataque|viol[êe]nc|terror|cabo delgado|sa[úu]de|hospital|surto|c[óo]lera|covid|vacina|futebol|mamba|mundial|\bcopa|sele[çc][ãa]o|campe[ãa]o|\bfinal\b|estrei|champions|fifa|\bgolo|transfer|contrat|pol[íi]cia|tribunal|deten[çc]|pris[ãa]o|viral|chocante|bomb[áa]stic|sensa[çc])/i;
+// Exportado p/ o cálculo do "potencial viral" (estrela ⭐) em main.js — 100% local, sem IA.
+export const IMPACT_KEYWORDS = /(govern|ministr|president|eleic|elei[çc]|partido|frelimo|renamo|parlament|\blei\b|decret|greve|manifesta|protest|combust[íi]vel|gasolina|gas[óo]leo|metical|pre[çc]o|sal[áa]rio|imposto|economia|infla[çc]|d[óo]lar|emprego|despedimento|corrup|esc[âa]ndal|pol[ée]mic|recorde|hist[óo]ric|in[ée]dit|morte|morr|faleceu|acidente|ataque|viol[êe]nc|terror|cabo delgado|sa[úu]de|hospital|surto|c[óo]lera|covid|vacina|futebol|mamba|mundial|\bcopa|sele[çc][ãa]o|campe[ãa]o|\bfinal\b|estrei|champions|fifa|\bgolo|transfer|contrat|pol[íi]cia|tribunal|deten[çc]|pris[ãa]o|viral|chocante|bomb[áa]stic|sensa[çc])/i;
 // Categorias inerentemente de impacto geral (inclui as usadas pelo catálogo
 // padrão: "Moçambique" e "Global", além das do cadastro).
 const IMPACT_CATEGORIES = new Set([
@@ -163,6 +164,7 @@ export const automation = {
                     sourceName: source.name,
                     sourceType: 'rss',                        // origem (p/ filtrar nas Propostas)
                     category: source.category || 'Geral',
+                    comments: this.extractCommentsCount(item), // engajamento (proxy) p/ potencial viral ⭐
                     date: publishedAt != null ? new Date(publishedAt).toLocaleDateString('pt-PT') : new Date().toLocaleDateString('pt-PT'),
                     image: image,
                     status: 'new',
@@ -233,6 +235,8 @@ export const automation = {
                 sourceName: source.name,
                 sourceType: 'instagram',                  // origem (p/ filtrar nas Propostas)
                 category: source.category || 'Geral',
+                likes: Number(m.like_count) || 0,         // engajamento real IG → potencial viral ⭐
+                comments: Number(m.comments_count) || 0,
                 date: publishedAt != null ? new Date(publishedAt).toLocaleDateString('pt-PT') : new Date().toLocaleDateString('pt-PT'),
                 image,
                 status: 'new',

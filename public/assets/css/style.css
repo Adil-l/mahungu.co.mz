@@ -1874,6 +1874,18 @@ body.editor-active #tab-editor {
     border: 1px solid rgba(112, 0, 255, 0.45);
 }
 .proposal-badge.story i { width: 12px; height: 12px; }
+/* Badge "⭐ potencial viral" — canto inferior esquerdo, sobre a imagem (dourado). */
+.proposal-badge.viral {
+    top: auto; bottom: 8px; right: auto; left: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffce3a;
+    border: 1px solid rgba(255, 193, 7, 0.55);
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.25);
+}
+.proposal-badge.viral i, .proposal-badge.viral svg { width: 12px; height: 12px; fill: currentColor; }
 
 /* ── Navegação de slides nos modais de visualização (carrossel) ── */
 .modal-preview-frame, .proposal-preview-lg { position: relative; }
@@ -2298,6 +2310,18 @@ body.editor-active #tab-editor {
 .src-chip i, .src-chip svg { width: 14px; height: 14px; }
 .src-chip:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
 .src-chip.active { background: rgba(212, 82, 42, 0.15); border-color: var(--primary); color: #e8763e; }
+/* Separador vertical entre os filtros de origem e a chip "Sugeridas". */
+.source-filter-sep { width: 1px; align-self: stretch; margin: 2px 4px; background: var(--glass-border); }
+/* Chip "⭐ Sugeridas" — destaque dourado quando ativa. */
+.suggest-chip i, .suggest-chip svg { fill: none; }
+.suggest-chip:hover { border-color: rgba(255, 193, 7, 0.5); color: #ffce3a; }
+.suggest-chip.active { background: rgba(255, 193, 7, 0.16); border-color: rgba(255, 193, 7, 0.6); color: #ffce3a; }
+.suggest-chip.active i, .suggest-chip.active svg { fill: currentColor; }
+.suggest-chip .suggest-count {
+    font-size: 10px; font-weight: 700; line-height: 1;
+    padding: 2px 6px; border-radius: 10px;
+    background: rgba(255, 255, 255, 0.12); color: inherit;
+}
 
 .filter-search {
     display: flex;

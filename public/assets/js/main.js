@@ -2,7 +2,7 @@ import { storage } from './modules/storage.js';
 import { ai } from './modules/ai.js';
 import { core } from './modules/core.js';
 import { ui } from './modules/ui.js';
-import { automation } from './modules/automation.js';
+import { automation, IMPACT_KEYWORDS } from './modules/automation.js';
 import { scheduler } from './modules/scheduler.js';
 import { images } from './modules/images.js';
 
@@ -195,13 +195,67 @@ function fitHeadline(editorEl) {
 }
 
 // ── FILTROS E PESQUISA (Propostas e Histórico) ──
-let proposalsFilter = { category: 'Todas', query: '', source: 'all' };
+let proposalsFilter = { category: 'Todas', query: '', source: 'all', suggested: false };
 
 // Origem de uma proposta: usa o campo sourceType (novo) e, p/ propostas antigas
 // sem ele, infere pelo URL (permalink do Instagram) — senão assume RSS.
 function proposalOrigin(p) {
     if (p.sourceType === 'instagram' || p.sourceType === 'rss') return p.sourceType;
     return /instagram\.com/i.test(p.sourceUrl || '') ? 'instagram' : 'rss';
+}
+
+// ── POTENCIAL VIRAL (estrela ⭐) — heurística 100% LOCAL, ZERO créditos de IA ──
+// Pontua 0–100 a probabilidade de uma notícia "puxar" engajamento, combinando
+// sinais que JÁ temos: palavras de impacto, gatilhos de curiosidade/emoção,
+// engajamento real (likes/comentários do IG), categoria, frescura e sinais do
+// título. Não chama Claude nem nenhuma IA paga/gratuita — é instantâneo e offline.
+const VIRAL_SUGGEST_THRESHOLD = 60;   // score a partir do qual a notícia ganha ⭐
+
+// Subconjunto "quente": gatilhos de curiosidade/emoção que disparam partilhas.
+const VIRAL_HOT_WORDS = /(morte|morr|faleceu|matou|tragéd|acidente|choc|esc[âa]ndal|pol[ée]mic|exclusiv|revela|bombást|urgent|alerta|flagrante|v[íi]deo|imagens|recorde|hist[óo]ric|in[ée]dit|primeira vez|viral|\bgolo|campe[ãa]o|vit[óo]ria|derrota|\bfinal\b|deten[çc]|pris[ãa]o|corrup|fraude|esquema|surpreend|inacredit|impressionante|\bna[íi]\b)/gi;
+
+// Peso por categoria (as mais partilháveis pesam mais). Default: 4.
+const VIRAL_CATEGORY_WEIGHT = {
+    'Desporto': 16, 'Celebridades': 16, 'Famosos': 16, 'Política': 14,
+    'Segurança': 14, 'Saúde': 12, 'Sociedade': 11, 'Economia': 11,
+    'Moçambique': 10, 'Nacional': 10, 'Internacional': 8, 'Global': 8,
+};
+
+function viralScore(p) {
+    if (!p) return 0;
+    const title = String(p.generatedTitle || p.title || '');
+    const text = `${title} ${p.summary || ''} ${p.sourceText || ''}`;
+    let score = 0;
+
+    // 1) Tópico de impacto geral (o mesmo léxico que filtra as notícias).
+    if (IMPACT_KEYWORDS.test(text)) score += 12;
+
+    // 2) Gatilhos "quentes" distintos (curiosidade/emoção) — até +30.
+    const hits = text.match(VIRAL_HOT_WORDS);
+    if (hits) score += Math.min(30, new Set(hits.map(w => w.toLowerCase())).size * 12);
+
+    // 3) Engajamento real (Instagram) — sinal mais forte quando existe (escala log).
+    const likes = Number(p.likes) || 0;
+    const comments = Number(p.comments) || 0;
+    if (likes) score += Math.min(22, Math.round(Math.log10(Math.max(1, likes)) * 6));
+    if (comments) score += Math.min(12, Math.round(Math.log10(Math.max(1, comments)) * 6));
+
+    // 4) Categoria.
+    score += VIRAL_CATEGORY_WEIGHT[p.category] || 4;
+
+    // 5) Frescura — 0h:+14, 24h:+10, ~84h:0.
+    const ts = Number(p.publishedAt) || Number(p.timestamp) || 0;
+    if (ts) {
+        const ageH = (Date.now() - ts) / 36e5;
+        score += Math.max(0, Math.min(14, Math.round(14 - ageH / 6)));
+    }
+
+    // 6) Sinais do título: número (preço/idade/recorde), pergunta, comprimento ideal.
+    if (/\d/.test(title)) score += 5;
+    if (/\?/.test(title)) score += 4;
+    if (title.length >= 30 && title.length <= 80) score += 4;
+
+    return Math.max(0, Math.min(100, score));
 }
 
 function setProposalsSource(src) {
@@ -211,6 +265,15 @@ function setProposalsSource(src) {
     renderProposals();
 }
 window.setProposalsSource = setProposalsSource;
+
+// Liga/desliga o filtro "⭐ Sugeridas" (só notícias com potencial viral).
+function toggleSuggestedFilter() {
+    proposalsFilter.suggested = !proposalsFilter.suggested;
+    const btn = document.getElementById('proposals-suggest-chip');
+    if (btn) btn.classList.toggle('active', proposalsFilter.suggested);
+    renderProposals();
+}
+window.toggleSuggestedFilter = toggleSuggestedFilter;
 let aiSavedFilter = { category: 'Todas', query: '' };
 let historyFilter = { category: 'Todas', query: '' };
 let storiesFilter = { category: 'Todas', query: '' };
@@ -3924,36 +3987,65 @@ async function renderProposals() {
         filtered = filtered.filter(p => proposalOrigin(p) === proposalsFilter.source);
     }
 
+    // Potencial viral (⭐) — calculado uma vez por card (heurística local, 0 créditos).
+    filtered.forEach(p => { p._viral = viralScore(p); });
+    const suggestedCount = filtered.filter(p => p._viral >= VIRAL_SUGGEST_THRESHOLD).length;
+
+    // Atualiza o contador da chip "⭐ Sugeridas".
+    const suggestCountEl = document.getElementById('proposals-suggest-count');
+    if (suggestCountEl) suggestCountEl.textContent = suggestedCount;
+
+    // Filtro "⭐ Sugeridas": só as de potencial viral, ordenadas por score.
+    const suggestedMode = proposalsFilter.suggested;
+    if (suggestedMode) {
+        filtered = filtered.filter(p => p._viral >= VIRAL_SUGGEST_THRESHOLD);
+    }
+
     if (filtered.length === 0) {
-        container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">Nenhuma proposta corresponde ao filtro/pesquisa.</div>';
+        const emptyMsg = suggestedMode
+            ? 'Nenhuma notícia com potencial viral de momento. Desliga o filtro ⭐ Sugeridas para ver todas.'
+            : 'Nenhuma proposta corresponde ao filtro/pesquisa.';
+        container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">${emptyMsg}</div>`;
         return;
     }
 
-    // Ordenação por timestamp descendente (mais recentes primeiro)
-    filtered.sort((a, b) => {
-        const tsA = a.timestamp || (a.id > 1000000000000 ? a.id : 0);
-        const tsB = b.timestamp || (b.id > 1000000000000 ? b.id : 0);
-        return tsB - tsA;
-    });
+    if (suggestedMode) {
+        // Ordenar pelas mais promissoras primeiro.
+        filtered.sort((a, b) => b._viral - a._viral);
+    } else {
+        // Ordenação por timestamp descendente (mais recentes primeiro)
+        filtered.sort((a, b) => {
+            const tsA = a.timestamp || (a.id > 1000000000000 ? a.id : 0);
+            const tsB = b.timestamp || (b.id > 1000000000000 ? b.id : 0);
+            return tsB - tsA;
+        });
+    }
 
     const total = filtered.length;
     const shown = filtered.slice(0, PROPOSALS_RENDER_LIMIT);
 
     let currentGroup = '';
     let html = '';
+    if (suggestedMode) {
+        html += `<div class="date-group-header" style="grid-column:1/-1;">⭐ Sugeridas · ordenadas por potencial viral</div>`;
+    }
 
     shown.forEach(p => {
-        const label = getGroupLabel(p.timestamp || (p.id > 1000000000000 ? p.id : null));
-        if (label !== currentGroup) {
-            currentGroup = label;
-            html += `<div class="date-group-header">${label}</div>`;
+        if (!suggestedMode) {
+            const label = getGroupLabel(p.timestamp || (p.id > 1000000000000 ? p.id : null));
+            if (label !== currentGroup) {
+                currentGroup = label;
+                html += `<div class="date-group-header">${label}</div>`;
+            }
         }
+        const isViral = p._viral >= VIRAL_SUGGEST_THRESHOLD;
 
         html += `
         <article class="proposal-card">
             <button class="proposal-preview" onclick="generateProposalAs(${p.id}, 'feed')" title="Gerar flyer de Feed e abrir no editor">
                 ${miniFlyerHTML(p)}
                 <span class="proposal-badge new">Nova</span>
+                ${isViral ? `<span class="proposal-badge viral" title="Pode viralizar · potencial ${p._viral}/100"><i data-lucide="star"></i> ${p._viral}</span>` : ''}
             </button>
             <div class="proposal-card-info">
                 <div class="proposal-card-title">${escapeHtml(p.generatedTitle || p.title)}</div>
