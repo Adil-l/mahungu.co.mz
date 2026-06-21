@@ -27,7 +27,11 @@ use Illuminate\Support\Facades\Route;
 
 // Health check (público) — para monitorização de uptime no Laravel Cloud.
 // Verifica conectividade à BD; 200 = ok, 503 = degradado.
-Route::get('/health', function () {
+// Inclui `ai_claude`: se for false, a geração de conteúdo cai para IA GRATUITAS
+// (que alucinam) → principal causa de fake news. Abre /api/health no browser
+// para confirmar se o Claude está mesmo ativo em produção. (Só um booleano, não
+// revela a chave.)
+Route::get('/health', function (\App\Services\ClaudeService $claude) {
     $database = 'ok';
     try {
         DB::connection()->getPdo();
@@ -40,7 +44,10 @@ Route::get('/health', function () {
         'status' => $ok ? 'ok' : 'degraded',
         'app' => config('app.name'),
         'time' => now()->toIso8601String(),
-        'checks' => ['database' => $database],
+        'checks' => [
+            'database' => $database,
+            'ai_claude' => $claude->configured(), // false = gera com IA grátis (risco de fake news)
+        ],
     ], $ok ? 200 : 503);
 });
 

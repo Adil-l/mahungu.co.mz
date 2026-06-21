@@ -3501,6 +3501,19 @@ function aiClaudeEnabled() {
     return map.claude !== false;
 }
 
+// Avisa quando a geração caiu para uma IA GRATUITA (llm7/Pollinations) — estas
+// alucinam e ignoram as regras anti-invenção, sendo a PRINCIPAL causa de fake
+// news quando o Claude não está configurado no servidor (503 → fallback).
+function warnIfFreeAI() {
+    if (ai.lastProviderWasFree && ai.lastProviderWasFree()) {
+        ui.showToast(
+            `⚠️ Conteúdo gerado por IA GRATUITA (${ai.lastProvider}) — maior risco de imprecisão/fake news. Falta configurar o Claude no servidor (ANTHROPIC_API_KEY).`,
+            'error'
+        );
+    }
+}
+window.warnIfFreeAI = warnIfFreeAI;
+
 async function generateContentPackage(topicArg) {
     // topicArg vem dos botões da Proposta de IA (tema já conhecido — sem prompt).
     // Sem argumento (botão do editor), pergunta o tema ao utilizador.
@@ -3542,9 +3555,11 @@ async function generateContentPackage(topicArg) {
             if (!data.title && data.raw) {
                 return ui.showToast('A IA respondeu sem o formato esperado. Tenta de novo ou reformula o tema.', 'error');
             }
+            ai.lastProvider = 'Claude'; // veio do endpoint server-side (Claude)
         } else {
             // Cadeia cliente por tarefa (Claude desligado OU permissões personalizadas).
             data = await ai.generatePackage(topic.trim(), isStory ? 'story' : 'feed');
+            warnIfFreeAI();
         }
         if (!data || !data.title) {
             return ui.showToast('A IA não devolveu conteúdo. Tenta de novo ou reformula o tema.', 'error');
@@ -3614,8 +3629,10 @@ async function regenerateCaption() {
             });
             data = await res.json().catch(() => ({}));
             if (!res.ok) return ui.showToast(data.error || 'Não foi possível gerar a legenda.', 'error');
+            ai.lastProvider = 'Claude';
         } else {
             data = await ai.generateCaption(topic); // IA atribuída à tarefa 'legenda'
+            warnIfFreeAI();
         }
         if (!data || !data.caption) return ui.showToast('A IA não devolveu legenda. Tenta de novo.', 'error');
         const tags = (Array.isArray(data.hashtags) && data.hashtags.length)
@@ -3663,8 +3680,10 @@ async function generateCarousel(topicArg, slidesArg, includeFirst) {
             });
             data = await res.json().catch(() => ({}));
             if (!res.ok) return ui.showToast(data.error || 'Não foi possível gerar o carrossel.', 'error');
+            ai.lastProvider = 'Claude';
         } else {
             data = await ai.generateCarouselSlides(baseTitle, n); // IA atribuída à tarefa 'carrossel'
+            warnIfFreeAI();
         }
         const gen = Array.isArray(data.slides) ? data.slides : null;
         if (!gen || gen.length < 2) return ui.showToast('A IA não devolveu slides. Tenta de novo ou reformula o tema.', 'error');
@@ -4434,6 +4453,7 @@ async function generateProposalContent(id) {
     try {
         await ensureArticleText(proposal); // lê o artigo completo p/ não inventar
         const result = await ai.generateContent(proposal);
+        warnIfFreeAI();
         applyGenerationToProposal(proposal, result);
         await ensureProposalImage(proposal);
         await storage.saveProposal(proposal);
@@ -4556,6 +4576,7 @@ async function regenerateProposal(id) {
     try {
         await ensureArticleText(proposal); // lê o artigo completo p/ não inventar
         const result = await ai.generateContent(proposal);
+        warnIfFreeAI();
         applyGenerationToProposal(proposal, result);
         await storage.saveProposal(proposal);
         await shareProposal(proposal); // Salvados visíveis para todos

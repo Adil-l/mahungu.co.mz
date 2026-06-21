@@ -127,6 +127,14 @@ export const ai = {
     openaiKey: '',       // OpenAI
     openrouterKey: '',   // OpenRouter (agregador, tem modelos grátis)
     openrouterModel: '', // modelo OpenRouter (default abaixo se vazio)
+    lastProvider: '',    // nome do último provedor que gerou (p/ avisar se foi grátis)
+
+    // Provedores GRÁTIS de baixa qualidade: alucinam e ignoram regras anti-invenção.
+    // Quando a geração cai para um destes (ex.: Claude não configurado), avisamos.
+    FREE_PROVIDERS: ['llm7', 'Pollinations'],
+    lastProviderWasFree() {
+        return this.FREE_PROVIDERS.includes(this.lastProvider);
+    },
 
     init() {
         this.apiKey = window.MAHUNGU_CONFIG?.apiKey || storage.getSetting('apiKey') || '';
@@ -314,7 +322,9 @@ export const ai = {
         for (let round = 0; round < MAX_ROUNDS; round++) {
             for (const [name, call] of providers) {
                 try {
-                    return await call(prompt);
+                    const result = await call(prompt);
+                    this.lastProvider = name; // regista quem gerou (p/ aviso de qualidade)
+                    return result;
                 } catch (err) {
                     lastError = err;
                     console.warn(`Mahungu AI: provedor ${name} falhou (${err.message}).`);
@@ -536,7 +546,9 @@ export const ai = {
         }[p];
         if (!direct) return this.ask(prompt);
         try {
-            return await direct();
+            const result = await direct();
+            this.lastProvider = p === 'free' ? 'llm7' : (p.charAt(0).toUpperCase() + p.slice(1));
+            return result;
         } catch (err) {
             console.warn(`Tarefa "${taskId}": provedor "${p}" falhou (${err.message}); a usar a cadeia automática.`);
             return this.ask(prompt);
