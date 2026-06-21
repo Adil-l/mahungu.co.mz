@@ -98,6 +98,24 @@
 
 <!-- Sidebar DIREITA: Ferramentas -->
 <aside class="sidebar-right hidden" id="editor-tools">
+    <!-- 1. Formato: Feed · Story · Carrossel (seletor único) -->
+    <div class="control-group">
+        <div class="control-label">Formato</div>
+        <div class="format-seg" id="editor-format-seg">
+            <button class="format-seg-btn active" data-mode="feed" onclick="setEditorMode('feed')"><i data-lucide="square"></i> Feed</button>
+            <button class="format-seg-btn" data-mode="story" onclick="setEditorMode('story')"><i data-lucide="zap"></i> Story</button>
+            <button class="format-seg-btn" data-mode="carousel" onclick="setEditorMode('carousel')"><i data-lucide="images"></i> Carrossel</button>
+        </div>
+        <p id="story-format-hint" style="display:none; color: var(--text-muted); font-size: 11px; margin-top: 8px; line-height: 1.4;">Formato vertical 9:16. Ao guardar, vai para a aba <strong>Stories</strong>.</p>
+        <div id="carousel-extra" style="display:none;">
+            <button class="btn-full btn-ai-generate" onclick="generateCarousel()" style="margin-top: 8px;" title="Define o nº de slides; a IA preenche todos a partir do título atual (1 só chamada)">
+                <i data-lucide="sparkles" style="width:14px;height:14px;"></i> Gerar carrossel com IA
+            </button>
+            <div id="carousel-bar" class="carousel-bar" style="display:none;"></div>
+        </div>
+    </div>
+
+    <!-- 2. IA — Conteúdo -->
     <div class="control-group">
         <div class="control-label">IA — Conteúdo</div>
         <button class="btn-main btn-ai-generate" onclick="generateContentPackage()" title="Gera título, legenda e hashtags na voz da Mahungu a partir de um tema">
@@ -106,26 +124,23 @@
         </button>
     </div>
 
+    <!-- 3. Imagem (fundo + ajustes) -->
     <div class="control-group">
-        <div class="control-label">Fundo</div>
+        <div class="control-label">Imagem</div>
         <button class="btn-main" onclick="trocarFoto()">
             <i data-lucide="image"></i>
             <span id="trocar-foto-label">Trocar Foto</span>
         </button>
-        <button class="btn-full" id="btn-fundo-duplo" onclick="toggleSplit()" style="margin-top: 8px;">
+        <button class="btn-full" id="btn-fundo-duplo" onclick="toggleSplit()">
             <i data-lucide="columns-2" style="width: 14px; height: 14px;"></i> Fundo duplo
         </button>
-        <div id="split-side-controls" style="display: none; margin-top: 8px;">
+        <div id="split-side-controls" style="display: none;">
             <div class="control-label" style="margin-bottom: 6px;">Lado a editar</div>
             <div class="color-grid">
                 <button class="btn-tool split-side-btn active" data-side="left" onclick="selectHalf('left')">Esquerda</button>
                 <button class="btn-tool split-side-btn" data-side="right" onclick="selectHalf('right')">Direita</button>
             </div>
         </div>
-    </div>
-
-    <div class="control-group">
-        <div class="control-label">Ajustes de Imagem</div>
         <div class="range-group">
             <label>Zoom</label>
             <input type="range" min="0.4" max="4" step="0.05" value="1" oninput="updateEditorState('zoom', this.value)">
@@ -140,13 +155,14 @@
         </div>
     </div>
 
+    <!-- 4. Texto -->
     <div class="control-group">
         <div class="control-label">Texto</div>
         <div class="color-grid">
             <button class="btn-tool laranja" onclick="aplicarCor('laranja')"><span></span> Laranja</button>
             <button class="btn-tool branco" onclick="aplicarCor('branco')"><span></span> Branco</button>
         </div>
-        <div class="font-controls" style="display: flex; gap: 10px; margin-top: 5px;">
+        <div class="font-controls" style="display: flex; gap: 10px;">
             <button class="btn-tool" style="flex:1" onclick="changeFontSize(4)" title="Aumentar Fonte">
                 <i data-lucide="plus"></i>
             </button>
@@ -154,42 +170,21 @@
                 <i data-lucide="minus"></i>
             </button>
         </div>
-        <button class="btn-full" onclick="limparFormatacao()" style="margin-top: 5px;">
+        <button class="btn-full" onclick="limparFormatacao()">
             <i data-lucide="eraser" style="width: 14px; height: 14px;"></i> Limpar Formatação
         </button>
     </div>
 
+    <!-- 5. Guardar (fixo no fundo) -->
     <div class="control-group" style="margin-top: auto;">
-        <div class="control-label">Formato do post</div>
-        <button class="btn-main" id="btn-toggle-story" onclick="toggleStoryFormat()" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">
-            <i data-lucide="smartphone"></i> <span id="btn-toggle-story-label">Transformar em Stories</span>
-        </button>
-        <p id="story-format-hint" style="display:none; color: var(--text-muted); font-size: 11px; margin-top: 6px; line-height: 1.4;">Formato vertical 9:16. Ao guardar, vai para a aba <strong>Stories</strong>.</p>
-    </div>
-
-    <div class="control-group" id="carousel-controls">
-        <div class="control-label">Carrossel (várias notícias num post)</div>
-        <button class="btn-main" id="btn-enter-carousel" onclick="enterCarouselMode()" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">
-            <i data-lucide="images"></i> Criar carrossel
-        </button>
-        <button class="btn-full btn-ai-generate" onclick="generateCarousel()" style="margin-top: 8px;" title="Define o nº de slides; a IA preenche todos a partir do título atual (1 só chamada)">
-            <i data-lucide="sparkles" style="width:14px;height:14px;"></i> Gerar carrossel com IA
-        </button>
-        <div id="carousel-bar" class="carousel-bar" style="display:none;"></div>
-    </div>
-
-    <div class="control-group">
-        <button class="btn-main" onclick="openSaveModal()" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border); margin-bottom: 10px;">
+        <div class="control-label">Guardar</div>
+        <button class="btn-main btn-success" id="btn-save-contextual" onclick="saveContextual()">
             <i data-lucide="save"></i>
-            Salvar Flyer
+            <span id="btn-save-label">Guardar Flyer</span>
         </button>
-        <button class="btn-main" onclick="saveAsStory()" style="background: rgba(225,48,108,0.12); border: 1px solid rgba(225,48,108,0.45); color: #ff5c97; margin-bottom: 10px;">
-            <i data-lucide="smartphone"></i>
-            Salvar Story (9:16)
-        </button>
-        <button class="btn-main btn-success" onclick="downloadFlyer()">
+        <button class="btn-main" onclick="downloadFlyer()" style="background: rgba(255,255,255,0.1); border: 1px solid var(--glass-border);">
             <i data-lucide="download"></i>
-            Exportar Flyer
+            Exportar
         </button>
     </div>
 </aside>

@@ -848,6 +848,7 @@ function setEditorFormat(format) {
     document.getElementById('btn-toggle-story')?.classList.toggle('active', isStory);
     core.setScale();
     invalidateFlyerSnapshot();
+    if (typeof syncEditorModeChips === 'function') syncEditorModeChips();
 }
 
 function toggleStoryFormat() {
@@ -869,6 +870,47 @@ function saveAsStory() {
     openSaveModal();
 }
 window.saveAsStory = saveAsStory;
+
+// ── Seletor de formato do editor (Feed · Story · Carrossel) ──
+// Unifica os antigos botões dispersos. 'carousel' usa o canvas de feed.
+function currentEditorMode() {
+    if (activeSlideIndex >= 0) return 'carousel';
+    return editorFormat === 'story' ? 'story' : 'feed';
+}
+
+function setEditorMode(mode) {
+    if (mode === 'carousel') {
+        setEditorFormat('feed');                 // carrossel usa o canvas de feed
+        if (activeSlideIndex < 0) enterCarouselMode();
+    } else {
+        if (activeSlideIndex >= 0) exitCarousel(); // sai do carrossel
+        setEditorFormat(mode === 'story' ? 'story' : 'feed');
+    }
+    syncEditorModeChips();
+}
+window.setEditorMode = setEditorMode;
+
+// Reflete o estado atual nos chips de formato + mostra os extras do carrossel +
+// atualiza o rótulo do botão Guardar (contextual).
+function syncEditorModeChips() {
+    const mode = currentEditorMode();
+    document.querySelectorAll('#editor-format-seg .format-seg-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.mode === mode));
+    const extra = document.getElementById('carousel-extra');
+    if (extra) extra.style.display = mode === 'carousel' ? 'block' : 'none';
+    const lbl = document.getElementById('btn-save-label');
+    if (lbl) lbl.textContent = mode === 'carousel' ? 'Guardar Carrossel' : (mode === 'story' ? 'Guardar Story' : 'Guardar Flyer');
+}
+window.syncEditorModeChips = syncEditorModeChips;
+
+// Guardar contextual: carrossel → saveCarousel; story → saveAsStory; feed → modal.
+function saveContextual() {
+    const mode = currentEditorMode();
+    if (mode === 'carousel') return saveCarousel();
+    if (mode === 'story') return saveAsStory();
+    return openSaveModal();
+}
+window.saveContextual = saveContextual;
 
 function snapshotEditor() {
     const editor = document.getElementById('editor');
@@ -893,6 +935,7 @@ function loadEditorState(s) {
 function renderCarouselBar() {
     const bar = document.getElementById('carousel-bar');
     const enterBtn = document.getElementById('btn-enter-carousel');
+    if (typeof syncEditorModeChips === 'function') syncEditorModeChips();
     if (!bar) return;
     if (activeSlideIndex < 0) {
         bar.style.display = 'none';
@@ -1191,6 +1234,7 @@ function showTab(tabId, el) {
     if (tabId === 'editor') {
         if (flyerSidebar) flyerSidebar.classList.remove('hidden');
         document.body.classList.add('editor-active');
+        if (typeof syncEditorModeChips === 'function') syncEditorModeChips();
     }
     
     setTimeout(core.setScale, 50);
@@ -2011,6 +2055,32 @@ window.addEventListener('load', () => {
     const editor = document.getElementById('editor');
     if (editor) {
         editor.addEventListener('input', () => {
+            invalidateFlyerSnapshot();
+            autoSave();
+        });
+        // Colar de fora trazia font-size/cor inline da origem → o texto ficava com
+        // um tamanho fixo que os botões +/− não mexiam. Colamos SÓ texto simples,
+        // para herdar o tamanho/cor definidos no editor (e voltar a ser ajustável).
+        editor.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const cd = e.clipboardData || window.clipboardData;
+            const text = cd ? cd.getData('text/plain') : '';
+            if (!text) return;
+            const clean = text.replace(/\r\n?/g, '\n');
+            let ok = false;
+            try { ok = document.execCommand('insertText', false, clean); } catch (err) { ok = false; }
+            if (!ok) {
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount) {
+                    const range = sel.getRangeAt(0);
+                    range.deleteContents();
+                    range.insertNode(document.createTextNode(clean));
+                    range.collapse(false);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }
+            }
+            fitHeadline(editor);       // re-ajusta ao tamanho padrão
             invalidateFlyerSnapshot();
             autoSave();
         });

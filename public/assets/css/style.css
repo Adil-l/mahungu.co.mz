@@ -141,6 +141,19 @@ body.sidebar-collapsed #mahungu-userbox button { font-size: 0 !important; gap: 0
 }
 .control-label { color: var(--text-muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
 
+/* Seletor de formato do editor (Feed · Story · Carrossel) */
+.format-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.format-seg-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    padding: 9px 6px; border-radius: 9px; font-size: 12px; font-weight: 700;
+    cursor: pointer; line-height: 1; white-space: nowrap;
+    background: rgba(255, 255, 255, 0.05); color: var(--text-muted);
+    border: 1px solid var(--glass-border); transition: all 0.15s;
+}
+.format-seg-btn i { width: 14px; height: 14px; }
+.format-seg-btn:hover { color: #fff; border-color: rgba(255, 255, 255, 0.25); }
+.format-seg-btn.active { background: rgba(212, 82, 42, 0.18); color: #ff8a5c; border-color: rgba(212, 82, 42, 0.5); }
+
 /* ── BOTÕES ── */
 .btn-main {
   background: var(--primary); color: #fff; border: none; border-radius: 8px; padding: 12px;
