@@ -63,6 +63,31 @@ class AiContentTest extends TestCase
             ->assertJsonFragment(['title' => 'Gasolina sobe hoje']);
     }
 
+    public function test_prompts_target_mozambican_audience(): void
+    {
+        config(['services.anthropic.key' => 'sk-ant-test']);
+        Http::fake([
+            'api.anthropic.com/*' => Http::response([
+                'content' => [['type' => 'text', 'text' => json_encode([
+                    'title' => 'x', 'summary' => 'y', 'caption' => 'z',
+                    'hashtags' => ['Mocambique'], 'cta' => 'w',
+                ])]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+        $this->actingAs($user)
+            ->postJson('/api/ai/content-package', ['topic' => 'Notícia internacional qualquer'])
+            ->assertOk();
+
+        // O público principal é moçambicano: o system tem de pedir esse ângulo.
+        Http::assertSent(function ($request) {
+            $system = $request['system'] ?? '';
+            return str_contains($system, 'MOÇAMBICANOS')
+                && str_contains($system, 'AUDIÊNCIA');
+        });
+    }
+
     public function test_content_package_story_uses_light_prompt(): void
     {
         config(['services.anthropic.key' => 'sk-ant-test']);

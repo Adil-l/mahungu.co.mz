@@ -221,6 +221,11 @@ const VIRAL_CATEGORY_WEIGHT = {
     'Moçambique': 10, 'Nacional': 10, 'Internacional': 8, 'Global': 8,
 };
 
+// Sinais de RELEVÂNCIA LOCAL (Moçambique). O público principal é moçambicano,
+// por isso notícias com âncora local valem mais ⭐ — lugares, instituições,
+// moeda (MT/metical), partidos, figuras e clubes que o moçambicano reconhece.
+const MOZ_RELEVANCE = /(mo[çc]ambi|maputo|matola|\bbeira\b|nampula|quelimane|\btete\b|pemba|chimoio|xai-xai|inhambane|\bgaza\b|niassa|manica|sofala|zamb[ée]zia|cabo delgado|metical|metica(l|is)|\bMT\b|frelimo|renamo|\bmdm\b|nyusi|mondlane|\bchapo\b|mamba(s)?|mambas|costa do sol|ferrovi[áa]rio|black bullets|mo[çc]ambola|\bedm\b|petromoc|\btmcel\b|movitel|vodacom mo[çc]ambique|\bsadc\b)/i;
+
 function viralScore(p) {
     if (!p) return 0;
     const title = String(p.generatedTitle || p.title || '');
@@ -254,6 +259,11 @@ function viralScore(p) {
     if (/\d/.test(title)) score += 5;
     if (/\?/.test(title)) score += 4;
     if (title.length >= 30 && title.length <= 80) score += 4;
+
+    // 7) Relevância LOCAL — público principal moçambicano: notícia com âncora
+    //    em Moçambique fala mais alto ao nosso leitor → reforço de potencial.
+    if (MOZ_RELEVANCE.test(text)) score += 14;
+    else if (p.category === 'Moçambique' || p.category === 'Nacional') score += 8;
 
     return Math.max(0, Math.min(100, score));
 }

@@ -60,6 +60,15 @@ NUNCA uses travessões (— ou –); usa vírgula, ponto ou dois pontos.
 
 const MAHUNGU_CTA = '🔥 Siga a @mahungu_mz para mais notícias e tendências.';
 
+// Audiência: a Mahungu comunica para todos, mas o público PRINCIPAL é moçambicano.
+// Tudo deve ser enquadrado pelo que importa a quem vive em Moçambique.
+const MAHUNGU_AUDIENCE_RULE = `
+AUDIÊNCIA (o mais importante): escreves para MOÇAMBICANOS. A Mahungu fala para todos, mas o público principal vive em Moçambique.
+- Enquadra a notícia pelo que importa ao moçambicano: o impacto no dia a dia, no bolso (valores em meticais/MT), na comunidade e na vida local.
+- Notícia internacional ou estrangeira? Liga-a a Moçambique sempre que faça sentido (o que muda para nós, para a região/SADC, para preços, emprego ou segurança). Se não houver ligação direta, escolhe o ângulo que mais interessa ao leitor moçambicano.
+- Usa referências, lugares e exemplos que o moçambicano reconhece. Nunca soes a alguém de fora a falar de longe.
+`;
+
 // Idioma obrigatório: tudo em português de Moçambique, mesmo que a notícia-fonte
 // venha noutra língua (deve ser traduzida). Reforçado em todos os prompts.
 const MAHUNGU_LANGUAGE_RULE = `
@@ -67,7 +76,7 @@ IDIOMA (OBRIGATÓRIO): Escreve absolutamente TUDO em português de Moçambique �
 todos os campos (flyerTitle, flyerSummary, caption e hashtags). Se a notícia vier
 em inglês ou noutra língua, TRADUZ e escreve sempre em português. NUNCA respondas
 em inglês nem misturES línguas.
-`;
+${MAHUNGU_AUDIENCE_RULE}`;
 
 // Guarda-costas anti-invenção: injetado em todos os prompts de geração para
 // impedir que o modelo "encha" a legenda com factos que não estão na fonte.
