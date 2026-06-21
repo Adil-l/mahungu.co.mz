@@ -3587,8 +3587,15 @@ async function regenerateCaption() {
     const flyerId = document.getElementById('schedule-flyer')?.value;
     const flyer = (schedulerFlyers || []).find(f => String(f.id) === String(flyerId));
     const ta = document.getElementById('schedule-content');
-    const base = (flyer && flyer.title) ? flyer.title : (ta?.value || '').trim();
-    if (!base) return ui.showToast('Escolhe um flyer (ou escreve o tema) primeiro.', 'info');
+    const title = (flyer && flyer.title) ? flyer.title : '';
+    const existingCaption = (ta?.value || flyer?.caption || '').trim();
+    // FONTE para ancorar a IA: título + legenda atual (se houver). Assim a "nova
+    // legenda" é uma VARIAÇÃO dos MESMOS factos, não uma invenção a partir só do
+    // título (era a causa de saírem factos falsos). A regra anti-invenção no
+    // servidor impede acrescentar números/nomes que não estejam aqui.
+    const topic = [title, existingCaption && `Legenda atual (mesma informação, só varia a redação):\n${existingCaption}`]
+        .filter(Boolean).join('\n\n');
+    if (!topic) return ui.showToast('Escolhe um flyer (ou escreve o tema) primeiro.', 'info');
 
     ui.showToast('A gerar nova legenda…', 'info');
     try {
@@ -3596,12 +3603,12 @@ async function regenerateCaption() {
         if (aiClaudeEnabled() && aiTaskProvider('legenda') === 'auto') {
             const res = await fetch('/api/ai/caption', {
                 method: 'POST', headers: apiHeaders(), credentials: 'same-origin',
-                body: JSON.stringify({ topic: base })
+                body: JSON.stringify({ topic })
             });
             data = await res.json().catch(() => ({}));
             if (!res.ok) return ui.showToast(data.error || 'Não foi possível gerar a legenda.', 'error');
         } else {
-            data = await ai.generateCaption(base); // IA atribuída à tarefa 'legenda'
+            data = await ai.generateCaption(topic); // IA atribuída à tarefa 'legenda'
         }
         if (!data || !data.caption) return ui.showToast('A IA não devolveu legenda. Tenta de novo.', 'error');
         const tags = (Array.isArray(data.hashtags) && data.hashtags.length)

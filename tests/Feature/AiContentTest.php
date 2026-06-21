@@ -88,6 +88,35 @@ class AiContentTest extends TestCase
         });
     }
 
+    public function test_generation_prompts_forbid_fabrication(): void
+    {
+        config(['services.anthropic.key' => 'sk-ant-test']);
+        Http::fake([
+            'api.anthropic.com/*' => Http::response([
+                'content' => [['type' => 'text', 'text' => json_encode([
+                    'title' => 'x', 'summary' => 'y', 'caption' => 'z',
+                    'slides' => [['title' => 's1', 'summary' => 'a'], ['title' => 's2', 'summary' => 'b']],
+                    'hashtags' => ['Mocambique'], 'cta' => 'w',
+                ])]],
+            ], 200),
+        ]);
+
+        $user = User::factory()->create();
+
+        // A âncora anti-invenção tem de ir nos 3 endpoints de geração.
+        $this->actingAs($user)->postJson('/api/ai/content-package', ['topic' => 'Só um título'])->assertOk();
+        $this->actingAs($user)->postJson('/api/ai/caption', ['topic' => 'Só um título'])->assertOk();
+        $this->actingAs($user)->postJson('/api/ai/carousel', ['topic' => 'Só um título', 'slides' => 2])->assertOk();
+
+        Http::assertSent(function ($request) {
+            $prompt = $request['messages'][0]['content'] ?? '';
+            return str_contains($prompt, 'ANCORAGEM NOS FACTOS')
+                && str_contains($prompt, 'proibido inventar');
+        });
+        // O system também carrega a regra de VERDADE (inquebrável).
+        Http::assertSent(fn ($r) => str_contains($r['system'] ?? '', 'NUNCA inventes factos'));
+    }
+
     public function test_content_package_story_uses_light_prompt(): void
     {
         config(['services.anthropic.key' => 'sk-ant-test']);

@@ -47,13 +47,14 @@ const MAHUNGU_CAPTION_OPENINGS = '🚨 ATENÇÃO: | 🚨 ÚLTIMA HORA: | 🔥 EM
 // Fórmula da LEGENDA (post): FACTO + CONTEXTO + IMPACTO + PERGUNTA + CTA.
 const MAHUNGU_CAPTION_RULES = `
 REGRAS DA LEGENDA (Manual Mahungu) — informar rápido, explicar contexto e gerar interação.
-Estrutura em parágrafos separados por uma linha em branco:
+Estrutura em parágrafos separados por uma linha em branco (usa SÓ os parágrafos que a FONTE permitir):
 1) Abra com UM destes marcadores (alterne): ${MAHUNGU_CAPTION_OPENINGS}
    seguido do FACTO principal numa frase curta.
-2) Explique o que aconteceu com os principais números, nomes ou decisões (2 a 4 linhas).
-3) Contexto: porquê aconteceu, quem está envolvido, qual o impacto e o que acontece a seguir (2 a 4 linhas).
+2) Explique o que aconteceu com os números, nomes ou decisões QUE ESTIVEREM NA FONTE (2 a 4 linhas).
+3) Contexto: porquê, quem está envolvido e impacto — SÓ com base na fonte (2 a 4 linhas).
 4) 💬 Uma pergunta que convide ao comentário/debate.
 5) 🔥 Siga a @mahungu_mz para mais notícias e tendências.
+NUNCA inventes números, nomes, datas nem "o que acontece a seguir". Se a fonte for curta, faz uma legenda mais curta e verdadeira (menos parágrafos), nunca preencher com suposições.
 Português de Moçambique. Tom claro e envolvente, nunca burocrático. Use \\n\\n entre parágrafos.
 NUNCA uses travessões (— ou –); usa vírgula, ponto ou dois pontos.
 `;
@@ -451,9 +452,11 @@ export const ai = {
             Você é o social media manager da Mahungu em Moçambique.
             ${MAHUNGU_LANGUAGE_RULE}
             ${this.brandDirectives()}
-            Um flyer já foi criado com este título: "${title}" (categoria: ${category}).
+            FONTE (única verdade — usa só isto): "${title}" (categoria: ${category}).
+            ${MAHUNGU_ANTI_FABRICATION}
 
             Escreva a legenda para publicar este flyer, seguindo a fórmula da Mahungu.
+            Atenção: se a fonte for só este título, faz uma legenda CURTA e verdadeira, sem inventar números, nomes nem contexto que não estejam aqui.
             ${MAHUNGU_CAPTION_RULES}
 
             Responda APENAS em formato JSON estrito, exatamente com estes campos:
@@ -483,10 +486,11 @@ export const ai = {
             ${this.brandDirectives()}
             Vou publicar um CARROSSEL no Instagram que junta estas ${items.length} notícias (cada uma é um slide):
             ${lista}
+            ${MAHUNGU_ANTI_FABRICATION}
 
             Escreva UMA legenda única que faça o RESUMO do conjunto (apanhado coeso, não slide a slide
             isolado). Começa com um gancho que abranja o tema comum (ex.: "Resumo do Mundial:") e refere
-            os destaques de cada slide de forma fluida.
+            os destaques de cada slide de forma fluida, SÓ com base nos títulos acima (não inventes detalhes).
             ${MAHUNGU_CAPTION_RULES}
 
             Responda APENAS em JSON estrito:
