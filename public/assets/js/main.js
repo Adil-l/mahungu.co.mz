@@ -4554,15 +4554,15 @@ function populateAISettings() {
     if (window.lucide) lucide.createIcons();
 }
 
-// Alterna os separadores da aba Perfil (Perfil | Configurações) sem abrir modal.
+// Alterna os separadores da aba Perfil (Perfil | Configurações | Backup) sem
+// abrir modal. Mostra o painel correspondente e esconde os restantes.
 function switchProfileTab(section) {
     document.querySelectorAll('#tab-profile .admin-tab-btn').forEach(b =>
         b.classList.toggle('active', b.dataset.profileTab === section));
-    const perfil = document.getElementById('profile-panel-perfil');
-    const config = document.getElementById('profile-panel-config');
-    if (perfil) perfil.classList.toggle('hidden', section !== 'perfil');
-    if (config) config.classList.toggle('hidden', section !== 'config');
+    document.querySelectorAll('#tab-profile .profile-panel').forEach(p =>
+        p.classList.toggle('hidden', p.id !== 'profile-panel-' + section));
     if (section === 'config') populateAISettings();
+    if (window.lucide) lucide.createIcons();
 }
 window.switchProfileTab = switchProfileTab;
 
@@ -4656,15 +4656,14 @@ async function testAIConnection() {
 // ║ FUNÇÕES DE BACKUP E RECUPERAÇÃO                                  ║
 // ╚═══════════════════════════════════════════════════════════════════╝
 
+// Backup é agora um separador da aba Perfil (não um modal).
 function openBackupModal() {
-    document.getElementById('backup-modal').classList.add('active');
-    lucide.createIcons();
+    const nav = document.querySelector('.main-nav .nav-item[data-tab="profile"]');
+    showTab('profile', nav);
+    switchProfileTab('backup');
 }
 
-function closeBackupModal(e) {
-    if (e && e.target !== e.currentTarget && e.type !== 'click') return;
-    document.getElementById('backup-modal').classList.remove('active');
-}
+function closeBackupModal() { switchProfileTab('perfil'); }
 
 async function downloadBackupFile() {
     try {

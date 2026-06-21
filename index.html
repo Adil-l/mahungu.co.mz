@@ -494,6 +494,7 @@
                 <div class="admin-tabs" style="margin-bottom: 24px;">
                     <button class="admin-tab-btn active" data-profile-tab="perfil" onclick="switchProfileTab('perfil')"><i data-lucide="user"></i> Perfil</button>
                     <button class="admin-tab-btn" data-profile-tab="config" onclick="switchProfileTab('config')"><i data-lucide="settings"></i> Configurações</button>
+                    <button class="admin-tab-btn" data-profile-tab="backup" onclick="switchProfileTab('backup')"><i data-lucide="database"></i> Backup</button>
                 </div>
 
                 <div id="profile-panel-perfil" class="profile-panel">
@@ -545,10 +546,6 @@
                                 <i data-lucide="lock-keyhole"></i>
                                 Alterar Senha
                             </button>
-                            <button class="btn-main" style="background: rgba(255, 152, 0, 0.1); color: #ffb347; border: 1px solid rgba(255, 152, 0, 0.3);" type="button" onclick="openBackupModal()">
-                                <i data-lucide="database"></i>
-                                Backup & Recuperação
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -556,11 +553,11 @@
 
                 <!-- Painel: Configurações (antigo modal de IA, agora inline) -->
                 <div id="profile-panel-config" class="profile-panel hidden">
-                    <div class="profile-form-panel" style="max-width: 820px;">
+                    <div class="settings-stack">
 
-                        <div class="form-group">
-                            <label>Provedores de IA — liga/desliga os que queres usar</label>
-                            <p style="font-size: 11px; color: var(--text-muted); margin: 2px 0 10px;">Desliga os que não queres. Para usar <strong>só um</strong>, desliga os restantes. O Claude é o pago (servidor); as "IA Gratuitas" não precisam de chave.</p>
+                        <section class="settings-section">
+                            <h3><i data-lucide="cpu"></i> Provedores de IA</h3>
+                            <p class="settings-hint">Liga/desliga os que queres. Para usar <strong>só um</strong>, desliga os restantes. O Claude é o pago (servidor); as "IA Gratuitas" não precisam de chave.</p>
                             <div class="ai-providers">
                                 <label class="ai-prov"><input type="checkbox" id="prov-claude"><span class="ai-prov-name">Claude</span><span class="ai-prov-tag tag-paid">paga · servidor</span></label>
                                 <label class="ai-prov"><input type="checkbox" id="prov-gemini"><span class="ai-prov-name">Google Gemini</span><span class="ai-prov-tag">precisa de chave</span></label>
@@ -568,65 +565,66 @@
                                 <label class="ai-prov"><input type="checkbox" id="prov-openrouter"><span class="ai-prov-name">OpenRouter</span><span class="ai-prov-tag">grátis/pago · chave</span></label>
                                 <label class="ai-prov"><input type="checkbox" id="prov-free"><span class="ai-prov-name">IA Gratuitas</span><span class="ai-prov-tag tag-free">llm7 + Pollinations · sem chave</span></label>
                             </div>
-                        </div>
+                        </section>
 
-                        <div class="form-group">
-                            <label>Quem faz o quê — permissões por tarefa</label>
-                            <p style="font-size: 11px; color: var(--text-muted); margin: 2px 0 10px;">Qualquer IA pode fazer qualquer função. Escolhe quem faz cada tarefa (ex.: Gemini a legenda, Claude o título). "Automático" usa a melhor disponível pela ordem dos provedores ligados.</p>
+                        <section class="settings-section">
+                            <h3><i data-lucide="sliders-horizontal"></i> Quem faz o quê</h3>
+                            <p class="settings-hint">Qualquer IA pode fazer qualquer função. Escolhe quem faz cada tarefa (ex.: Gemini a legenda, Claude o título). "Automático" usa a melhor disponível pela ordem dos provedores ligados.</p>
                             <div class="ai-tasks" id="ai-tasks-grid"><!-- selects preenchidos via JS --></div>
-                        </div>
+                        </section>
 
-                        <div class="form-group">
-                            <label>OpenAI API Key (recomendado)</label>
-                            <input type="password" id="ai-openai-key" placeholder="sk-... — provedor principal, sem limites das APIs gratuitas" style="width: 100%;">
-                            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">Com uma chave OpenAI, o modelo gpt-4o-mini passa a ser o provedor principal (mais fiável). <a href="https://platform.openai.com/api-keys" target="_blank" style="color: var(--primary); text-decoration: none;">Obtenha a sua chave aqui.</a></p>
-                        </div>
+                        <section class="settings-section">
+                            <h3><i data-lucide="key-round"></i> Chaves de API <span class="settings-tag">opcional</span></h3>
+                            <p class="settings-hint">Sem chaves, as IA gratuitas já funcionam. Adiciona uma chave para usar esse provedor.</p>
+                            <div class="settings-grid">
+                                <div class="form-group">
+                                    <label>OpenAI <a href="https://platform.openai.com/api-keys" target="_blank" class="settings-link">obter chave</a></label>
+                                    <input type="password" id="ai-openai-key" placeholder="sk-..." style="width: 100%;">
+                                </div>
+                                <div class="form-group">
+                                    <label>OpenRouter <a href="https://openrouter.ai/keys" target="_blank" class="settings-link">obter chave</a></label>
+                                    <input type="password" id="ai-openrouter-key" placeholder="sk-or-..." style="width: 100%;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Google Gemini <a href="https://aistudio.google.com/app/apikey" target="_blank" class="settings-link">obter chave</a></label>
+                                    <input type="password" id="ai-api-key" placeholder="Opcional" style="width: 100%;">
+                                </div>
+                            </div>
+                        </section>
 
-                        <div class="form-group">
-                            <label>OpenRouter API Key (opcional)</label>
-                            <input type="password" id="ai-openrouter-key" placeholder="sk-or-... — usa modelos grátis (gpt-oss-120b)" style="width: 100%;">
-                            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">Agregador com modelos grátis. <a href="https://openrouter.ai/keys" target="_blank" style="color: var(--primary); text-decoration: none;">Obtenha a sua chave aqui.</a></p>
-                        </div>
+                        <section class="settings-section">
+                            <h3><i data-lucide="newspaper"></i> Conteúdo &amp; Monitorização</h3>
+                            <div class="settings-grid">
+                                <div class="form-group">
+                                    <label>Intervalo de monitoramento (min)</label>
+                                    <input type="number" id="monitoring-interval" min="1" max="180" value="15" style="width: 100%;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Mostrar notícias dos últimos</label>
+                                    <select id="news-age-days" class="custom-select" style="width: 100%;">
+                                        <option value="2">2 dias</option>
+                                        <option value="3" selected>3 dias (recomendado)</option>
+                                        <option value="7">7 dias (1 semana)</option>
+                                        <option value="14">14 dias (2 semanas)</option>
+                                        <option value="30">30 dias (1 mês)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Voz da marca</label>
+                                    <input type="text" id="brand-voice" placeholder="Ex: jovem, com gírias de Maputo" style="width: 100%;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Público-alvo</label>
+                                    <input type="text" id="brand-audience" placeholder="Ex: jovens 18-35 anos" style="width: 100%;">
+                                </div>
+                                <div class="form-group settings-grid-full">
+                                    <label>Hashtags padrão</label>
+                                    <input type="text" id="brand-hashtags" placeholder="Ex: #Mahungu #Moçambique" style="width: 100%;">
+                                </div>
+                            </div>
+                        </section>
 
-                        <div class="form-group">
-                            <label>Google API Key (opcional)</label>
-                            <input type="password" id="ai-api-key" placeholder="Opcional — sem chave, usa IA gratuita integrada" style="width: 100%;">
-                            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">A IA gratuita já está ativa. Para usar o Gemini, <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--primary); text-decoration: none;">obtenha uma chave gratuita aqui.</a></p>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Intervalo de Monitoramento (minutos)</label>
-                            <input type="number" id="monitoring-interval" min="1" max="180" value="15" style="width: 100%;">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Mostrar notícias dos últimos</label>
-                            <select id="news-age-days" class="custom-select" style="width: 100%;">
-                                <option value="2">2 dias</option>
-                                <option value="3" selected>3 dias (recomendado)</option>
-                                <option value="7">7 dias (1 semana)</option>
-                                <option value="14">14 dias (2 semanas)</option>
-                                <option value="30">30 dias (1 mês)</option>
-                            </select>
-                            <p style="color: var(--text-muted); font-size: 11px; margin-top: 6px;">Notícias mais antigas só entram se forem virais (muitos comentários ou palavras-chave como "polémica", "viral").</p>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Voz da marca (opcional)</label>
-                            <input type="text" id="brand-voice" placeholder="Ex: jovem, descontraída, com gírias de Maputo" style="width: 100%;">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Público-alvo (opcional)</label>
-                            <input type="text" id="brand-audience" placeholder="Ex: jovens moçambicanos 18-35 anos" style="width: 100%;">
-                        </div>
-
-                        <div class="form-group">
-                            <label>Hashtags padrão (opcional)</label>
-                            <input type="text" id="brand-hashtags" placeholder="Ex: #Mahungu #Moçambique" style="width: 100%;">
-                        </div>
-
-                        <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+                        <div class="settings-actions">
                             <button class="btn-main" id="test-ai-btn" style="flex: 1; min-width: 160px; background: rgba(255,255,255,0.1);" onclick="testAIConnection()">
                                 <i data-lucide="plug-zap"></i> Testar Conexão
                             </button>
@@ -636,6 +634,42 @@
                         </div>
                     </div>
                 </div><!-- /profile-panel-config -->
+
+                <div id="profile-panel-backup" class="profile-panel hidden">
+                    <div class="settings-stack" style="max-width: 760px;">
+                        <div class="settings-note settings-note-warn">
+                            <i data-lucide="alert-circle"></i>
+                            Faz backup com regularidade para não perderes flyers, propostas e configurações.
+                        </div>
+
+                        <div class="settings-grid">
+                            <section class="settings-section">
+                                <h3><i data-lucide="download"></i> Exportar</h3>
+                                <p class="settings-hint">Descarrega um ficheiro JSON com todos os teus dados. Guarda-o em local seguro.</p>
+                                <button class="btn-main btn-success" style="width: 100%;" onclick="downloadBackupFile()">
+                                    <i data-lucide="download"></i> Fazer download do backup
+                                </button>
+                            </section>
+
+                            <section class="settings-section">
+                                <h3><i data-lucide="upload"></i> Restaurar</h3>
+                                <p class="settings-hint">Carrega um .json de backup. Isto substitui os dados atuais.</p>
+                                <input type="file" id="backup-file-input" accept=".json" style="display: none;" onchange="handleBackupFileUpload(event)">
+                                <button class="btn-main" style="width: 100%; background: rgba(112, 0, 255, 0.1); color: #b78cff;" onclick="triggerBackupFileInput()">
+                                    <i data-lucide="upload"></i> Carregar ficheiro
+                                </button>
+                            </section>
+                        </div>
+
+                        <section class="settings-section settings-section-danger">
+                            <h3><i data-lucide="trash-2"></i> Zona de perigo</h3>
+                            <p class="settings-hint">⚠️ Esta ação é irreversível. Faz backup antes de continuar.</p>
+                            <button class="btn-main" style="background: rgba(255, 68, 68, 0.1); color: #ff4444;" onclick="clearAllDataConfirm()">
+                                <i data-lucide="trash-2"></i> Limpar todos os dados
+                            </button>
+                        </section>
+                    </div>
+                </div><!-- /profile-panel-backup -->
             </div>
         </div>
     </section>
@@ -1086,54 +1120,7 @@
 </div>
 
 <!-- MODAL DE BACKUP E RESTORE -->
-<div class="modal-overlay" id="backup-modal" onclick="closeBackupModal(event)">
-    <div class="modal-container modal-form" style="max-width: 450px; height: auto; min-height: 0; padding: 40px; flex-direction: column;" onclick="event.stopPropagation()">
-        <div class="modal-header" style="margin-bottom: 25px;">
-            <div>
-                <div class="modal-eyebrow">Proteção de Dados</div>
-                <h2 style="color: #fff; font-size: 20px;">Backup e Recuperação</h2>
-            </div>
-            <button class="close-modal" onclick="closeBackupModal()"><i data-lucide="x"></i></button>
-        </div>
-        
-        <div style="background: rgba(255, 152, 0, 0.05); border: 1px solid rgba(255, 152, 0, 0.2); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
-            <p style="font-size: 13px; color: #ffb347; line-height: 1.5;">
-                <i data-lucide="alert-circle" size="14" style="display: inline; vertical-align: middle; margin-right: 8px;"></i>
-                Faça backup regularmente para não perder seus flyers, propostas e configurações.
-            </p>
-        </div>
-
-        <div style="margin-bottom: 30px;">
-            <h3 style="font-size: 14px; color: var(--text-muted); margin-bottom: 12px; font-weight: 700;">Exportar Dados</h3>
-            <button class="btn-main btn-success" style="width: 100%;" onclick="downloadBackupFile()">
-                <i data-lucide="download"></i> Fazer Download do Backup
-            </button>
-            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
-                Um arquivo JSON com todos os seus dados será baixado. Guarde em local seguro.
-            </p>
-        </div>
-
-        <div style="border-top: 1px solid var(--glass-border); padding-top: 20px;">
-            <h3 style="font-size: 14px; color: var(--text-muted); margin-bottom: 12px; font-weight: 700;">Restaurar Dados</h3>
-            <input type="file" id="backup-file-input" accept=".json" style="display: none;" onchange="handleBackupFileUpload(event)">
-            <button class="btn-main" style="width: 100%; background: rgba(112, 0, 255, 0.1); color: #b78cff;" onclick="triggerBackupFileInput()">
-                <i data-lucide="upload"></i> Carregar Arquivo de Backup
-            </button>
-            <p style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
-                Selecione um arquivo de backup .json para restaurar seus dados. Isto substituirá os dados atuais.
-            </p>
-        </div>
-
-        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border);">
-            <button class="btn-main" style="width: 100%; background: rgba(255, 68, 68, 0.1); color: #ff4444;" onclick="clearAllDataConfirm()">
-                <i data-lucide="trash-2"></i> Limpar Todos os Dados
-            </button>
-            <p style="font-size: 11px; color: #ff6666; margin-top: 8px;">
-                ⚠️ Esta ação é irreversível. Faça backup antes de continuar.
-            </p>
-        </div>
-    </div>
-</div>
+<!-- (Backup & Recuperação passou para o separador "Backup" na aba Perfil.) -->
 
 <!-- MODAL DE CONTEÚDO DE ENGAJAMENTO -->
 <div class="modal-overlay" id="engagement-modal" onclick="closeEngagementModal(event)">
