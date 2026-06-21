@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\AiController;
+use App\Http\Controllers\ArticleExtractController;
 use App\Http\Controllers\FlyerController;
 use App\Http\Controllers\HashtagController;
 use App\Http\Controllers\ImageSearchController;
@@ -66,6 +67,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/ai/caption', [AiController::class, 'caption']);
     // Carrossel de N slides numa única chamada (slide 1 = gancho, restantes desenvolvem).
     Route::post('/ai/carousel', [AiController::class, 'carousel']);
+    // Extrai o texto do artigo completo (ancora a IA nos factos reais → anti fake news).
+    Route::get('/article-extract', ArticleExtractController::class);
 
     // Sugestões de agendamento (horários ótimos + cadência p/ página de notícias).
     Route::get('/scheduling/suggestions', [SchedulingController::class, 'suggestions']);

@@ -377,9 +377,9 @@ export const ai = {
     },
 
     async generateContent(newsItem) {
-        // Usa o texto-fonte completo (sourceText) para ancorar a IA; cai para o
-        // resumo curto se a proposta for antiga e não tiver sourceText.
-        const sourceText = String(newsItem.sourceText || newsItem.summary || '').trim();
+        // Usa o ARTIGO COMPLETO (articleText, obtido do link) para ancorar a IA;
+        // cai para o sourceText do RSS e depois para o resumo curto.
+        const sourceText = String(newsItem.articleText || newsItem.sourceText || newsItem.summary || '').trim();
         // Fonte curta (típico em posts do Instagram): não há matéria para 5 parágrafos
         // sem inventar. Faz-se uma ADAPTAÇÃO LEVE que mantém ~80% do original.
         const SHORT_SOURCE_CHARS = 280;

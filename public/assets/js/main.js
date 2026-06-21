@@ -4321,8 +4321,36 @@ async function ensureProposalImage(proposal) {
 // para poupar tokens). Ancorar nos factos reais evita que a IA invente.
 function buildProposalTopic(p) {
     const title = (p.generatedTitle || p.title || '').trim();
-    const body = String(p.sourceText || p.summary || '').trim().slice(0, 1500);
+    // Prefere o texto do artigo completo (articleText) quando já foi obtido —
+    // dá à IA os FACTOS REAIS (placar, nomes, contexto) em vez do teaser do RSS,
+    // que era o que levava a IA a inventar. Cai para sourceText/summary.
+    const body = String(p.articleText || p.sourceText || p.summary || '').trim().slice(0, 3500);
     return [title, body].filter(Boolean).join('\n\n') || title || 'Notícia de Moçambique';
+}
+
+// Vai buscar o ARTIGO COMPLETO ao link da proposta (server-side, anti-SSRF) e
+// guarda-o em p.articleText (cache). Os feeds RSS muitas vezes só trazem 1 frase;
+// sem o corpo, a IA inventava factos para encher. Só corre quando o texto que
+// temos é curto e há URL. Falha em silêncio (mantém o que havia) — nunca bloqueia
+// a geração. Devolve true se enriqueceu.
+async function ensureArticleText(p) {
+    if (!p || p.articleText) return !!p?.articleText;        // já temos (cache)
+    const url = (p.sourceUrl || '').trim();
+    const have = String(p.sourceText || p.summary || '').trim();
+    if (!/^https?:\/\//i.test(url) || have.length >= 600) return false; // já é rico ou sem URL
+    try {
+        const res = await fetch(`/api/article-extract?url=${encodeURIComponent(url)}`, {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin'
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data && data.ok && data.text && data.text.length > have.length) {
+            p.articleText = data.text;
+            try { await storage.saveProposal(p); } catch (e) {}
+            return true;
+        }
+    } catch (e) { /* fonte indisponível/bloqueada — segue com o que há */ }
+    return false;
 }
 
 // Gera a partir de uma Proposta de IA JÁ no formato escolhido e abre no editor,
@@ -4360,6 +4388,13 @@ async function generateProposalAs(id, format) {
     await editProposalInEditor(id);
     if (activeSlideIndex >= 0) exitCarousel(); // limpa qualquer carrossel anterior
 
+    // ANCORAGEM: tenta ler o artigo completo (o RSS muitas vezes só dá 1 frase →
+    // a IA inventava). Se conseguir, a geração usa os factos reais.
+    if (!proposal.articleText && /^https?:\/\//i.test(proposal.sourceUrl || '')) {
+        ui.showToast('A ler o artigo completo para não inventar factos…', 'info');
+        await ensureArticleText(proposal);
+    }
+
     const topic = buildProposalTopic(proposal);
 
     if (format === 'carousel') {
@@ -4394,6 +4429,7 @@ async function generateProposalContent(id) {
 
     ui.showToast('A gerar proposta com IA... ✨', 'info');
     try {
+        await ensureArticleText(proposal); // lê o artigo completo p/ não inventar
         const result = await ai.generateContent(proposal);
         applyGenerationToProposal(proposal, result);
         await ensureProposalImage(proposal);
@@ -4515,6 +4551,7 @@ async function regenerateProposal(id) {
     }
 
     try {
+        await ensureArticleText(proposal); // lê o artigo completo p/ não inventar
         const result = await ai.generateContent(proposal);
         applyGenerationToProposal(proposal, result);
         await storage.saveProposal(proposal);
