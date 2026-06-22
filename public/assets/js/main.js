@@ -1900,7 +1900,7 @@ async function generateHashtags() {
         const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-            ui.showToast(data.message || 'Não foi possível gerar hashtags.', data.needs_subscription ? 'info' : 'error');
+            ui.showToast(aiErrorMessage(response, data, 'Não foi possível gerar hashtags.'), data.needs_subscription ? 'info' : 'error');
             return;
         }
 
@@ -2633,6 +2633,17 @@ function apiHeaders() {
         'Accept': 'application/json',
         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
     };
+}
+
+// Mensagem de erro para uma resposta !ok de um endpoint de IA. Trata primeiro
+// os casos de framework (sessão/CSRF expirados → 419/401), que o Laravel
+// devolve em `message` (não `error`) e que antes caíam no fallback enganador
+// "a IA tem chave/créditos?". Caso contrário usa o erro do controller.
+function aiErrorMessage(res, data, fallback) {
+    if (res.status === 419 || res.status === 401) {
+        return 'Sessão expirada. Atualiza a página (e entra de novo) para gerar.';
+    }
+    return (data && (data.error || data.message)) || fallback;
 }
 
 async function saveProfileData() {
@@ -3549,7 +3560,7 @@ async function generateContentPackage(topicArg) {
             });
             data = await res.json().catch(() => ({}));
             if (!res.ok) {
-                return ui.showToast(data.error || 'Não foi possível gerar (a IA tem chave/créditos no servidor?).', 'error');
+                return ui.showToast(aiErrorMessage(res, data, 'Não foi possível gerar (a IA tem chave/créditos no servidor?).'), 'error');
             }
             // Se a IA não devolveu JSON limpo, o backend manda {raw, warning}.
             if (!data.title && data.raw) {
@@ -3628,7 +3639,7 @@ async function regenerateCaption() {
                 body: JSON.stringify({ topic })
             });
             data = await res.json().catch(() => ({}));
-            if (!res.ok) return ui.showToast(data.error || 'Não foi possível gerar a legenda.', 'error');
+            if (!res.ok) return ui.showToast(aiErrorMessage(res, data, 'Não foi possível gerar a legenda.'), 'error');
             ai.lastProvider = 'Claude';
         } else {
             data = await ai.generateCaption(topic); // IA atribuída à tarefa 'legenda'
@@ -3679,7 +3690,7 @@ async function generateCarousel(topicArg, slidesArg, includeFirst) {
                 body: JSON.stringify({ topic: baseTitle, slides: n })
             });
             data = await res.json().catch(() => ({}));
-            if (!res.ok) return ui.showToast(data.error || 'Não foi possível gerar o carrossel.', 'error');
+            if (!res.ok) return ui.showToast(aiErrorMessage(res, data, 'Não foi possível gerar o carrossel.'), 'error');
             ai.lastProvider = 'Claude';
         } else {
             data = await ai.generateCarouselSlides(baseTitle, n); // IA atribuída à tarefa 'carrossel'
