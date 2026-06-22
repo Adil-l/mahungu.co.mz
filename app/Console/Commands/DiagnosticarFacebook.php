@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 class DiagnosticarFacebook extends Command
 {
     protected $signature = 'mahungu:fb-diag {--user= : ID do utilizador cuja conta Facebook ligada será testada}
+                                            {--connected : Diagnostica a conta OAuth de Facebook ligada mais recente (qualquer utilizador)}
                                             {--token= : Testar diretamente este access_token (ignora a conta ligada)}
                                             {--page= : Diagnosticar esta Página por ID diretamente (útil quando me/accounts vem vazio, ex.: token de Utilizador de Sistema)}
                                             {--post-test : Publica um post de teste na Página e mostra a resposta crua do Facebook}';
@@ -20,8 +21,8 @@ class DiagnosticarFacebook extends Command
         $token = $this->option('token');
 
         // Por omissão, diagnostica o token que REALMENTE publica (FACEBOOK_PAGE_TOKEN),
-        // a menos que se peça uma conta OAuth específica via --user.
-        if (!$token && !$this->option('user')) {
+        // a menos que se peça uma conta OAuth via --user ou --connected.
+        if (!$token && !$this->option('user') && !$this->option('connected')) {
             $token = config('services.facebook.page_token');
             if ($token) {
                 $this->line('A usar FACEBOOK_PAGE_TOKEN (token fixo de publicação — o mesmo que o agendador usa).');
