@@ -28,6 +28,11 @@ return [
         // business_management é necessário para que Páginas que pertencem a um
         // Portefólio de negócios (Business) apareçam em /me/accounts.
         'scopes' => env('FACEBOOK_SCOPES', 'public_profile,pages_show_list,pages_manage_posts,pages_read_engagement,business_management'),
+        // "Facebook Login for Business": o ID da Configuration criada no painel
+        // (Facebook Login for Business > Configurations). Quando definido, o login
+        // passa config_id (são as permissões da configuração que valem) em vez de
+        // scope. Sem ele, mantém-se o fluxo clássico baseado em scope.
+        'config_id' => env('FACEBOOK_CONFIG_ID'),
         // Publicação na Página da marca com token fixo (Utilizador de Sistema ou
         // token de Página), à semelhança do X. Evita o OAuth por utilizador e o
         // problema de Páginas de negócio não aparecerem no me/accounts.
@@ -43,6 +48,8 @@ return [
         'client_secret' => env('INSTAGRAM_CLIENT_SECRET') ?: env('FACEBOOK_CLIENT_SECRET'),
         // Publicar no IG exige conta IG Business ligada a uma Página + estas permissões.
         'scopes' => env('INSTAGRAM_SCOPES', 'public_profile,pages_show_list,instagram_basic,instagram_content_publish,business_management'),
+        // Mesma Configuration do Facebook por omissão (uma só cobre Páginas + IG).
+        'config_id' => env('INSTAGRAM_CONFIG_ID') ?: env('FACEBOOK_CONFIG_ID'),
     ],
     'tiktok' => [
         'client_id' => env('TIKTOK_CLIENT_ID'),

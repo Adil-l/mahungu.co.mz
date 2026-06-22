@@ -136,17 +136,26 @@ A Mahungu **não tem auto-registo** (as contas são criadas pelo admin). Por iss
 
 ---
 
-## 5. ⚠️ Cuidado importante (causa comum de reprovação)
+## 5. ✅ Publicação com o token do utilizador (RESOLVIDO no código)
 
-Em produção, a Mahungu publica na Página/IG **da marca** via **token de Utilizador de
-Sistema fixo** (`FACEBOOK_PAGE_TOKEN`). Mas a App Review exige que o revisor veja as
-**permissões que ELE concedeu** a serem usadas **na conta dele**. Se a app só publicar na
-Página da marca, a Meta reprova com "não conseguimos ver a permissão a ser usada".
+> Era a causa comum de reprovação: a App Review exige que o revisor veja as
+> **permissões que ELE concedeu** a serem usadas **na conta dele**. Se a app só
+> publicasse na Página da marca (via `FACEBOOK_PAGE_TOKEN`), a Meta reprovava com
+> "não conseguimos ver a permissão a ser usada".
 
-**Para passar:** garante que, para a conta do revisor, o fluxo usa o **token OAuth do
-utilizador** guardado em `social_accounts` (publicar na Página/IG que o revisor ligou),
-e não exclusivamente o `FACEBOOK_PAGE_TOKEN` da marca. Ou seja, o `PostToSocialMedia`
-deve conseguir publicar com o token do utilizador ligado. Demonstra isso no screencast.
+O `PostToSocialMedia` agora **prefere SEMPRE a conta OAuth ligada pelo utilizador**
+(linha em `handle()`): se o autor do post tem uma `SocialAccount` válida para a
+plataforma, publica com o token DELE (na Página/IG que ele ligou). Só quando **não há
+conta ligada** (o caso do agendador da marca) é que recorre ao `FACEBOOK_PAGE_TOKEN`.
+
+Implicação prática: para o revisor, basta ligar a conta dele (Perfil → Ligar Facebook /
+Instagram) e publicar — sai na Página/IG dele e a Meta vê as permissões em uso.
+⚠️ Em produção, os admins **não devem ligar contas pessoais** (senão os posts sairiam na
+página pessoal, não na da marca) — quem publica em nome da marca confia no token fixo.
+
+**Login for Business:** o login passa `config_id` (a Configuration criada no painel) via
+`FACEBOOK_CONFIG_ID` no `.env` — sem ele, as permissões certas não são pedidas. Preenche
+essa variável com o *Configuration ID* antes de testar/gravar o screencast.
 
 ---
 

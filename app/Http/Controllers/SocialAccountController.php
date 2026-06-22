@@ -58,13 +58,7 @@ class SocialAccountController extends Controller
         }
 
         $redirectUrl = match ($platform) {
-            'facebook', 'instagram' => 'https://www.facebook.com/v19.0/dialog/oauth?' . http_build_query([
-                'client_id' => config("services.$platform.client_id"),
-                'redirect_uri' => route('social.callback', $platform),
-                'state' => Auth::id(),
-                'response_type' => 'code',
-                'scope' => config("services.$platform.scopes"),
-            ]),
+            'facebook', 'instagram' => $this->metaDialogUrl($platform),
             'tiktok' => 'https://www.tiktok.com/v2/auth/authorize/?' . http_build_query([
                 'client_key' => config('services.tiktok.client_id'),
                 'redirect_uri' => route('social.callback', $platform),
@@ -82,6 +76,30 @@ class SocialAccountController extends Controller
         };
 
         return response()->json(['redirect_url' => $redirectUrl]);
+    }
+
+    /**
+     * Constrói a URL do diálogo OAuth da Meta (Facebook/Instagram).
+     * Se houver uma Configuration definida (config_id), usa "Facebook Login for
+     * Business" — passa config_id, e são as permissões dessa configuração que
+     * valem. Sem config_id, mantém o fluxo clássico baseado em scope.
+     */
+    private function metaDialogUrl(string $platform): string
+    {
+        $params = [
+            'client_id' => config("services.$platform.client_id"),
+            'redirect_uri' => route('social.callback', $platform),
+            'state' => Auth::id(),
+            'response_type' => 'code',
+        ];
+
+        if ($configId = config("services.$platform.config_id")) {
+            $params['config_id'] = $configId;
+        } else {
+            $params['scope'] = config("services.$platform.scopes");
+        }
+
+        return 'https://www.facebook.com/v19.0/dialog/oauth?' . http_build_query($params);
     }
 
     /**

@@ -61,37 +61,36 @@ class PostToSocialMedia implements ShouldQueue
                     continue;
                 }
 
-                // Facebook com token fixo (Utilizador de Sistema/Página) no .env:
-                // publica na Página da marca sem depender da ligação OAuth por
-                // utilizador. É o caminho fiável para Páginas de um negócio.
-                if ($platform === 'facebook' && config('services.facebook.page_token')) {
-                    $this->postToFacebookPage();
-                    $successCount++;
-                    continue;
-                }
-
-                // Instagram com o mesmo token fixo: a conta IG Business está ligada
-                // à Página, e o token de sistema tem instagram_content_publish.
-                if ($platform === 'instagram' && config('services.facebook.page_token')) {
-                    $this->postToInstagramViaToken();
-                    $successCount++;
-                    continue;
-                }
-
+                // Preferir SEMPRE a conta ligada pelo utilizador (token OAuth) quando
+                // existe e é válida — publica na Página/IG que ESSE utilizador ligou.
+                // É essencial para a App Review da Meta: o revisor liga a SUA conta e
+                // tem de ver as permissões a serem usadas nela. Só quando não há conta
+                // ligada válida (caso típico do agendador da marca) é que se recorre ao
+                // token fixo (FACEBOOK_PAGE_TOKEN) para publicar na Página/IG da marca.
                 $account = SocialAccount::where('user_id', $this->scheduledPost->user_id)
                     ->where('platform', $platform)
                     ->first();
+
+                if ($account && !$account->isExpired()) {
+                    $this->postToPlatform($platform, $account);
+                    $successCount++;
+                    continue;
+                }
+
+                // Sem conta válida do utilizador: token fixo da marca (Página/IG).
+                if (in_array($platform, ['facebook', 'instagram'], true) && config('services.facebook.page_token')) {
+                    $platform === 'facebook'
+                        ? $this->postToFacebookPage()
+                        : $this->postToInstagramViaToken();
+                    $successCount++;
+                    continue;
+                }
 
                 if (!$account) {
                     throw new \Exception("Conta do $platform não conectada.");
                 }
 
-                if ($account->isExpired()) {
-                    throw new \Exception("Token do $platform expirado. Reconecte a conta.");
-                }
-
-                $this->postToPlatform($platform, $account);
-                $successCount++;
+                throw new \Exception("Token do $platform expirado. Reconecte a conta.");
             } catch (\Exception $e) {
                 $errors[$platform] = $e->getMessage();
                 Log::error("Erro ao postar no $platform: " . $e->getMessage());
@@ -506,8 +505,19 @@ class PostToSocialMedia implements ShouldQueue
             throw new \Exception('Esta Página não tem uma conta Instagram Business ligada.');
         }
 
+        $disk = Storage::disk(config('filesystems.media_disk'));
+
+        // Carrossel: slide 1 = media_path, slides 2..N = carousel_paths (igual ao
+        // caminho do token fixo, para o comportamento ser o mesmo nas duas vias).
+        if ($this->scheduledPost->media_type === 'carousel' && !empty($this->scheduledPost->carousel_paths)) {
+            $urls = array_map(fn ($p) => $disk->url($p), array_merge([$mediaPath], $this->scheduledPost->carousel_paths));
+            $this->postIds['instagram'] = $this->publishInstagramCarousel($igId, $urls, $content, $pageToken);
+            Log::info("Publicado no Instagram (conta {$igId}) para o utilizador {$account->user_id} [CAROUSEL].");
+            return true;
+        }
+
         // 3) URL público da imagem (o IG vai buscá-la; não aceita upload de bytes).
-        $imageUrl = Storage::disk(config('filesystems.media_disk'))->url($mediaPath);
+        $imageUrl = $disk->url($mediaPath);
 
         // 4-5) Cria o container, espera o IG processar a imagem e publica.
         $igMediaType = ($this->scheduledPost->media_type === 'story') ? 'STORIES' : 'IMAGE';
