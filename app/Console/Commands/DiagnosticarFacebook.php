@@ -57,6 +57,24 @@ class DiagnosticarFacebook extends Command
         }
         $this->info("Token OK — utilizador Facebook: {$me['name']} (id {$me['id']}).");
 
+        // 1b) debug_token: diz QUANDO o token foi emitido (issued_at) — serve para
+        // saber se a reconexão gerou um token FRESCO ou se ficou o antigo — e a que
+        // app pertence. Precisa de um app access token (app_id|app_secret).
+        $appId = config('services.facebook.client_id');
+        $appSecret = config('services.facebook.client_secret');
+        if ($appId && $appSecret) {
+            $dbg = Http::get('https://graph.facebook.com/v19.0/debug_token', [
+                'input_token' => $token,
+                'access_token' => $appId . '|' . $appSecret,
+            ])->json('data', []);
+            if ($dbg) {
+                $issued = !empty($dbg['issued_at']) ? date('Y-m-d H:i:s', $dbg['issued_at']) . ' UTC' : 'n/d';
+                $app = $dbg['application'] ?? '?';
+                $appOk = ((string) ($dbg['app_id'] ?? '')) === (string) $appId ? 'OK (esta app)' : "OUTRA APP! ({$dbg['app_id']})";
+                $this->line("Token emitido em: {$issued} | app: {$app} [{$appOk}] | tipo: " . ($dbg['type'] ?? '?'));
+            }
+        }
+
         // 2) Que permissões foram realmente concedidas vs. recusadas
         $perms = Http::get('https://graph.facebook.com/v19.0/me/permissions', [
             'access_token' => $token,
