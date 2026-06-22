@@ -6,7 +6,6 @@ use App\Models\ActivityLog;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 class AdminController extends Controller
@@ -34,12 +33,15 @@ class AdminController extends Controller
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
-            'is_admin' => (bool) ($data['is_admin'] ?? false),
             'password' => Hash::make($data['password']),
             'email_verified_at' => now(),
             'theme' => 'dark',
             'monitoring_interval' => 15,
         ]);
+        // 'is_admin' não é mass-assignable (ver User::$fillable): define-se aqui,
+        // explicitamente, já dentro da zona protegida pelo middleware 'admin'.
+        $user->is_admin = (bool) ($data['is_admin'] ?? false);
+        $user->save();
 
         ActivityLog::record('user.created', "Criou o utilizador {$user->email}");
 

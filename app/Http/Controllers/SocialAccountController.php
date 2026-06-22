@@ -57,19 +57,24 @@ class SocialAccountController extends Controller
             ], 422);
         }
 
+        // 'state' aleatório guardado na sessão (anti-CSRF de OAuth): impede que um
+        // atacante injete o SEU 'code' no callback da vítima e ligue a conta errada.
+        $state = bin2hex(random_bytes(16));
+        $request->session()->put("oauth_state.$platform", $state);
+
         $redirectUrl = match ($platform) {
-            'facebook', 'instagram' => $this->metaDialogUrl($platform),
+            'facebook', 'instagram' => $this->metaDialogUrl($platform, $state),
             'tiktok' => 'https://www.tiktok.com/v2/auth/authorize/?' . http_build_query([
                 'client_key' => config('services.tiktok.client_id'),
                 'redirect_uri' => route('social.callback', $platform),
-                'state' => Auth::id(),
+                'state' => $state,
                 'scope' => config('services.tiktok.scopes'),
                 'response_type' => 'code',
             ]),
             'threads' => 'https://threads.net/oauth/authorize?' . http_build_query([
                 'client_id' => config('services.threads.client_id'),
                 'redirect_uri' => route('social.callback', $platform),
-                'state' => Auth::id(),
+                'state' => $state,
                 'scope' => config('services.threads.scopes'),
                 'response_type' => 'code',
             ]),
@@ -84,12 +89,12 @@ class SocialAccountController extends Controller
      * Business" — passa config_id, e são as permissões dessa configuração que
      * valem. Sem config_id, mantém o fluxo clássico baseado em scope.
      */
-    private function metaDialogUrl(string $platform): string
+    private function metaDialogUrl(string $platform, string $state): string
     {
         $params = [
             'client_id' => config("services.$platform.client_id"),
             'redirect_uri' => route('social.callback', $platform),
-            'state' => Auth::id(),
+            'state' => $state,
             'response_type' => 'code',
         ];
 
@@ -111,6 +116,13 @@ class SocialAccountController extends Controller
         // O utilizador cancelou ou o provedor devolveu erro.
         if ($request->filled('error') || !$request->filled('code')) {
             return $this->backToApp($platform, false, $request->input('error_description', 'Autorização cancelada.'));
+        }
+
+        // Valida o 'state' contra o que guardámos na sessão (anti-CSRF de OAuth).
+        // pull() consome-o (uso único); sem correspondência exata → recusa.
+        $expectedState = $request->session()->pull("oauth_state.$platform");
+        if (! $expectedState || ! hash_equals($expectedState, (string) $request->input('state'))) {
+            return $this->backToApp($platform, false, 'Sessão de autorização inválida ou expirada. Tenta ligar de novo.');
         }
 
         try {

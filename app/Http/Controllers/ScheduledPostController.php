@@ -159,11 +159,23 @@ class ScheduledPostController extends Controller
      */
     private function storeRemoteImage(string $url): ?string
     {
-        if (! $this->isPublicHttpUrl($url)) {
+        $ips = $this->resolveSafeIps($url);
+        if (empty($ips)) {
             return null;
         }
+        $parts = parse_url($url);
+        $host = $parts['host'] ?? '';
+        $port = $parts['port'] ?? (strtolower($parts['scheme'] ?? '') === 'https' ? 443 : 80);
         try {
-            $res = Http::timeout(15)->get($url);
+            // FIXA a ligação ao(s) IP(s) já validado(s) (CURLOPT_RESOLVE → fecha a
+            // janela de DNS rebinding) e DESATIVA redirects (um redirect poderia
+            // apontar para um host interno sem ser revalidado). Falha fechada.
+            $res = Http::timeout(15)
+                ->withOptions([
+                    'allow_redirects' => false,
+                    'curl' => [CURLOPT_RESOLVE => ["{$host}:{$port}:" . implode(',', $ips)]],
+                ])
+                ->get($url);
         } catch (\Throwable $e) {
             return null;
         }
@@ -202,26 +214,45 @@ class ScheduledPostController extends Controller
         return $path;
     }
 
-    /** Só http/https que resolva exclusivamente para IP(s) público(s) — anti-SSRF. */
-    private function isPublicHttpUrl(string $url): bool
+    /**
+     * Devolve os IP(s) PÚBLICOS (IPv4 + IPv6) a que o URL resolve, ou [] se for
+     * inseguro (esquema não http/https, host vazio, não resolve, ou QUALQUER IP
+     * privado/reservado — incl. 169.254.169.254 de metadados da cloud). Os IPs
+     * devolvidos servem para FIXAR a ligação curl (anti-SSRF / anti-rebinding).
+     */
+    private function resolveSafeIps(string $url): array
     {
         $parts = parse_url($url);
         $scheme = strtolower($parts['scheme'] ?? '');
         $host = $parts['host'] ?? '';
         if (! in_array($scheme, ['http', 'https'], true) || $host === '') {
-            return false;
+            return [];
         }
-        $ips = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : (@gethostbynamel($host) ?: []);
+
+        $ips = [];
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            $ips[] = $host;
+        } else {
+            foreach (@gethostbynamel($host) ?: [] as $ip) {
+                $ips[] = $ip;
+            }
+            foreach (@dns_get_record($host, DNS_AAAA) ?: [] as $r) {
+                if (! empty($r['ipv6'])) {
+                    $ips[] = $r['ipv6'];
+                }
+            }
+        }
         if (empty($ips)) {
-            return false;
+            return []; // não resolve → recusa (evita truques de DNS)
         }
+
         foreach ($ips as $ip) {
             if (! filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
-                return false;
+                return [];
             }
         }
 
-        return true;
+        return array_values(array_unique($ips));
     }
 
     public function show(ScheduledPost $scheduledPost)

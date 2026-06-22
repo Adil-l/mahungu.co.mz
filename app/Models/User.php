@@ -12,10 +12,12 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
+    // NOTA: 'is_admin' é DELIBERADAMENTE omitido do $fillable — não pode ser
+    // atribuído em massa (ex.: via /api/user/profile). Define-se explicitamente
+    // apenas no AdminController (atrás do middleware 'admin'), nunca por request.
     protected $fillable = [
         'name',
         'email',
-        'is_admin',
         'password',
         'phone',
         'avatar_url',

@@ -68,19 +68,23 @@ Route::middleware(['auth'])->group(function () {
 
     Route::apiResource('flyers', FlyerController::class);
     Route::apiResource('proposals', ProposalController::class);
-    Route::post('/proposals/clear', [ProposalController::class, 'clear']);
+    // Operação destrutiva (apaga TODAS as propostas): restrita a admin.
+    Route::post('/proposals/clear', [ProposalController::class, 'clear'])->middleware('admin');
     Route::apiResource('sources', NewsSourceController::class);
 
-    // Geração de texto editorial por IA (proxy Claude — chave no servidor).
-    Route::post('/ai/generate', [AiController::class, 'generate']);
-    // Reescreve qualquer texto na voz da Mahungu (content-humanizer).
-    Route::post('/ai/humanize', [AiController::class, 'humanize']);
-    // Pacote completo a partir de um tema: headline + legenda + hashtags + CTA + variantes.
-    Route::post('/ai/content-package', [AiController::class, 'package']);
-    // Só a legenda (variações sem regerar o título).
-    Route::post('/ai/caption', [AiController::class, 'caption']);
-    // Carrossel de N slides numa única chamada (slide 1 = gancho, restantes desenvolvem).
-    Route::post('/ai/carousel', [AiController::class, 'carousel']);
+    // Endpoints de IA (proxy Claude → gastam créditos): limite apertado (15/min/user).
+    Route::middleware('throttle:ai')->group(function () {
+        // Geração de texto editorial por IA (proxy Claude — chave no servidor).
+        Route::post('/ai/generate', [AiController::class, 'generate']);
+        // Reescreve qualquer texto na voz da Mahungu (content-humanizer).
+        Route::post('/ai/humanize', [AiController::class, 'humanize']);
+        // Pacote completo a partir de um tema: headline + legenda + hashtags + CTA + variantes.
+        Route::post('/ai/content-package', [AiController::class, 'package']);
+        // Só a legenda (variações sem regerar o título).
+        Route::post('/ai/caption', [AiController::class, 'caption']);
+        // Carrossel de N slides numa única chamada (slide 1 = gancho, restantes desenvolvem).
+        Route::post('/ai/carousel', [AiController::class, 'carousel']);
+    });
     // Extrai o texto do artigo completo (ancora a IA nos factos reais → anti fake news).
     Route::get('/article-extract', ArticleExtractController::class);
 

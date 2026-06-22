@@ -31,7 +31,10 @@ class RouteServiceProvider extends ServiceProvider
             // já que o SPA é da mesma origem e autentica por sessão. Evita o
             // fluxo "stateful" do Sanctum (cuja config aqui aponta para
             // middleware inexistente) e usa o mesmo mecanismo do login.
-            Route::middleware('web')
+            // 'throttle:api' aplica o rate limiter definido abaixo (60/min) — sem
+            // isto, como carregamos a API no grupo 'web' (que não tem throttle),
+            // os endpoints ficavam SEM limite (risco de cost-DoS no /api/ai/*).
+            Route::middleware(['web', 'throttle:api'])
                 ->prefix('api')
                 ->group(base_path('routes/api.php'));
 
@@ -47,6 +50,12 @@ class RouteServiceProvider extends ServiceProvider
     {
         RateLimiter::for('api', function (Request $request) {
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Endpoints caros que fazem proxy ao Claude (cada chamada gasta créditos):
+        // limite apertado por utilizador para travar esgotamento de custos/faturação.
+        RateLimiter::for('ai', function (Request $request) {
+            return Limit::perMinute(15)->by($request->user()?->id ?: $request->ip());
         });
     }
 }
